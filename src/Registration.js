@@ -1,8 +1,7 @@
 import React, {useState} from 'react';
 
 // firebase 
-import { database } from './firebase';
-import { storage } from './firebase';
+import { database, storage } from './firebase';
 import {ref,push,child,update} from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { ref as storageRef } from 'firebase/storage'; // avoid naming issues
@@ -28,6 +27,9 @@ const Registration = () => {
     const [email, setEmail] = useState();
     const [skills, setSkills] = useState();
 
+    // upload file
+    const [uploadResume, setUploadResume] = useState('Upload Resume');
+
     // dietary restrictions
     const [dietaryRestriction, setDietaryRestriction] = useState('none');
 
@@ -47,24 +49,16 @@ const Registration = () => {
 
     const changeResumeHandle = (event) => {
 		setSelectedResume(event.target.files[0]);
-        console.log(event.target.files[0].name);
+        setUploadResume(event.target.files[0].name);
 		setIsResumePicked(true);
 	};
 
-    const handleSubmit = () => {
+    async function handleSubmit () {
 
-        const storageReference = storageRef(storage, `/ideathon-resume/${selectedResume.name}`);
+        // upload resume and get download url
+        const storageReference = storageRef(storage, `/ideathon-resume/${selectYear}/${selectedResume.name}`);
         const uploadResume = uploadBytesResumable(storageReference, selectedResume);
-
-        // get download url
-        uploadResume.on(
-            "state_changed",
-            (err) => console.alert(err),
-            () => {
-                let url = getDownloadURL(uploadResume.snapshot.ref);
-                setDownloadURL(url);
-            }
-        )
+        const url = await getDownloadURL(uploadResume.snapshot.ref);
 
         let applicant = {
             firstName: firstName,
@@ -72,11 +66,15 @@ const Registration = () => {
             email: email,
             schoolYear: selectYear,
             uvaSchool: selectSchool,
-            resume: downloadURL,
+            resume: url,
             skills: skills,
+            dietaryRestriction: dietaryRestriction,
         };
 
-        console.log(applicant);
+        const newPostKey = push(child(ref(database), 'posts')).key;
+        const updates = {};
+        updates['/' + newPostKey] = applicant;
+        return update(ref(database), updates);
     }
 
 
@@ -104,22 +102,23 @@ const Registration = () => {
                     }}
                 >
 
-                    <Typography>Registration</Typography>
+                    <Typography>Ideathon Registration</Typography>
 
                     <Box
                         sx={{
                             width: "100%",
                             display: "flex",
-                            flexFlow: "column nowrap",
-                            gap: "4px"
+                            flexFlow: "row nowrap",
+                            justifyContent: "center",
+                            gap: "8px"
                         }}
                     >
-                        <InputLabel id="first-name">
-                            First Name
-                        </InputLabel>
                         <TextField
+                            fullWidth="true"
+                            required
                             id="first-name"
                             name="first-name"
+                            label="First Name"
                             variant="outlined"
                             value={firstName}
                             type="text"
@@ -127,22 +126,13 @@ const Registration = () => {
                             autoComplete="first-name"
                             onChange={(e) => setFirstName(e.target.value)}
                         />
-                    </Box>
-                    <Box
-                        sx={{
-                            width: "100%",
-                            display: "flex",
-                            flexFlow: "column nowrap",
-                            gap: "8px"
-                        }}
-                    >
-                        <InputLabel id="last-name">
-                            Last Name 
-                        </InputLabel>
                         <TextField
+                            fullWidth="true"
+                            required
                             id="last-name"
                             name="last-name"
                             variant="outlined"
+                            label="Last Name"
                             size="small"
                             type={lastName}
                             autoComplete="last-name"
@@ -157,11 +147,10 @@ const Registration = () => {
                             gap: "8px"
                         }}
                     >
-                        <InputLabel id="Email" htmlFor="Email">
-                            Email *
-                        </InputLabel>
                         <TextField
+                            required
                             id="Email"
+                            label="Email Address"
                             name="Email"
                             variant="outlined"
                             size="small"
@@ -178,7 +167,6 @@ const Registration = () => {
                             gap: "8px"
                         }}
                     >
-                        <InputLabel id="school-year-select">School Year</InputLabel>
                         <Select
                             labelId="school-year-select"
                             label="Year"
@@ -228,7 +216,19 @@ const Registration = () => {
                             gap: "8px"
                         }}
                     >
-                        <Input type="file" name="resume" onChange={changeResumeHandle} />
+                        {/* <Input type="file" name="resume" onChange={changeResumeHandle} /> */}
+                        <Button
+                        variant="contained"
+                        component="label"
+                        >
+                            {uploadResume}
+                            <input
+                                type="file"
+                                hidden="true"
+                                accept="application/msword, application/pdf"
+                                onChange={(e) => changeResumeHandle(e)}
+                            />
+                        </Button>
                     </Box>
                     <Box
                         sx={{
