@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { isValidElement, useState } from 'react';
 
 // firebase 
+import firebase from "firebase/compat/app";
+import "firebase/compat/firestore";
 import { database, storage } from './firebase';
 import { ref, push, child, update } from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { ref as storageRef } from 'firebase/storage'; // avoid naming issues
+
+// react pop up
+import { Popup } from 'reactjs-popup';
+import 'reactjs-popup/dist/index.css';
 
 // import mui styling
 import {
@@ -21,46 +27,74 @@ import {
     FormControlLabel,
     FormGroup,
     FormControl,
-    Grid
+    Grid,
+    Link,
+    RadioGroup,
+    Radio,
+    FormHelperText
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
-import CustomCheckbox from './components/CustomCheckbox';
-
 // import logo
 import Logo from "./images/logo.png";
-import IdeathonHeader from "./images/ideathonheader.png";
+import { maxWidth } from '@mui/system';
+
+// email format 
+const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 const Registration = () => {
 
     // theme
     const theme = createTheme({
         palette: {
-          secondary: {
-            main: '#f82249'
-          },
-          primary: {
-            main: '#ff9daf'
-          }
-
+            secondary: {
+                main: '#f82249'
+            },
+            primary: {
+                main: '#ff9daf'
+            },
+            warning: {
+                main: '#f82249'
+            },
+            error: {
+                main: '#f82249'
+            },
+            info: {
+                main: '#f82249'
+            }
         }
-      });
+    });
 
     // text-fields
-    const [firstName, setFirstName] = useState();
-    const [lastName, setLastName] = useState();
-    const [email, setEmail] = useState();
-    const [skills, setSkills] = useState();
-    const [major, setMajor] = useState();
-    const [learn, setLearn] = useState();
+    const [firstName, setFirstName] = useState('');
+    const [firstNameCheck, setFirstNameCheck] = useState(false);
+    const [lastName, setLastName] = useState('');
+    const [lastNameCheck, setLastNameCheck] = useState(false);
+    const [email, setEmail] = useState('');
+    const [emailCheck, setEmailCheck] = useState(false);
+    const [skills, setSkills] = useState('');
+    const [skillsCheck, setSkillsCheck] = useState(false);
+    const [major, setMajor] = useState('');
+    const [majorCheck, setMajorCheck] = useState(false);
+    const [learn, setLearn] = useState('');
+    const [learnCheck, setLearnCheck] = useState(false);
+
+    // gender
+    const [gender, setGender] = useState(null);
+    const [genderCheck, setGenderCheck] = useState(false);
+
+    // email check
+    const [isValidEmail, setIsValidEmail] = useState(true);
 
     // dietary restrictions
-    const [dietaryRestriction, setDietaryRestriction] = useState(['none']);
-    const [otherDietaryRestriction, setOtherDietaryRestriction] = useState();
+    const [dietaryRestriction, setDietaryRestriction] = useState([]);
+    const [otherDietaryRestriction, setOtherDietaryRestriction] = useState('');
+    const [otherDietaryRestrictionCheck, setOtherDietaryRestrictionCheck] = useState(false);
 
     // year
     const [selectYear, setSelectYear] = useState(2023);
-    const [otherSelectYear, setOtherSelectYear] = useState(0);
+    const [otherSelectYear, setOtherSelectYear] = useState('');
+    const [otherSelectYearCheck, setOtherSelectYearCheck] = useState('');
 
     // school
     const [selectSchool, setSelectedSchool] = useState('college');
@@ -70,6 +104,9 @@ const Registration = () => {
     const [uploadResume, setUploadResume] = useState();
     const [isResumePicked, setIsResumePicked] = useState(false);
     const [progress, setProgress] = useState(0);
+
+    // successful registration upload
+    const [successRegistration, setSuccessRegistration] = useState(false);
 
     const changeResumeHandle = (event) => {
         const storageReference = storageRef(storage, `/ideathon-resume/${selectYear}/${event.target.files[0].name}`);
@@ -88,67 +125,137 @@ const Registration = () => {
     // add multiple dietary restrictions
     const selectRestrictions = (event) => {
 
-        var restList = [];
 
-        if (restList.includes(event.target.value)) {
-            var restList2 = restList.filter(function (value, index, arr) {
-                return value !== event.target.value;
-            });
-            restList = restList2;
+        if (dietaryRestriction.includes(event.target.value)) {
+            setDietaryRestriction(current => current.filter(diet => diet !== event.target.value))
         }
         else {
-            restList.push(event.target.value)
+            setDietaryRestriction(current => [...current, event.target.value]);
         }
-        setDietaryRestriction(restList);
+
     };
 
     async function handleSubmit() {
 
 
+        // update dietary restrictions with other value
+        var dietRestriction = dietaryRestriction;
+        if (otherDietaryRestriction !== '') {
+            dietRestriction.push(otherDietaryRestriction);
+        }
+
+
         // checks if resume has been uploaded yet or not
         if (progress === 100 && isResumePicked) {
+
+
             // download url
             const url = await getDownloadURL(uploadResume.snapshot.ref);
-
-            // update dietary restrictions with other value
-            dietaryRestriction.push(otherDietaryRestriction);
-
-            // update school year if other
-            // if (otherSelectYear !== 0) {
-            //     setSelectYear(otherSelectYear);
-            // }
 
             let applicant = {
                 firstName: firstName,
                 lastName: lastName,
                 email: email,
-                schoolYear: selectYear,
+                schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
                 uvaSchool: selectSchool,
                 resume: url,
                 skills: skills,
+                gender: gender,
                 learn: learn,
                 major: major,
-                dietaryRestriction: dietaryRestriction,
+                registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
+                dietaryRestriction: dietRestriction.length === 0 ? "none" : dietRestriction,
             };
 
             const newPostKey = push(child(ref(database), 'posts')).key;
             const updates = {};
             updates['/' + newPostKey] = applicant;
-            return update(ref(database), updates);
+            return update(ref(database), updates).then(() => setSuccessRegistration(true)).catch((error) => { console.warn(error) });
+        } else { // for when no resume is selected
+
+
+            let applicant = {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
+                uvaSchool: selectSchool,
+                resume: "none",
+                skills: skills,
+                gender: gender,
+                learn: learn,
+                major: major,
+                registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
+                dietaryRestriction: dietRestriction.length === 0 ? "none" : dietRestriction,
+            };
+
+            const newPostKey = push(child(ref(database), 'posts')).key;
+            const updates = {};
+            updates['/' + newPostKey] = applicant;
+            return update(ref(database), updates).then(() => setSuccessRegistration(true)).catch((error) => { console.warn(error) });
         }
     }
 
 
+    function Copyright() {
+        return (
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ marginTop: "10px" }}>
+                {'Copyright © '}
+                <Link color="inherit" href="https://ideathon.hoohacks.io">
+                    Hoohacks Ideathon
+                </Link>{' '}
+                {new Date().getFullYear()}
+            </Typography>
+        );
+    }
+
     return (
         <>
             <ThemeProvider theme={theme}>
+
+                <Popup
+                    open={successRegistration}
+                    modal
+                >
+                    <Box
+                        sx={{
+                            borderRadius: "5px",
+                            textAlign: "center",
+                            padding: "15px",
+                            display: "flex",
+                            flexFlow: "column",
+                            gap: "8px",
+                        }}
+                    >
+                        <Typography>Successfully signed up for Ideathon 22-23!</Typography>
+                        <Link href='https://ideathon.hoohacks.io'>
+                            <Button
+                                sx={{
+                                    backgroundColor: "#f82249",
+                                    color: "#fff",
+                                    boxShadow: 2,
+                                    "&:hover": {
+                                        transform: "scale3d(1.05, 1.05, 1)",
+                                        backgroundColor: "#fff",
+                                        color: "#f82249",
+                                        border: "1px solid",
+                                        borderColor: "#f82249",
+                                    }
+                                }}
+                                type="button"
+                            >
+                                View Schedule
+                            </Button>
+                        </Link>
+                    </Box>
+                </Popup>
                 <Grid
                     container
                     spacing={0}
                     direction="column"
                     alignItems="center"
                     justifyContent="center"
-                    style={{ minHeight: '100vh' }}
+                    style={{ minHeight: '100vh', minWidth: '100wh' }}
                 >
                     <Box
                         sx={{
@@ -165,29 +272,49 @@ const Registration = () => {
                                 boxShadow: 4,
                                 display: "flex",
                                 flexFlow: "column nowrap",
-                                width: "992px",
+                                margin: "24px",
+                                width: "582px",
                                 alignItems: "center",
                                 backgroundColor: "#fff",
-                                padding: "14px 18px",
+                                padding: "22px 22px",
                                 gap: "16px",
+                                border: "none",
+                                boxShadow: "none",
+                                [theme.breakpoints.down('md')]: {
+                                    margin: "0",
+                                }
                             }}
                         >
 
                             {/* IDEATHON LOGO */}
-                            <a href="https://ideathon.hoohacks.io ">
+                            <Link 
+                                href="https://ideathon.hoohacks.io"
+                                sx={{
+
+                                    maxWidth: "582px",
+                                    [theme.breakpoints.down('md')]: {
+                                        maxWidth: "402px",
+                                        
+                                    }
+                                }} 
+                            >
                                 <img
                                     src={Logo}
                                     style={{
                                         borderRadius: "5px",
-                                        width: "427px",
+                                        width: "582px",
+                                        objectFit: "cover",
+                                        [theme.breakpoints.down('md')]: {
+                                            width: "402px",
+                                        }
                                     }}
-                                    
+
                                 />
-                            </a>
+                            </Link>
 
 
-                            <Typography sx={{ textAlign: "center", }}>
-                                The third annual Ideathon is a networking, team-building, and pitching event designed to help students with technical experience and students with business experience build their technical business ideas.  Student teams can meet 1:1 with industry experts about their ideas and form long lasting relationships with them as they continue to grow their ideas. Corporate sponsors will be holding workshops to teach students about pitching their ideas, valuing their potential businesses, and building technical prototypes. There will be a two hour pitch event, where teams will pitch to a board of sponsors for funding. Teams will have the opportunity to win thousands of dollars in funding in order to bring their idea to fruition!
+                            <Typography >
+                                The fourth annual Ideathon is a networking, team-building, and pitching event designed to help students with technical experience and students with business experience build their technical business ideas.  Student teams can meet 1:1 with industry experts about their ideas and form long lasting relationships with them as they continue to grow their ideas. Corporate sponsors will be holding workshops to teach students about pitching their ideas, valuing their potential businesses, and building technical prototypes. There will be a two hour pitch event, where teams will pitch to a board of sponsors for funding. Teams will have the opportunity to win thousands of dollars in funding in order to bring their idea to fruition!
                             </Typography>
 
                             <Box
@@ -200,7 +327,7 @@ const Registration = () => {
                                 }}
                             >
                                 <TextField
-                                    fullWidth="true"
+                                    fullWidth={true}
                                     required
                                     id="first-name"
                                     name="first-name"
@@ -208,59 +335,87 @@ const Registration = () => {
                                     variant="outlined"
                                     value={firstName}
                                     type="text"
-                                    size="small"
+                                    size="large"
                                     autoComplete="first-name"
-                                    onChange={(e) => setFirstName(e.target.value)}
+                                    onChange={(e) => { setFirstName(e.target.value.replace(/[^a-z]/gi, '')); setFirstNameCheck(firstName !== '') }}
+                                    helperText={firstName === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your first name</Typography>}
                                 />
                                 <TextField
-                                    fullWidth="true"
+                                    fullWidth={true}
                                     required
                                     id="last-name"
                                     name="last-name"
                                     variant="outlined"
                                     label="Last Name"
-                                    size="small"
+                                    size="large"
                                     value={lastName}
                                     type="text"
                                     autoComplete="last-name"
-                                    onChange={(e) => setLastName(e.target.value)}
+                                    onChange={(e) => { setLastName(e.target.value.replace(/[^a-z]/gi, '')); setLastNameCheck(lastName !== '') }}
+                                    helperText={lastName === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your last name</Typography>}
                                 />
                             </Box>
+                            <TextField
+                                fullWidth={true}
+                                required
+                                id="Email"
+                                label="Email Address"
+                                name="Email"
+                                variant="outlined"
+                                size="large"
+                                value={email}
+                                type="email"
+                                autoComplete="email"
+                                onBlur={() => setIsValidEmail(mailformat.test(email))}
+                                error={!isValidEmail}
+                                onChange={(e) => { setEmail(e.target.value); setEmailCheck(email !== '') }}
+                                helperText={(email === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your email</Typography>) ||
+                                    (!isValidEmail && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Invalid Email Format</Typography>)
+                                }
+                            />
+                            <TextField
+                                fullWidth={true}
+                                required
+                                id="major"
+                                label="Major/Intended Major"
+                                name="major"
+                                variant="outlined"
+                                value={major}
+                                size="large"
+                                type="text"
+                                autoComplete="major"
+                                onChange={(e) => { setMajor(e.target.value); setMajorCheck(e.target.value !== '') }}
+                                helperText={major === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your major</Typography>}
+                            />
                             <Box
                                 sx={{
                                     width: "100%",
                                     display: "flex",
-                                    flexFlow: "row nowrap",
-                                    justifyContent: "center",
-                                    gap: "8px"
+                                    flexFlow: "column",
+                                    gap: "4px",
                                 }}
                             >
-                                <TextField
-                                    fullWidth="true"
-                                    required
-                                    id="Email"
-                                    label="Email Address"
-                                    name="Email"
-                                    variant="outlined"
-                                    size="small"
-                                    value={email}
-                                    type="email"
-                                    autoComplete="email"
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                                <TextField
-                                    fullWidth="true"
-                                    required
-                                    id="major"
-                                    label="What is your major/intended major?"
-                                    name="major"
-                                    variant="outlined"
-                                    value={major}
-                                    size="small"
-                                    type="text"
-                                    autoComplete="major"
-                                    onChange={(e) => setMajor(e.target.value)}
-                                />
+                                <FormGroup>
+                                    <InputLabel id="gender">Gender</InputLabel>
+                                    <RadioGroup
+                                        name="gender-select"
+                                        onChange={(e) => { setGender(e.target.value); setGenderCheck(e.target.value !== null) }}
+                                    >
+
+
+                                        <FormControlLabel hidden={true} control={<Radio />} label="Male" value="male" />
+                                        <FormControlLabel hidden={true} control={<Radio />} label="Female" value="female" />
+                                        <FormControlLabel hidden={true} control={<Radio />} label="Other" value="other" />
+                                        <FormControlLabel hidden={true} control={<Radio />} label="Prefer not to say" value="prefer-not-to-say" />
+
+                                    </RadioGroup>
+                                    
+                                    {gender == null ? (
+                                        <FormHelperText sx={{color: "red", fontSize: "11px",}}>Please select an option</FormHelperText>
+                                    ) : null}
+                                </FormGroup>
+
+
                             </Box>
                             <Box
                                 sx={{
@@ -274,32 +429,35 @@ const Registration = () => {
                                     <InputLabel>Expected Graduation Date</InputLabel>
                                     <Select
                                         labelId="school-year-select"
-                                        label="Expected Graduation Date"
+                                        label="Expected Graduation Year"
                                         value={selectYear}
+                                        size="large"
                                         onChange={(e) => setSelectYear(e.target.value)}
                                     >
                                         <MenuItem value={2023}>2023</MenuItem>
                                         <MenuItem value={2024}>2024</MenuItem>
                                         <MenuItem value={2025}>2025</MenuItem>
                                         <MenuItem value={2026}>2026</MenuItem>
-                                        {/* <MenuItem value={0} onClick={(e) => console.log(e.target.value)}>Other</MenuItem> */}
+                                        <MenuItem value={0}>Other</MenuItem>
 
                                     </Select>
-                                    {/* {selectYear === 0 ? (
-                                            <>
-                                                <TextField
-                                                    id="other-year"
-                                                    label="Different Graduation Date"
-                                                    name="other-year"
-                                                    variant="outlined"
-                                                    size="small"
-                                                    type="text"
-                                                    autoComplete="selectYear"
-                                                    sx={{marginTop: "8px"}}
-                                                    onChange={(e) => setOtherSelectYear(e.target.value)}
-                                                />
-                                            </>
-                                        ) : null} */}
+                                    {selectYear === 0 ? (
+                                        <>
+                                            <TextField
+                                                id="other-year"
+                                                label="Other Expected Graduation Year"
+                                                name="other-year"
+                                                variant="outlined"
+                                                size="large"
+                                                type="text"
+                                                autoComplete="selectYear"
+                                                value={otherSelectYear}
+                                                sx={{ marginTop: "8px" }}
+                                                onChange={(e) => { setOtherSelectYear(e.target.value.replace(/\D/g, '')); setOtherSelectYearCheck(e.target.value !== '') }}
+                                                helperText={otherSelectYear === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your expected graduation year</Typography>}
+                                            />
+                                        </>
+                                    ) : null}
                                 </FormControl>
                             </Box>
                             <Box
@@ -316,6 +474,7 @@ const Registration = () => {
                                         labelId="school-select"
                                         label="University of Virginia School"
                                         value={selectSchool}
+                                        size="large"
                                         onChange={(e) => setSelectedSchool(e.target.value)}
                                     >
                                         <MenuItem value={"college"}>College of Arts and Science</MenuItem>
@@ -340,7 +499,6 @@ const Registration = () => {
                                     gap: "4px"
                                 }}
                             >
-                                {/* <Input type="file" name="resume" onChange={changeResumeHandle} /> */}
                                 <Button
                                     variant="contained"
                                     component="label"
@@ -350,13 +508,16 @@ const Registration = () => {
                                         "&:hover": {
                                             backgroundColor: "#fff",
                                             color: "#f82249",
+                                            border: "1px solid",
+                                            borderColor: "#f82249",
                                         }
                                     }}
                                 >
-                                    {progress < 100 ? "Upload Resume" : resumeName}
+                                    {progress < 100 ? "Optional - Upload Resume" : resumeName}
                                     <input
                                         type="file"
-                                        hidden="true"
+                                        size="large"
+                                        hidden={true}
                                         accept="application/msword, application/pdf"
                                         onChange={(e) => changeResumeHandle(e)}
                                     />
@@ -381,10 +542,13 @@ const Registration = () => {
                                     id="skills"
                                     name="skills"
                                     variant="outlined"
-                                    size="small"
+                                    size="large"
+                                    multiline
+                                    maxRows={Infinity}
                                     value={skills}
                                     autoComplete="skills"
-                                    onChange={(e) => setSkills(e.target.value)}
+                                    onChange={(e) => { setSkills(e.target.value); setSkillsCheck(e.target.value !== '') }}
+                                    helperText={skills === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your skills or N/A</Typography>}
                                 />
                             </Box>
                             <Box
@@ -404,10 +568,13 @@ const Registration = () => {
                                     id="learn"
                                     name="learn"
                                     variant="outlined"
-                                    size="small"
+                                    size="large"
+                                    multiline
+                                    maxRows={Infinity}
                                     value={learn}
                                     autoComplete="learn"
-                                    onChange={(e) => setLearn(e.target.value)}
+                                    onChange={(e) => { setLearn(e.target.value); setLearnCheck(e.target.value !== '') }}
+                                    helperText={learn === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter something you would like to learn or N/A</Typography>}
                                 />
                             </Box>
                             <Box
@@ -422,10 +589,10 @@ const Registration = () => {
                                 >
                                     <InputLabel id="dietary-restriction">Dietary Restrictions</InputLabel>
 
-                                    <FormControlLabel control={<CustomCheckbox onChange={selectRestrictions} />} label="Vegetarian" value="vegetarian" />
-                                    <FormControlLabel control={<Checkbox onChange={selectRestrictions} />} label="Gluten Free" value="gluten-free" />
-                                    <FormControlLabel control={<Checkbox onChange={selectRestrictions} />} label="Vegan" value="vegan" />
-                                    <FormControlLabel control={<Checkbox onChange={selectRestrictions} />} label="Other" value="other" />
+                                    <FormControlLabel hidden={true} control={<Checkbox onChange={selectRestrictions} />} label="Vegetarian" value="vegetarian" />
+                                    <FormControlLabel hidden={true} control={<Checkbox onChange={selectRestrictions} />} label="Gluten Free" value="gluten-free" />
+                                    <FormControlLabel hidden={true} control={<Checkbox onChange={selectRestrictions} />} label="Vegan" value="vegan" />
+                                    <FormControlLabel hidden={true} control={<Checkbox onChange={selectRestrictions} />} label="Other" value="other" />
                                     {dietaryRestriction.includes("other") ? (
                                         <>
                                             <InputLabel id="dietary-specify-other">Specify Other Dietary Restriction</InputLabel>
@@ -433,35 +600,107 @@ const Registration = () => {
                                                 id="dietary-specify-other"
                                                 name="dietary-specify-other"
                                                 variant="outlined"
-                                                size="small"
+                                                size="large"
                                                 type="text"
                                                 value={otherDietaryRestriction}
                                                 autoComplete="dietary-specify-other"
-                                                onChange={(e) => setOtherDietaryRestriction(e.target.value)}
+                                                onChange={(e) => { setOtherDietaryRestriction(e.target.value); setOtherDietaryRestrictionCheck(e.target.value !== '') }}
+                                                helperText={!otherDietaryRestrictionCheck && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter Your Dietary Restriction</Typography>}
                                             />
                                         </>
                                     ) : null}
 
                                 </FormGroup>
                             </Box>
-                            <Button
+                            <Box
                                 sx={{
-                                    backgroundColor: "#f82249",
-                                    color: "#fff",
-                                    boxShadow: 2,
-                                    "&:hover": {
-                                        transform: "scale3d(1.05, 1.05, 1)",
-                                        backgroundColor: "#fff",
-                                        color: "#f82249",
-                                    }
+                                    display: "flex",
+                                    flexFlow: "row nowrap",
+                                    gap: "16px",
                                 }}
-                                type="submit"
-                                onClick={() => handleSubmit()}
                             >
-                                Submit Registration
-                            </Button>
+                                {firstNameCheck && lastNameCheck && isValidEmail &&
+                                    emailCheck && majorCheck && skillsCheck && genderCheck &&
+                                    learnCheck && (selectYear === 0 ? otherSelectYearCheck : true) &&
+                                    (dietaryRestriction.includes("other") ? otherDietaryRestrictionCheck : true) ? (
+                                    <Button
+                                        sx={{
+                                            backgroundColor: "#f82249",
+                                            color: "#fff",
+                                            boxShadow: 2,
+                                            "&:hover": {
+                                                transform: "scale3d(1.05, 1.05, 1)",
+                                                backgroundColor: "#fff",
+                                                color: "#f82249",
+                                                border: "1px solid",
+                                                borderColor: "#f82249",
+                                            }
+                                        }}
+                                        type="submit"
+                                        onClick={() => handleSubmit()}
+                                    >
+                                        Submit Registration
+                                    </Button>
+                                ) : (
+                                    <Popup
+                                        trigger={
+                                            <Button
+                                                sx={{
+                                                    backgroundColor: "#f82249",
+                                                    color: "#fff",
+                                                    boxShadow: 2,
+                                                    "&:hover": {
+                                                        transform: "scale3d(1.05, 1.05, 1)",
+                                                        backgroundColor: "#fff",
+                                                        color: "#f82249",
+                                                        border: "1px solid",
+                                                        borderColor: "#f82249",
+                                                    }
+                                                }}
+                                                type="submit"
+                                            >
+                                                Submit Registration
+                                            </Button>
+                                        }
+                                        on="hover"
+                                        position="top center"
+                                    >
+                                        <Box
+                                            sx={{
+                                                padding: "5px",
+                                                textAlign: "center",
+                                                display: "flex",
+                                                flexFlow: "column nowrap",
+                                            }}
+                                        >
+                                            <Typography>Please fill out the remaining fields.</Typography>
+                                        </Box>
+                                    </Popup>
+                                )}
+
+                                <Link href="https://ideathon.hoohacks.io">
+                                    <Button
+                                        sx={{
+                                            backgroundColor: "#fff",
+                                            color: "#f82249",
+                                            border: "1px solid",
+                                            borderColor: "#f82249",
+                                            boxShadow: 2,
+                                            "&:hover": {
+                                                transform: "scale3d(1.05, 1.05, 1)",
+                                                backgroundColor: "#f82249",
+                                                color: "#fff",
+                                            }
+                                        }}
+                                        type="button"
+                                    >
+                                        Cancel
+                                    </Button>
+                                </Link>
+                            </Box>
                         </Card>
                     </Box>
+                    <Copyright />
                 </Grid>
             </ThemeProvider>
         </>
