@@ -1,7 +1,7 @@
 self.__precacheManifest = [
   {
-    "revision": "c828547fdb5f6c917fcc",
-    "url": "/ideathon-registration/static/js/main.0b651c38.chunk.js"
+    "revision": "c01777f359466e13517a",
+    "url": "/ideathon-registration/static/js/main.f7f08115.chunk.js"
   },
   {
     "revision": "4a53fa750533176a68ea",
@@ -24,7 +24,7 @@ self.__precacheManifest = [
     "url": "/ideathon-registration/static/media/logo.8887ae4c.png"
   },
   {
-    "revision": "6c7d9b840c17e38d0e0505623233a38b",
+    "revision": "edd7b0ad15f1bd37d126ba186a335d1c",
     "url": "/ideathon-registration/index.html"
   }
 ];
