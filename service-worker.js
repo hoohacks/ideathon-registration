@@ -14,7 +14,7 @@
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
 
 importScripts(
-  "/ideathon-registration/precache-manifest.ecc335fb5187581de6f25b7316d0f15f.js"
+  "/ideathon-registration/precache-manifest.a0ed238275ef58e75df50834df65a64b.js"
 );
 
 workbox.clientsClaim();
