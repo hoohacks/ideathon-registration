@@ -227,7 +227,7 @@ const Registration = () => {
                             gap: "8px",
                         }}
                     >
-                        <Typography>Successfully signed up for Ideathon 22-23!</Typography>
+                        <Typography>Successfully signed up for Ideathon 23-24!</Typography>
                         <Link href='https://ideathon.hoohacks.io'>
                             <Button
                                 sx={{
