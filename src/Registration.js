@@ -314,7 +314,7 @@ const Registration = () => {
 
 
                             <Typography >
-                                The fifth annual Ideathon, <span style={{fontWeight: 'bold'}}>Saturday October 8, 2022 10 AM - 5 PM</span>, is a networking, team-building, and pitching event designed to help students with 
+                                The fifth annual Ideathon, <span style={{fontWeight: 'bold'}}>Saturday October 14, 2024</span>, is a networking, team-building, and pitching event designed to help students with 
                                 technical experience and students with business experience build their technical business ideas.  Student teams 
                                 can meet 1:1 with industry experts about their ideas and form long lasting relationships with them as they 
                                 continue to grow their ideas. Corporate sponsors will be holding workshops to teach students about pitching 
