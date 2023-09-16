@@ -36,8 +36,7 @@ import {
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // import logo
-import Logo from "./images/logo.png";
-import { maxWidth } from '@mui/system';
+import Logo from "../images/logo.png";
 
 // email format 
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
@@ -314,7 +313,7 @@ const Registration = () => {
 
 
                             <Typography >
-                                The fourth annual Ideathon, <span style={{fontWeight: 'bold'}}>Saturday October 8, 2022 10 AM - 5 PM</span>, is a networking, team-building, and pitching event designed to help students with 
+                                The fifth annual Ideathon, <span style={{fontWeight: 'bold'}}>Saturday October 8, 2022 10 AM - 5 PM</span>, is a networking, team-building, and pitching event designed to help students with 
                                 technical experience and students with business experience build their technical business ideas.  Student teams 
                                 can meet 1:1 with industry experts about their ideas and form long lasting relationships with them as they 
                                 continue to grow their ideas. Corporate sponsors will be holding workshops to teach students about pitching 
@@ -440,10 +439,10 @@ const Registration = () => {
                                         size="large"
                                         onChange={(e) => setSelectYear(e.target.value)}
                                     >
-                                        <MenuItem value={2023}>2023</MenuItem>
                                         <MenuItem value={2024}>2024</MenuItem>
                                         <MenuItem value={2025}>2025</MenuItem>
                                         <MenuItem value={2026}>2026</MenuItem>
+                                        <MenuItem value={2027}>2027</MenuItem>
                                         <MenuItem value={0}>Other</MenuItem>
 
                                     </Select>
