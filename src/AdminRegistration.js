@@ -335,7 +335,7 @@ const AdminRegistration = () => {
                                     type="password"
                                     size="large"
                                     autoComplete="password"
-                                    onChange={(e) => { setPassword(e.target.value.replace(/[^a-z]/gi, '')); setPasswordCheck(password === confirmPassword) }}
+                                    onChange={(e) => { setPasswordCheck(password === confirmPassword); }}
                                     helperText={password === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Create a password</Typography>}
                                 />
                                 <TextField
@@ -349,7 +349,7 @@ const AdminRegistration = () => {
                                     value={confirmPassword}
                                     type="password"
                                     autoComplete="confirm-password"
-                                    onChange={(e) => { setConfirmPassword(e.target.value.replace(/[^a-z]/gi, '')); setPasswordCheck(password === confirmPassword) }}
+                                    onChange={(e) => { setPasswordCheck(password === confirmPassword); }}
                                     helperText={confirmPassword === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Confirm your password</Typography>}
                                 />
                             </Box>
