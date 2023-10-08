@@ -372,9 +372,8 @@ const Registration = () => {
                                 value={email}
                                 type="email"
                                 autoComplete="email"
-                                onBlur={() => setIsValidEmail(mailformat.test(email))}
                                 error={!isValidEmail}
-                                onChange={(e) => { setEmail(e.target.value); setEmailCheck(email !== '') }}
+                                onChange={(e) => { setEmail(e.target.value); setEmailCheck(email !== ''); setIsValidEmail(mailformat.test(email)) }}
                                 helperText={(email === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your email</Typography>) ||
                                     (!isValidEmail && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Invalid Email Format</Typography>)
                                 }
@@ -704,6 +703,21 @@ const Registration = () => {
                                         Cancel
                                     </Button>
                                 </Link>
+                            </Box>
+                            <Box
+                                sx={{
+                                    width: "100%",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    marginLeft: "auto",
+                                    marginRight: "auto",
+                                    textAlign: "center",
+                                    display: "flex",
+                                }}
+                            >
+                                <Typography >
+                                    If you are having trouble registering for our event, please email <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> with your information.
+                                </Typography>
                             </Box>
                         </Card>
                     </Box>
