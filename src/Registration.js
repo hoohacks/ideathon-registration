@@ -1,12 +1,11 @@
-import React, { isValidElement, useState } from 'react';
+import React, { useState } from 'react';
 
 // firebase 
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
+import { child, push, ref, update } from "firebase/database";
+import { getDownloadURL, ref as storageRef, uploadBytesResumable } from 'firebase/storage';
 import { database, storage } from './firebase';
-import { ref, push, child, update } from "firebase/database";
-import { uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { ref as storageRef } from 'firebase/storage'; // avoid naming issues
 
 // react pop up
 import { Popup } from 'reactjs-popup';
@@ -15,29 +14,28 @@ import 'reactjs-popup/dist/index.css';
 // import mui styling
 import {
     Box,
-    Card,
-    Typography,
-    InputLabel,
-    TextField,
-    Select,
-    MenuItem,
-    LinearProgress,
     Button,
+    Card,
     Checkbox,
+    FormControl,
     FormControlLabel,
     FormGroup,
-    FormControl,
+    FormHelperText,
     Grid,
+    InputLabel,
+    LinearProgress,
     Link,
-    RadioGroup,
+    MenuItem,
     Radio,
-    FormHelperText
+    RadioGroup,
+    Select,
+    TextField,
+    Typography
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // import logo
 import Logo from "./images/logo.png";
-import { maxWidth } from '@mui/system';
 
 // email format 
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
