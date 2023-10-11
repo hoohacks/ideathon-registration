@@ -181,7 +181,7 @@ const AdminRegistration = () => {
 
         const newPostKey = push(child(ref(database), 'posts')).key;
         const updates = {};
-        updates['/' + newPostKey] = applicant;
+        updates['/admin/accounts/' + newPostKey] = applicant;
         return update(ref(database), updates).then(() => setSuccessRegistration(true)).catch((error) => {
             console.warn(error)
         });
