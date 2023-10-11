@@ -123,11 +123,6 @@ function RegisteredAtDisplay() {
             <Line data={totalParticipantsData} />
         </div>
 
-        <div>
-            {RegisteredAt.map((date, index) => (
-                <div key={index}>{convertDateToInt(date)}</div>
-            ))}
-        </div>
     </>
     );
 }
