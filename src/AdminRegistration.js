@@ -1,4 +1,4 @@
-import React, { isValidElement, useState } from 'react';
+import React, { useState } from 'react';
 
 // firebase
 import firebase from "firebase/compat/app";
@@ -17,27 +17,15 @@ import {
     Box,
     Card,
     Typography,
-    InputLabel,
     TextField,
-    Select,
-    MenuItem,
-    LinearProgress,
     Button,
-    Checkbox,
-    FormControlLabel,
-    FormGroup,
-    FormControl,
     Grid,
     Link,
-    RadioGroup,
-    Radio,
-    FormHelperText
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 // import logo
 import Logo from "./images/logo.png";
-import { maxWidth } from '@mui/system';
 
 // email format
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
@@ -45,27 +33,43 @@ const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 const AdminRegistration = () => {
 
     const popupMessages = () => {
-        if (firstNameCheck && lastNameCheck && isValidEmail && emailCheck && passwordCheck) {
-            return <Button
-                sx={{
-                    backgroundColor: "#f82249",
-                    color: "#fff",
-                    boxShadow: 2,
-                    "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#fff",
-                        color: "#f82249",
-                        border: "1px solid",
-                        borderColor: "#f82249",
-                    }
-                }}
-                type="submit"
-                onClick={() => handleSubmit()}
+        if (!firstNameCheck || !lastNameCheck || !isValidEmail || !emailCheck || !passwordCheck || !confirmPasswordCheck || !secretKeyCheck) {
+            return <Popup
+                trigger={
+                    <Button
+                        sx={{
+                            backgroundColor: "#f82249",
+                            color: "#fff",
+                            boxShadow: 2,
+                            "&:hover": {
+                                transform: "scale3d(1.05, 1.05, 1)",
+                                backgroundColor: "#fff",
+                                color: "#f82249",
+                                border: "1px solid",
+                                borderColor: "#f82249",
+                            }
+                        }}
+                        type="submit"
+                    >
+                        Create Account
+                    </Button>
+                }
+                on="hover"
+                position="top center"
             >
-                Create Account
-            </Button>
+                <Box
+                    sx={{
+                        padding: "5px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexFlow: "column nowrap",
+                    }}
+                >
+                    <Typography>Please fill out the remaining fields.</Typography>
+                </Box>
+            </Popup>
         }
-        else if (!passwordCheck) {
+        else if (!passwordEquality) {
             return <Popup
                 trigger={
                     <Button
@@ -102,41 +106,26 @@ const AdminRegistration = () => {
             </Popup>
         }
         else {
-            return <Popup
-                trigger={
-                    <Button
-                        sx={{
-                            backgroundColor: "#f82249",
-                            color: "#fff",
-                            boxShadow: 2,
-                            "&:hover": {
-                                transform: "scale3d(1.05, 1.05, 1)",
-                                backgroundColor: "#fff",
-                                color: "#f82249",
-                                border: "1px solid",
-                                borderColor: "#f82249",
-                            }
-                        }}
-                        type="submit"
-                    >
-                        Create Account
-                    </Button>
-                }
-                on="hover"
-                position="top center"
+            return <Button
+                sx={{
+                    backgroundColor: "#f82249",
+                    color: "#fff",
+                    boxShadow: 2,
+                    "&:hover": {
+                        transform: "scale3d(1.05, 1.05, 1)",
+                        backgroundColor: "#fff",
+                        color: "#f82249",
+                        border: "1px solid",
+                        borderColor: "#f82249",
+                    }
+                }}
+                type="submit"
+                onClick={() => handleSubmit()}
             >
-                <Box
-                    sx={{
-                        padding: "5px",
-                        textAlign: "center",
-                        display: "flex",
-                        flexFlow: "column nowrap",
-                    }}
-                >
-                    <Typography>Please fill out the remaining fields.</Typography>
-                </Box>
-            </Popup>
+                Create Account
+            </Button>
         }
+
     }
     // theme
     const theme = createTheme({
@@ -165,10 +154,14 @@ const AdminRegistration = () => {
     const [lastName, setLastName] = useState('');
     const [lastNameCheck, setLastNameCheck] = useState(false);
     const [password, setPassword] = useState('');
-    const [passwordCheck, setPasswordCheck] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordCheck, setPasswordCheck] = useState(false);
+    const [confirmPasswordCheck, setConfirmPasswordCheck] = useState(false);
+    const [passwordEquality, setPasswordEquality] = useState(false);
     const [email, setEmail] = useState('');
     const [emailCheck, setEmailCheck] = useState(false);
+    const [secretKey, setSecretKey] = useState('');
+    const [secretKeyCheck, setSecretKeyCheck] = useState(false);
 
     // email check
     const [isValidEmail, setIsValidEmail] = useState(true);
@@ -193,9 +186,6 @@ const AdminRegistration = () => {
             console.warn(error)
         });
     }
-
-
-
 
     function Copyright() {
         return (
@@ -275,8 +265,6 @@ const AdminRegistration = () => {
                                 />
                             </Link>
 
-
-
                             <Box
                                 sx={{
                                     width: "100%",
@@ -335,7 +323,7 @@ const AdminRegistration = () => {
                                     type="password"
                                     size="large"
                                     autoComplete="password"
-                                    onChange={(e) => { setPasswordCheck(password === confirmPassword); }}
+                                    onChange={(e) => { setPassword(e.target.value); setPasswordCheck(password !== ''); setPasswordEquality(password !== confirmPassword); }}
                                     helperText={password === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Create a password</Typography>}
                                 />
                                 <TextField
@@ -349,28 +337,52 @@ const AdminRegistration = () => {
                                     value={confirmPassword}
                                     type="password"
                                     autoComplete="confirm-password"
-                                    onChange={(e) => { setPasswordCheck(password === confirmPassword); }}
+                                    onChange={(e) => { setConfirmPassword(e.target.value); setConfirmPasswordCheck(confirmPassword !== ''); setPasswordEquality(password !== confirmPassword); }}
                                     helperText={confirmPassword === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Confirm your password</Typography>}
                                 />
                             </Box>
-                            <TextField
-                                fullWidth={true}
-                                required
-                                id="Email"
-                                label="Email Address"
-                                name="Email"
-                                variant="outlined"
-                                size="large"
-                                value={email}
-                                type="email"
-                                autoComplete="email"
-                                onBlur={() => setIsValidEmail(mailformat.test(email))}
-                                error={!isValidEmail}
-                                onChange={(e) => { setEmail(e.target.value); setEmailCheck(email !== '') }}
-                                helperText={(email === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your email</Typography>) ||
-                                    (!isValidEmail && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Invalid Email Format</Typography>)
-                                }
-                            />
+                            <Box
+                                sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    flexFlow: "row nowrap",
+                                    justifyContent: "center",
+                                    gap: "8px"
+                                }}
+                            >
+                                <TextField
+                                    fullWidth={true}
+                                    required
+                                    id="Email"
+                                    label="Email Address"
+                                    name="Email"
+                                    variant="outlined"
+                                    size="large"
+                                    value={email}
+                                    type="email"
+                                    autoComplete="email"
+                                    onBlur={() => setIsValidEmail(mailformat.test(email))}
+                                    error={!isValidEmail}
+                                    onChange={(e) => { setEmail(e.target.value); setEmailCheck(email !== '') }}
+                                    helperText={(email === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter your email</Typography>) ||
+                                        (!isValidEmail && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Invalid Email Format</Typography>)
+                                    }
+                                />
+                                <TextField
+                                    fullWidth={true}
+                                    required
+                                    id="secretkey"
+                                    label="Secret Key"
+                                    name="Secret"
+                                    variant="outlined"
+                                    size="large"
+                                    value={secretKey}
+                                    type="password"
+                                    autoComplete="secretkey"
+                                    onChange={(e) => { setSecretKey(e.target.value); setSecretKeyCheck(secretKey !== '') }}
+                                    helperText={(secretKey === '' && <Typography sx={{ color: "#f82249", fontSize: "11px" }}>Enter the secret key</Typography>)}
+                                />
+                            </Box>
                             <Box
                                 sx={{
                                     display: "flex",
