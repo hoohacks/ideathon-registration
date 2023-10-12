@@ -313,7 +313,7 @@ const Registration = () => {
                             </Link>
 
 
-                            <Typography >
+                            <Typography sx={{textAlign: "center"}}>
                                 The fifth annual Ideathon, <span style={{fontWeight: 'bold'}}>Saturday October 14, 2023</span>, is a networking, team-building, and pitching event designed to help students with 
                                 technical experience and students with business experience build their technical business ideas.  Student teams 
                                 can meet 1:1 with industry experts about their ideas and form long lasting relationships with them as they 
@@ -323,7 +323,7 @@ const Registration = () => {
                                 of dollars in funding in order to bring their idea to fruition! 
                             </Typography>
 
-                            <Box
+                            {/* <Box
                                 sx={{
                                     width: "100%",
                                     display: "flex",
@@ -703,7 +703,7 @@ const Registration = () => {
                                         Cancel
                                     </Button>
                                 </Link>
-                            </Box>
+                            </Box> */}
                             <Box
                                 sx={{
                                     width: "100%",
@@ -716,7 +716,7 @@ const Registration = () => {
                                 }}
                             >
                                 <Typography >
-                                    If you are having trouble registering for our event, please email <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> with your information.
+                                    Registration for Ideathon has ended! Please reach out to <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> for additional questions.
                                 </Typography>
                             </Box>
                         </Card>
