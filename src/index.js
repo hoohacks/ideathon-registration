@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import Registration from './Registration';
 import SignUp from './SignUp';
 import reportWebVitals from './reportWebVitals';
+import Search from './Search';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -10,6 +11,14 @@ root.render(
     <Registration route="/" />
     {/* <SignUp route="signup/" /> */}
   </React.StrictMode>
+  
+);
+
+root.render(
+  <React.StrictMode>
+    <Search route />
+  </React.StrictMode>
+  
 );
 
 // If you want to start measuring performance in your app, pass a function
