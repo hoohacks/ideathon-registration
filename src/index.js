@@ -1,23 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import Registration from './Registration';
-import SignUp from './SignUp';
 import reportWebVitals from './reportWebVitals';
-import Search from './Search';
+import {BrowserRouter} from 'react-router-dom';
+import App from "./App"
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <Registration route="/" />
-    {/* <SignUp route="signup/" /> */}
-  </React.StrictMode>
-  
-);
+
 
 root.render(
-  <React.StrictMode>
-    <Search route />
-  </React.StrictMode>
+  <BrowserRouter>
+  <App />
+</BrowserRouter>
   
 );
 
