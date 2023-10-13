@@ -142,7 +142,7 @@ function Search() {
                 >
                   <option value="">All Dietary Restrictions</option>
                   <option value="vegetarian">Vegetarian</option>
-                  <option value="gluten">Gluten-free</option>
+                  <option value="gluten-free">Gluten-free</option>
                   <option value="other">Other</option>
                 </select>
               </div>
