@@ -1,16 +1,16 @@
 {
-  "main.js": "/ideathon-registration/static/js/main.0377db5b.chunk.js",
-  "main.js.map": "/ideathon-registration/static/js/main.0377db5b.chunk.js.map",
-  "runtime~main.js": "/ideathon-registration/static/js/runtime~main.99c39014.js",
-  "runtime~main.js.map": "/ideathon-registration/static/js/runtime~main.99c39014.js.map",
-  "static/css/2.a885abb4.chunk.css": "/ideathon-registration/static/css/2.a885abb4.chunk.css",
-  "static/js/2.da1b66da.chunk.js": "/ideathon-registration/static/js/2.da1b66da.chunk.js",
-  "static/js/2.da1b66da.chunk.js.map": "/ideathon-registration/static/js/2.da1b66da.chunk.js.map",
-  "static/js/3.d6cbfaa7.chunk.js": "/ideathon-registration/static/js/3.d6cbfaa7.chunk.js",
-  "static/js/3.d6cbfaa7.chunk.js.map": "/ideathon-registration/static/js/3.d6cbfaa7.chunk.js.map",
-  "index.html": "/ideathon-registration/index.html",
-  "precache-manifest.81f466d599080d6bdb28da1fb88d562c.js": "/ideathon-registration/precache-manifest.81f466d599080d6bdb28da1fb88d562c.js",
-  "service-worker.js": "/ideathon-registration/service-worker.js",
-  "static/css/2.a885abb4.chunk.css.map": "/ideathon-registration/static/css/2.a885abb4.chunk.css.map",
-  "static/media/logo.png": "/ideathon-registration/static/media/logo.8887ae4c.png"
+  "files": {
+    "main.css": "/ideathon-registration/static/css/main.2517ad09.css",
+    "main.js": "/ideathon-registration/static/js/main.2806f025.js",
+    "static/js/787.c7ba16c6.chunk.js": "/ideathon-registration/static/js/787.c7ba16c6.chunk.js",
+    "static/media/logo.png": "/ideathon-registration/static/media/logo.3f64e9d9387cfcddb5c4.png",
+    "index.html": "/ideathon-registration/index.html",
+    "main.2517ad09.css.map": "/ideathon-registration/static/css/main.2517ad09.css.map",
+    "main.2806f025.js.map": "/ideathon-registration/static/js/main.2806f025.js.map",
+    "787.c7ba16c6.chunk.js.map": "/ideathon-registration/static/js/787.c7ba16c6.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.2517ad09.css",
+    "static/js/main.2806f025.js"
+  ]
 }
