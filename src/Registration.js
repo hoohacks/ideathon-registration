@@ -718,7 +718,7 @@ const Registration = () => {
                                 }}
                             >
                                 <Typography >
-                                    Registration for Ideathon has ended! Please reach out to <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> for additional questions.
+                                    Registration for Ideathon has ended!!!! Please reach out to <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> for additional questions.
                                 </Typography>
                             </Box>
                         </Card>
