@@ -92,7 +92,7 @@ const Registration = () => {
     useState(false);
 
   // year
-  const [selectYear, setSelectYear] = useState(0);
+  const [selectYear, setSelectYear] = useState(2024);
   const [otherSelectYear, setOtherSelectYear] = useState("");
   const [otherSelectYearCheck, setOtherSelectYearCheck] = useState("");
 
