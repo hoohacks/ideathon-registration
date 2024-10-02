@@ -321,7 +321,7 @@ const Registration = () => {
               <Typography sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
                 <span style={{ fontWeight: "bold" }}>
-                  Saturday October 19, 2024
+                  Sunday October 27, 2024
                 </span>
                 , is a networking, team-building, and pitching event designed to
                 help students with technical experience and students with
