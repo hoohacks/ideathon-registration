@@ -1,12 +1,15 @@
-import React, { isValidElement, useState } from "react";
+import React, { useState } from "react";
 
 // firebase
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
+import { child, push, ref, update } from "firebase/database";
+import {
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytesResumable,
+} from "firebase/storage";
 import { database, storage } from "./firebase";
-import { ref, push, child, update } from "firebase/database";
-import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { ref as storageRef } from "firebase/storage"; // avoid naming issues
 
 // react pop up
 import { Popup } from "reactjs-popup";
