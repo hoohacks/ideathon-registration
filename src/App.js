@@ -14,38 +14,46 @@ function useAuth() {
 
 function ProtectedRoute({ children }) {
   const { token, handleLogin } = useAuth();
+  const [authenticated, setAuthenticated] = React.useState(null);
 
-  if (!token && handleLogin && !handleLogin())
-    return <Navigate to="/" />;
-  else if (!token)
+
+  React.useEffect(() => {
+    async function checkAuth() {
+      if (!token && !(await handleLogin()))
+        setAuthenticated(false);
+      else if (token)
+        setAuthenticated(true);
+    }
+
+    checkAuth();
+  }, [token, handleLogin]);
+
+  if (authenticated === null)
     return null;
 
-  return children;
+  return authenticated ? children : <Navigate to="/" />;
 }
 
 function AuthProvider({ children }) {
   const [token, setToken] = React.useState(null);
-  const [handleLogin, setHandleLogin] = React.useState(null);
 
-  React.useEffect(() => {
-    const promptAuth = async () => {
-      const token = prompt("Access token?");
+  const promptAuth = async () => {
+    const token = prompt("Access token?");
 
-      try {
-        const jwtPublicKey = await importSPKI(jwtPublicKeyFile.publicKey, "RS256");
-        return await jwtVerify(token, jwtPublicKey);
-      } catch (e) {
-        console.error(e);
-        return null;
-      }
-    };
+    try {
+      const jwtPublicKey = await importSPKI(jwtPublicKeyFile.publicKey, "RS256");
+      return await jwtVerify(token, jwtPublicKey);
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
 
-    setHandleLogin(() => async () => {
-      const token = await promptAuth();
-      setToken(token);
-      return token !== null;
-    });
-  }, [setToken, setHandleLogin]);
+  const handleLogin = async () => {
+    const token = await promptAuth();
+    setToken(token);
+    return token !== null;
+  };
 
   return (
     <AuthContext.Provider value={{ token, handleLogin }}>
