@@ -1,23 +1,22 @@
 import { Navigate, Routes, Route } from "react-router-dom"
-import React from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 import Registration from "./Registration"
 import Search from "./Search"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { importSPKI, jwtVerify } from "jose"
 import jwtPublicKeyFile from "./jwt.pub.json"
 
-const AuthContext = React.createContext(null);
+const AuthContext = createContext(null);
 
 function useAuth() {
-  return React.useContext(AuthContext);
+  return useContext(AuthContext);
 }
 
 function ProtectedRoute({ children }) {
   const { token, handleLogin } = useAuth();
-  const [authenticated, setAuthenticated] = React.useState(null);
+  const [authenticated, setAuthenticated] = useState(null);
 
-
-  React.useEffect(() => {
+  useEffect(() => {
     async function checkAuth() {
       if (!token && !(await handleLogin()))
         setAuthenticated(false);
@@ -35,7 +34,7 @@ function ProtectedRoute({ children }) {
 }
 
 function AuthProvider({ children }) {
-  const [token, setToken] = React.useState(null);
+  const [token, setToken] = useState(null);
 
   const promptAuth = async () => {
     const token = prompt("Access token?");
