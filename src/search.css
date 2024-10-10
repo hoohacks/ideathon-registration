@@ -12,7 +12,16 @@ code {
     monospace;
 }
 
+.label {
+  color: #e63946;
+}
 
+.background {
+  background: #012a4a;
+}
 
+.gridBox{
+  background: #01497c;
+}
 
 
