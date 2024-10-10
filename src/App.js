@@ -3,8 +3,8 @@ import { createContext, useContext, useState, useEffect } from "react"
 import Registration from "./Registration"
 import Search from "./Search"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
-import { importSPKI, jwtVerify } from "jose"
-import jwtPublicKeyFile from "./jwt.pub.json"
+import { auth } from "./firebase";
+import { signInWithEmailAndPassword } from "firebase/auth"
 
 const AuthContext = createContext(null);
 
@@ -37,13 +37,14 @@ function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
 
   const promptAuth = async () => {
-    const token = prompt("Access token?");
+    const email = prompt("Email?");
+    const password = prompt("Password?");
 
     try {
-      const jwtPublicKey = await importSPKI(jwtPublicKeyFile.publicKey, "RS256");
-      return await jwtVerify(token, jwtPublicKey);
-    } catch (e) {
-      console.error(e);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      return userCredential.user.getIdToken();
+    } catch (error) {
+      console.error(error);
       return null;
     }
   };
