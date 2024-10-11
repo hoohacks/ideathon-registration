@@ -7,7 +7,7 @@ function App() {
   return (
     <div className="App">
       <Routes>
-        <Route path="/" element={ <Search/> } />
+        <Route path="/" element={ <Registration/> } />
         <Route path="/ideathon-registration" element={ <Registration/> } />
         <Route path="/search" element={ <Search/> } />
         <Route path="/RegisteredAtDisplay" element={ <RegisteredAtDisplay/> } />
