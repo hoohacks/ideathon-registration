@@ -1,13 +1,17 @@
 import { onValue, ref, get, set } from 'firebase/database';
-import React, { useEffect, useState } from 'react';
 import { database } from './firebase';
+
+import React, { useEffect, useState } from 'react';
+
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Typography } from '@mui/material';
-import "./search.css";
+import { styled } from '@mui/material/styles';
+
 import ProgressBar from 'react-bootstrap/ProgressBar'
 import Button from 'react-bootstrap/Button'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Form from 'react-bootstrap/Form';
+
+import "./search.css";
 
 const theme = createTheme({
   palette: {
@@ -186,13 +190,19 @@ function Search() {
                 const fullName = personData[0].fullName.toString();
                 
                 const isCheckedIn = personData[0].checkedIn;
+
+                const HoverDiv = styled('div')({
+                  transition: "transform 0.10s ease-in-out",
+                  "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
+                })
         
                 if (!selectedDietaryRestriction || (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction))) {
                   return (
+                    <HoverDiv>
                     <div className='gridBox' key={index} style={{  borderRadius: '15px', border: "10px solid #ccc", borderColor:'#013a63', padding: "20px",transition: "background 0.1s", }}
                     
-                    onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
-                    onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
+                    //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
+                    //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
         
                     
                     >
@@ -209,15 +219,16 @@ function Search() {
                             </a>
                             </p>
                           ) : null}
-                          <Button
-                            onClick={() => handleCheckIn(key)}
-                            style={{ borderRadius:"12px", backgroundColor: isCheckedIn ? "#34a0a4" : "#2a6f97", color: "white" }}
-                          >
-                            {isCheckedIn ? "Checked In" : "Check In"}
-                          </Button>
+                            <Button
+                              onClick={() => handleCheckIn(key)}
+                              style={{ borderRadius:"12px", backgroundColor: isCheckedIn ? "#34a0a4" : "#2a6f97", color: "white" }}
+                            >
+                              {isCheckedIn ? "Checked In" : "Check In"}
+                            </Button>
                         </div>
                       ))}
                     </div>
+                    </HoverDiv>
                   );
                 } else {
                   return null; // Do not render if the dietary restriction does not match
