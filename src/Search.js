@@ -1,11 +1,22 @@
 import { onValue, ref, get, set } from 'firebase/database';
-import React, { useEffect, useState } from 'react';
 import { database } from './firebase';
+
+import React, { useEffect, useState } from 'react';
+
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
+
+import ProgressBar from 'react-bootstrap/ProgressBar'
+import Button from 'react-bootstrap/Button'
+import 'bootstrap/dist/css/bootstrap.min.css';
+import Form from 'react-bootstrap/Form';
+
+import "./search.css";
+
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976D2', // Adjust primary color
+      main: '#013a63', // Adjust primary color
     },
     secondary: {
       main: '#F82249', // Adjust secondary color
@@ -15,7 +26,8 @@ const theme = createTheme({
     fontFamily: 'Arial, sans-serif', // Change font family
     h1: {
       fontSize: '32px', // Adjust heading font size
-      fontWeight: 'bold', // Bold headings
+      fontWeight: 'bold',
+      color:"#E2F1E7" // Bold headings
     },
     h2: {
       fontSize: '24px',
@@ -24,7 +36,12 @@ const theme = createTheme({
   },
 });
 
-
+function CheckedInProgressBar({percent})
+{
+  return (<div style={{marginBottom:"40px", marginInline: '125px'}}>
+    <ProgressBar now={percent} label={percent + "%"} variant='danger'></ProgressBar>
+  </div>)
+}
 
 function Search() {
   
@@ -33,14 +50,21 @@ function Search() {
        const [dietaryRestriction, setDietaryRestriction] = useState([])
        const [selectedDietaryRestriction, setSelectedDietaryRestriction] = useState("");
        // varun stuff
-       
-       
-       
 
 
 
        const [Data, setData] = useState({}); 
        const [checkedInCount, setCheckedInCount] = useState(0);
+
+      
+       //progress bar
+      const [showProgressBar, setShowProgressBar] = useState(false); 
+      const percentCheckedIn = (checkedInCount / Object.keys(Data).length * 100).toFixed(2);
+
+      function toggleProgressBar(e)
+      {
+        setShowProgressBar(e.target.checked)
+      }
 
         useEffect(() => {
           onValue(ref(database), (snapshot) => {
@@ -99,6 +123,8 @@ function Search() {
         };
 
         
+
+        
         const filteredResults = Object.keys(Data).filter((key) => {
           const personData = Data[key];
           const fullName = personData[0].fullName.toString();
@@ -113,11 +139,21 @@ function Search() {
 
         return (
           <ThemeProvider theme={theme}>
-            <div style={{ textAlign: 'center', background: '#232D4B', color: 'white', padding: '20px' }}>
-              <h1 style={{ fontSize: '60px' }}>Ideathon Admin Dashboard</h1>
+            <div className='background' style={{ textAlign: 'center', padding: '20px', color:'white' }}>
+              <h1 className='label' style={{ fontSize: '60px' }}>Ideathon Admin Dashboard</h1>
               <p style={{ fontSize: '24px', textAlign: 'center' }}>
-                Checked In: {checkedInCount} | Percentage: {((checkedInCount / Object.keys(Data).length) * 100).toFixed(2)}%
+                Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
+                <Form.Check // prettier-ignore
+                  inline
+                  style = {{fontSize: '15px', marginLeft:'30px'}}
+                  type="switch"
+                  id="custom-switch"
+                  label="Show Progress Bar"
+                  onChange={e => (toggleProgressBar(e))}
+                />
               </p>
+              {showProgressBar && <CheckedInProgressBar  percent={percentCheckedIn}></CheckedInProgressBar>}
+              <h2 className='label'>Name and Emails</h2>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
                 {/* Search input */}
                 <input
@@ -146,7 +182,6 @@ function Search() {
                   <option value="other">Other</option>
                 </select>
               </div>
-              <h2>Name and Emails</h2>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(250px, 1fr))", gap: "20px" }}>
                 {filteredResults.map((key, index) => {
                   const personData = Data[key]; // Access the data associated with the key(hash)
@@ -155,17 +190,23 @@ function Search() {
                 const fullName = personData[0].fullName.toString();
                 
                 const isCheckedIn = personData[0].checkedIn;
+
+                const HoverDiv = styled('div')({
+                  transition: "transform 0.10s ease-in-out",
+                  "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
+                })
         
                 if (!selectedDietaryRestriction || (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction))) {
                   return (
-                    <div key={index} style={{ border: "1px solid #ccc", padding: "20px",transition: "background 0.1s", }}
+                    <HoverDiv>
+                    <div className='gridBox' key={index} style={{  borderRadius: '15px', border: "10px solid #ccc", borderColor:'#013a63', padding: "20px",transition: "background 0.1s", }}
                     
-                    onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
-                    onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
+                    //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
+                    //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
         
                     
                     >
-                      <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{fullName}</p>
+                      <p className='label' style={{ fontSize: '24px', fontWeight: 'bold' }}>{fullName}</p>
 
                       <p>{dietaryRestrictionValue}</p>
                       <p>{personData[0].email}</p>
@@ -173,20 +214,21 @@ function Search() {
                         <div key={dataIndex}>
                           {data.resume ? (
                             <p>
-                            <a href={data.resume} target="_blank" rel="noopener noreferrer" style={{ color: 'orange' }}>
+                            <a href={data.resume} target="_blank" rel="noopener noreferrer" style={{ color: '#89c2d9' }}>
                         {fullName} resume
                             </a>
                             </p>
                           ) : null}
-                          <button
-                            onClick={() => handleCheckIn(key)}
-                            style={{ backgroundColor: isCheckedIn ? "green" : "blue", color: "white" }}
-                          >
-                            {isCheckedIn ? "Checked In" : "Check In"}
-                          </button>
+                            <Button
+                              onClick={() => handleCheckIn(key)}
+                              style={{ borderRadius:"12px", backgroundColor: isCheckedIn ? "#34a0a4" : "#2a6f97", color: "white" }}
+                            >
+                              {isCheckedIn ? "Checked In" : "Check In"}
+                            </Button>
                         </div>
                       ))}
                     </div>
+                    </HoverDiv>
                   );
                 } else {
                   return null; // Do not render if the dietary restriction does not match
