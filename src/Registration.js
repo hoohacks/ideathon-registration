@@ -36,37 +36,23 @@ import {
   Radio,
   FormHelperText,
 } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
 
-// import logo
-import Logo from "./images/logo.png";
-import { maxWidth } from "@mui/system";
+// import more styling
+import { theme, popupStyles, gridStyles } from "./styles/registrationStyles.tsx"
+
+// import configs
+import configs from "./configs/textFieldConfig.tsx"
+
+// import components
+import RegistrationStatusModal from './components/RegistrationStatusModal.tsx';
+import IdeathonLogo from './components/IdeathonLogo.tsx';
+
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // email format
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 const Registration = () => {
-  // theme
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
-
   // text-fields
   const [firstName, setFirstName] = useState("");
   const [firstNameCheck, setFirstNameCheck] = useState(false);
@@ -229,97 +215,26 @@ const Registration = () => {
   return (
     <>
       <ThemeProvider theme={theme}>
-        <Popup open={successRegistration} modal>
-          <Box
-            sx={{
-              borderRadius: "5px",
-              textAlign: "center",
-              padding: "15px",
-              display: "flex",
-              flexFlow: "column",
-              gap: "8px",
-            }}
-          >
-            <Typography>Successfully signed up for Ideathon 23-24!</Typography>
-            <Link href="https://ideathon.hoohacks.io">
-              <Button
-                sx={{
-                  backgroundColor: "#f82249",
-                  color: "#fff",
-                  boxShadow: 2,
-                  "&:hover": {
-                    transform: "scale3d(1.05, 1.05, 1)",
-                    backgroundColor: "#fff",
-                    color: "#f82249",
-                    border: "1px solid",
-                    borderColor: "#f82249",
-                  },
-                }}
-                type="button"
-              >
-                View Schedule
-              </Button>
-            </Link>
-          </Box>
-        </Popup>
+      <RegistrationStatusModal 
+        isOpen={successRegistration} 
+        onClose={() => setSuccessRegistration(false)}
+      />
         <Grid
           container
-          spacing={0}
-          direction="column"
-          alignItems="center"
-          justifyContent="center"
-          style={{ minHeight: "100vh", minWidth: "100wh" }}
+          style={gridStyles.main}
         >
           <Box
-            sx={{
-              width: "100%",
-              justifyContent: "center",
-              alignItems: "center",
-              marginLeft: "auto",
-              marginRight: "auto",
-              display: "flex",
-            }}
+            sx={gridStyles.box}
           >
             <Card
               sx={{
-                boxShadow: 4,
-                display: "flex",
-                flexFlow: "column nowrap",
-                margin: "24px",
-                width: "582px",
-                alignItems: "center",
-                backgroundColor: "#fff",
-                padding: "22px 22px",
-                gap: "16px",
-                border: "none",
-                boxShadow: "none",
+                ...gridStyles.card,
                 [theme.breakpoints.down("md")]: {
                   margin: "0",
-                },
+                }
               }}
             >
-              {/* IDEATHON LOGO */}
-              <Link
-                href="https://ideathon.hoohacks.io"
-                sx={{
-                  maxWidth: "582px",
-                  [theme.breakpoints.down("md")]: {
-                    maxWidth: "402px",
-                  },
-                }}
-              >
-                <img
-                  src={Logo}
-                  style={{
-                    borderRadius: "5px",
-                    width: "582px",
-                    objectFit: "cover",
-                    [theme.breakpoints.down("md")]: {
-                      width: "402px",
-                    },
-                  }}
-                />
-              </Link>
+              <IdeathonLogo theme={theme} />
 
               <Typography sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
@@ -341,25 +256,11 @@ const Registration = () => {
               </Typography>
 
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
+                sx={gridStyles.box2}
               >
                 <TextField
-                  fullWidth={true}
-                  required
-                  id="first-name"
-                  name="first-name"
-                  label="First Name"
-                  variant="outlined"
+                  {... configs.firstNameConfig}
                   value={firstName}
-                  type="text"
-                  size="large"
-                  autoComplete="first-name"
                   onChange={(e) => {
                     setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
                     setFirstNameCheck(firstName !== "");
@@ -373,16 +274,8 @@ const Registration = () => {
                   }
                 />
                 <TextField
-                  fullWidth={true}
-                  required
-                  id="last-name"
-                  name="last-name"
-                  variant="outlined"
-                  label="Last Name"
-                  size="large"
+                  {... configs.lastNameConfig}
                   value={lastName}
-                  type="text"
-                  autoComplete="last-name"
                   onChange={(e) => {
                     setLastName(e.target.value.replace(/[^a-z]/gi, ""));
                     setLastNameCheck(lastName !== "");
@@ -397,17 +290,9 @@ const Registration = () => {
                 />
               </Box>
               <TextField
-                fullWidth={true}
-                required
-                id="Email"
-                label="Email Address"
-                name="Email"
-                variant="outlined"
-                size="large"
-                value={email}
-                type="email"
-                autoComplete="email"
+                {... configs.emailConfig}
                 error={!isValidEmail}
+                value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setEmailCheck(email !== "");
@@ -427,16 +312,8 @@ const Registration = () => {
                 }
               />
               <TextField
-                fullWidth={true}
-                required
-                id="major"
-                label="Major/Intended Major"
-                name="major"
-                variant="outlined"
+                {... configs.majorConfig}
                 value={major}
-                size="large"
-                type="text"
-                autoComplete="major"
                 onChange={(e) => {
                   setMajor(e.target.value);
                   setMajorCheck(e.target.value !== "");
@@ -450,12 +327,7 @@ const Registration = () => {
                 }
               />
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "4px",
-                }}
+                sx={gridStyles.box3}
               >
                 <FormGroup>
                   <InputLabel id="gender">Gender</InputLabel>
@@ -500,20 +372,13 @@ const Registration = () => {
                 </FormGroup>
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "8px",
-                }}
+                sx={gridStyles.box4}
               >
                 <FormControl size="small">
                   <InputLabel>Expected Graduation Date</InputLabel>
                   <Select
-                    labelId="school-year-select"
-                    label="Expected Graduation Year"
+                    {... configs.schoolLabelConfig}
                     value={selectYear}
-                    size="large"
                     onChange={(e) => setSelectYear(e.target.value)}
                   >
                     <MenuItem value={2025}>2025</MenuItem>
@@ -525,15 +390,9 @@ const Registration = () => {
                   {selectYear === 0 ? (
                     <>
                       <TextField
-                        id="other-year"
-                        label="Other Expected Graduation Year"
-                        name="other-year"
-                        variant="outlined"
-                        size="large"
-                        type="text"
-                        autoComplete="selectYear"
-                        value={otherSelectYear}
+                        {... configs.yearLabelConfig}
                         sx={{ marginTop: "8px" }}
+                        value={otherSelectYear}
                         onChange={(e) => {
                           setOtherSelectYear(e.target.value.replace(/\D/g, ""));
                           setOtherSelectYearCheck(e.target.value !== "");
@@ -553,22 +412,15 @@ const Registration = () => {
                 </FormControl>
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
+                sx={gridStyles.box5}
               >
                 <FormControl size="small">
                   <InputLabel id="school-select">
                     University of Virginia School
                   </InputLabel>
                   <Select
-                    labelId="school-select"
-                    label="University of Virginia School"
+                    {... configs.schoolSelectConfig}
                     value={selectSchool}
-                    size="large"
                     onChange={(e) => setSelectedSchool(e.target.value)}
                   >
                     <MenuItem value={"college"}>
@@ -600,46 +452,24 @@ const Registration = () => {
                 </FormControl>
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
+                sx={gridStyles.box5}
               >
                 <Button
                   variant="contained"
                   component="label"
-                  sx={{
-                    backgroundColor: "#f82249",
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                    },
-                  }}
+                  sx={gridStyles.button}
                 >
                   {progress < 100 ? "Optional - Upload Resume" : resumeName}
                   <input
-                    type="file"
-                    size="large"
+                    {... configs.applicationConfig}
                     hidden={true}
-                    accept="application/msword, application/pdf"
                     onChange={(e) => changeResumeHandle(e)}
                   />
                 </Button>
                 <LinearProgress variant="determinate" value={progress} />
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
+                sx={gridStyles.box6}
               >
                 <Typography id="skills">
                   What are some skills that you possess that you think would be
@@ -647,15 +477,8 @@ const Registration = () => {
                   for team building. *
                 </Typography>
                 <TextField
-                  required
-                  id="skills"
-                  name="skills"
-                  variant="outlined"
-                  size="large"
-                  multiline
-                  maxRows={Infinity}
+                  {... configs.skillsConfig}
                   value={skills}
-                  autoComplete="skills"
                   onChange={(e) => {
                     setSkills(e.target.value);
                     setSkillsCheck(e.target.value !== "");
@@ -670,27 +493,14 @@ const Registration = () => {
                 />
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
+                sx={gridStyles.box6}
               >
                 <Typography id="learn">
                   What would you like to learn or get out of the Ideathon? *
                 </Typography>
                 <TextField
-                  required
-                  id="learn"
-                  name="learn"
-                  variant="outlined"
-                  size="large"
-                  multiline
-                  maxRows={Infinity}
+                  {... configs.learnConfig}
                   value={learn}
-                  autoComplete="learn"
                   onChange={(e) => {
                     setLearn(e.target.value);
                     setLearnCheck(e.target.value !== "");
@@ -705,12 +515,7 @@ const Registration = () => {
                 />
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                }}
+                sx={gridStyles.box6}
               >
                 <FormGroup>
                   <InputLabel id="dietary-restriction">
@@ -747,13 +552,8 @@ const Registration = () => {
                         Specify Other Dietary Restriction
                       </InputLabel>
                       <TextField
-                        id="dietary-specify-other"
-                        name="dietary-specify-other"
-                        variant="outlined"
-                        size="large"
-                        type="text"
+                        {... configs.dietConfig}
                         value={otherDietaryRestriction}
-                        autoComplete="dietary-specify-other"
                         onChange={(e) => {
                           setOtherDietaryRestriction(e.target.value);
                           setOtherDietaryRestrictionCheck(
@@ -775,11 +575,7 @@ const Registration = () => {
                 </FormGroup>
               </Box>
               <Box
-                sx={{
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  gap: "16px",
-                }}
+                sx={gridStyles.box7}
               >
                 {firstNameCheck &&
                 lastNameCheck &&
@@ -794,18 +590,7 @@ const Registration = () => {
                   ? otherDietaryRestrictionCheck
                   : true) ? (
                   <Button
-                    sx={{
-                      backgroundColor: "#f82249",
-                      color: "#fff",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#fff",
-                        color: "#f82249",
-                        border: "1px solid",
-                        borderColor: "#f82249",
-                      },
-                    }}
+                    sx={gridStyles.button2}
                     type="submit"
                     onClick={() => handleSubmit()}
                   >
@@ -815,18 +600,7 @@ const Registration = () => {
                   <Popup
                     trigger={
                       <Button
-                        sx={{
-                          backgroundColor: "#f82249",
-                          color: "#fff",
-                          boxShadow: 2,
-                          "&:hover": {
-                            transform: "scale3d(1.05, 1.05, 1)",
-                            backgroundColor: "#fff",
-                            color: "#f82249",
-                            border: "1px solid",
-                            borderColor: "#f82249",
-                          },
-                        }}
+                        sx={gridStyles.button2}
                         type="submit"
                       >
                         Submit Registration
@@ -836,12 +610,7 @@ const Registration = () => {
                     position="top center"
                   >
                     <Box
-                      sx={{
-                        padding: "5px",
-                        textAlign: "center",
-                        display: "flex",
-                        flexFlow: "column nowrap",
-                      }}
+                      sx={gridStyles.popupBox}
                     >
                       <Typography>
                         Please fill out the remaining fields.
@@ -852,18 +621,7 @@ const Registration = () => {
 
                 <Link href="https://ideathon.hoohacks.io">
                   <Button
-                    sx={{
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#f82249",
-                        color: "#fff",
-                      },
-                    }}
+                    sx={gridStyles.button3}
                     type="button"
                   >
                     Cancel
