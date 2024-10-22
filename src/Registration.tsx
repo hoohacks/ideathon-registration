@@ -1,16 +1,13 @@
 import React, { useState } from "react";
-
 // firebase
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
 import { child, push, ref, update, set} from "firebase/database";
 import { getDownloadURL, ref as storageRef, uploadBytesResumable, UploadTask } from "firebase/storage";
 import { database, storage } from "./firebase";
-
 // react pop up
 import { Popup } from "reactjs-popup";
 import "reactjs-popup/dist/index.css";
-
 // import mui styling
 import {
   Box,
@@ -33,29 +30,31 @@ import {
   FormHelperText,
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
-
 // import logo
 import Logo from "./images/logo.png";
 import { maxWidth } from "@mui/system";
+// import more styling
+import { theme, popupStyles, gridStyles } from "./styles/registrationStyles.tsx"
+// import configs
+import configs from "./configs/textFieldConfig.tsx"
+// import components
+import RegistrationStatusModal from './components/RegistrationStatusModal.tsx';
+import IdeathonLogo from './components/IdeathonLogo.tsx';
+
 
 // email format
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-
 interface FormField {
     value: string | Array<string> | number
     isEmpty: boolean
 }
-
 interface EmailField extends FormField {
     isValid: boolean
 }
-
 interface ResumeField extends FormField {
     url: UploadTask | null
     progress: number
-
 }
-
 interface ApplicantForm {
     firstName: FormField
     lastName: FormField
@@ -72,28 +71,7 @@ interface ApplicantForm {
     checkedIn: boolean
 }
 
-
 const Registration = () => {
-  // theme
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
 
   const [applicant, setApplicant] = useState<ApplicantForm>({
         firstName: { value: "", isEmpty: true },
@@ -114,17 +92,17 @@ const Registration = () => {
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const handleInputChange = (field: keyof ApplicantForm, value: any, nestedField?: string) => {
-    setApplicant( (prevApplicant) => ({
+    setApplicant( (prevApplicant: ApplicantForm) => ({
         ...prevApplicant,
         [field] : {
-            ...prevApplicant[field],
+            ...prevApplicant[field] as (FormField | EmailField | ResumeField),
             ...(nestedField ? { [nestedField] : value } : {value : value} ),
             isEmpty: value === "" || (Array.isArray(value) && value.length === 0),
             },
         }));
   };
 
-  const changeResumeHandle = (event) => {
+  const changeResumeHandle = (event: any) => {
     const storageReference = storageRef(
       storage,
       `/ideathon-resume-2024/${applicant.year.value}/${event.target.files[0].name}`
@@ -144,7 +122,7 @@ const Registration = () => {
   };
 
   // add multiple dietary restrictions
-  const selectRestrictions = (event) => {
+  const selectRestrictions = (event : any) => {
     const value = event.target.value;
     const currentRestrictions = Array.isArray(applicant.dietaryRestriction.value) ? applicant.dietaryRestriction.value : [];
 
@@ -166,10 +144,11 @@ const Registration = () => {
             }
         };
 
-        const applicantData = Object.keys(updatedApplicant).reduce((acc,key) => {
-            acc[key] = updatedApplicant[key].value;
-            return acc
-        }, {})
+        const applicantData = Object.keys(updatedApplicant).reduce((acc: Record<string, any>, key) => {
+            const field = updatedApplicant[key as keyof ApplicantForm] as FormField | EmailField | ResumeField;
+            acc[key] = field.value;
+            return acc;
+        }, {});
 
         const newApplicantRef = push(ref(database, 'applicants'));
         await set(newApplicantRef, applicantData)
@@ -179,7 +158,6 @@ const Registration = () => {
         setSuccessRegistration(false)
     }
   }
-
 
   function Copyright() {
     return (
@@ -201,97 +179,26 @@ const Registration = () => {
   return (
     <>
       <ThemeProvider theme={theme}>
-        <Popup open={successRegistration} modal>
-          <Box
-            sx={{
-              borderRadius: "5px",
-              textAlign: "center",
-              padding: "15px",
-              display: "flex",
-              flexFlow: "column",
-              gap: "8px",
-            }}
-          >
-            <Typography>Successfully signed up for Ideathon 23-24!</Typography>
-            <Link href="https://ideathon.hoohacks.io">
-              <Button
-                sx={{
-                  backgroundColor: "#f82249",
-                  color: "#fff",
-                  boxShadow: 2,
-                  "&:hover": {
-                    transform: "scale3d(1.05, 1.05, 1)",
-                    backgroundColor: "#fff",
-                    color: "#f82249",
-                    border: "1px solid",
-                    borderColor: "#f82249",
-                  },
-                }}
-                type="button"
-              >
-                View Schedule
-              </Button>
-            </Link>
-          </Box>
-        </Popup>
+      <RegistrationStatusModal
+        isOpen={successRegistration}
+        onClose={() => setSuccessRegistration(false)}
+      />
         <Grid
           container
-          spacing={0}
-          direction="column"
-          alignItems="center"
-          justifyContent="center"
-          style={{ minHeight: "100vh", minWidth: "100wh" }}
+          sx={gridStyles.main}
         >
           <Box
-            sx={{
-              width: "100%",
-              justifyContent: "center",
-              alignItems: "center",
-              marginLeft: "auto",
-              marginRight: "auto",
-              display: "flex",
-            }}
+            sx={gridStyles.box}
           >
             <Card
               sx={{
-                boxShadow: 4,
-                display: "flex",
-                flexFlow: "column nowrap",
-                margin: "24px",
-                width: "582px",
-                alignItems: "center",
-                backgroundColor: "#fff",
-                padding: "22px 22px",
-                gap: "16px",
-                border: "none",
-                boxShadow: "none",
+                ...gridStyles.card,
                 [theme.breakpoints.down("md")]: {
                   margin: "0",
-                },
+                }
               }}
             >
-              {/* IDEATHON LOGO */}
-              <Link
-                href="https://ideathon.hoohacks.io"
-                sx={{
-                  maxWidth: "582px",
-                  [theme.breakpoints.down("md")]: {
-                    maxWidth: "402px",
-                  },
-                }}
-              >
-                <img
-                  src={Logo}
-                  style={{
-                    borderRadius: "5px",
-                    width: "582px",
-                    objectFit: "cover",
-                    [theme.breakpoints.down("md")]: {
-                      width: "402px",
-                    },
-                  }}
-                />
-              </Link>
+              <IdeathonLogo theme={theme} />
 
               <Typography sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
@@ -312,26 +219,10 @@ const Registration = () => {
                 idea to fruition!
               </Typography>
 
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
+              <Box sx={gridStyles.box2} >
                 <TextField
-                  fullWidth={true}
-                  required
-                  id="first-name"
-                  name="first-name"
-                  label="First Name"
-                  variant="outlined"
+                  {... configs.firstNameConfig}
                   value={applicant.firstName.value}
-                  type="text"
-                  size="large"
-                  autoComplete="first-name"
                   onChange={(e) => {
                     handleInputChange("firstName",e.target.value.replace(/[^a-z]/gi, "value"));
                     handleInputChange("firstName", false, "isEmpty")
@@ -345,16 +236,8 @@ const Registration = () => {
                   }
                 />
                 <TextField
-                  fullWidth={true}
-                  required
-                  id="last-name"
-                  name="last-name"
-                  variant="outlined"
-                  label="Last Name"
-                  size="large"
+                  {... configs.lastNameConfig}
                   value={applicant.lastName.value}
-                  type="text"
-                  autoComplete="last-name"
                   onChange={(e) => {
                     handleInputChange("lastName",e.target.value.replace(/[^a-z]/gi, "value"));
                     handleInputChange("lastName", false, "isEmpty")
@@ -369,16 +252,8 @@ const Registration = () => {
                 />
               </Box>
               <TextField
-                fullWidth={true}
-                required
-                id="Email"
-                label="Email Address"
-                name="Email"
-                variant="outlined"
-                size="large"
+                {...configs.emailConfig}
                 value={applicant.email.value}
-                type="email"
-                autoComplete="email"
                 error={!applicant.email.isValid}
                 onChange={(e) => {
                   handleInputChange("email",e.target.value, "value");
@@ -399,16 +274,8 @@ const Registration = () => {
                 }
               />
               <TextField
-                fullWidth={true}
-                required
-                id="major"
-                label="Major/Intended Major"
-                name="major"
-                variant="outlined"
+                {...configs.majorConfig}
                 value={applicant.major.value}
-                size="large"
-                type="text"
-                autoComplete="major"
                 onChange={(e) => {
                   handleInputChange("major", e.target.value, "value")
                   handleInputChange("major", false, "isEmpty")
@@ -421,14 +288,7 @@ const Registration = () => {
                   )
                 }
               />
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "4px",
-                }}
-              >
+              <Box sx={gridStyles.box3} >
                 <FormGroup>
                   <InputLabel id="gender">Gender</InputLabel>
                   <RadioGroup
@@ -457,21 +317,12 @@ const Registration = () => {
                   ) : null}
                 </FormGroup>
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "8px",
-                }}
-              >
+              <Box sx={gridStyles.box4}>
                 <FormControl size="small">
                   <InputLabel>Expected Graduation Date</InputLabel>
                   <Select
-                    labelId="school-year-select"
-                    label="Expected Graduation Year"
+                    {...configs.yearLabelConfig}
                     value={applicant.year.value}
-                    size="large"
                     onChange={(e) => {
                         handleInputChange("year",e.target.value, "value")
                         handleInputChange("year", false, "isEmpty")
@@ -487,23 +338,14 @@ const Registration = () => {
                   </Select>
                 </FormControl>
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
-              >
+              <Box sx={gridStyles.box5} >
                 <FormControl size="small">
                   <InputLabel id="school-select">
                     University of Virginia School
                   </InputLabel>
                   <Select
-                    labelId="school-select"
-                    label="University of Virginia School"
+                    {...configs.schoolSelectConfig}
                     value={applicant.school.value}
-                    size="large"
                     onChange={(e) => handleInputChange("school",e.target.value,"value")}
                   >
                     {["College", "Engineering", "McIntire", "Architecture", "Wise", "Medicine", "Law", "Darden", "Education", "Professional", "Other"].map( (options) => (
@@ -514,32 +356,16 @@ const Registration = () => {
                   </Select>
                 </FormControl>
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
-              >
+              <Box sx={gridStyles.box5}>
                 <Button
                   variant="contained"
                   component="label"
-                  sx={{
-                    backgroundColor: "#f82249",
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                    },
-                  }}
+                  sx={gridStyles.button}
                 >
                   {applicant.resume.progress < 100 ? "Optional - Upload Resume" : applicant.resume.value}
                   <input
                     type="file"
-                    size="large"
+                    size={100}
                     hidden={true}
                     accept="application/msword, application/pdf"
                     onChange={(e) => changeResumeHandle(e)}
@@ -547,30 +373,15 @@ const Registration = () => {
                 </Button>
                 <LinearProgress variant="determinate" value={applicant.resume.progress} />
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
-              >
+              <Box sx={gridStyles.box6}>
                 <Typography id="skills">
                   What are some skills that you possess that you think would be
                   helpful for Ideathon participants? This will be used primarily
                   for team building. *
                 </Typography>
                 <TextField
-                  required
-                  id="skills"
-                  name="skills"
-                  variant="outlined"
-                  size="large"
-                  multiline
-                  maxRows={Infinity}
+                  {...configs.skillsConfig}
                   value={applicant.skills.value}
-                  autoComplete="skills"
                   onChange={(e) => {
                     handleInputChange("skills",e.target.value, "value");
                     handleInputChange("skills", e.target.value !== "", "isEmpty");
@@ -584,28 +395,13 @@ const Registration = () => {
                   }
                 />
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
-              >
+              <Box sx={gridStyles.box6}>
                 <Typography id="learn">
                   What would you like to learn or get out of the Ideathon? *
                 </Typography>
                 <TextField
-                  required
-                  id="learn"
-                  name="learn"
-                  variant="outlined"
-                  size="large"
-                  multiline
-                  maxRows={Infinity}
+                  {...configs.learnConfig}
                   value={applicant.learn.value}
-                  autoComplete="learn"
                   onChange={(e) => {
                     handleInputChange("learn",e.target.value,"value");
                     handleInputChange("learn", e.target.value !== "", "isEmpty");
@@ -619,67 +415,28 @@ const Registration = () => {
                   }
                 />
               </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                }}
-              >
+              <Box sx={gridStyles.box6}>
                 <FormGroup>
                   <InputLabel id="dietary-restriction">
                     Dietary Restrictions
                   </InputLabel>
 
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Vegetarian"
-                    value="vegetarian"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Gluten Free"
-                    value="gluten-free"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Vegan"
-                    value="vegan"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Other"
-                    value="other"
-                  />
+                  { [{label: "Vegetarian", value: "vegetarian" }, {label: "Gluten Free", value: "gluten-free"}, {label: "Vegan", value: "vegan"}, {label: "Other", value: "other"}].map( (options) => (
+                    <FormControlLabel
+                        hidden={true}
+                        control={<Checkbox onChange={selectRestrictions} />}
+                        key = {options.value}
+                        label = {options.label}
+                        value={options.value}
+                    />
+                  ))}
                 </FormGroup>
               </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  gap: "16px",
-                }}
-              >
+              <Box sx={gridStyles.box7} >
                 { Object.values(applicant).every(empty => empty.isEmpty === false) && applicant.email.isValid ?
                 (
                   <Button
-                    sx={{
-                      backgroundColor: "#f82249",
-                      color: "#fff",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#fff",
-                        color: "#f82249",
-                        border: "1px solid",
-                        borderColor: "#f82249",
-                      },
-                    }}
+                    sx={gridStyles.button2}
                     type="submit"
                     onClick={() => handleSubmit()}
                   >
@@ -688,35 +445,14 @@ const Registration = () => {
                  ) : (
                   <Popup
                     trigger={
-                      <Button
-                        sx={{
-                          backgroundColor: "#f82249",
-                          color: "#fff",
-                          boxShadow: 2,
-                          "&:hover": {
-                            transform: "scale3d(1.05, 1.05, 1)",
-                            backgroundColor: "#fff",
-                            color: "#f82249",
-                            border: "1px solid",
-                            borderColor: "#f82249",
-                          },
-                        }}
-                        type="submit"
-                      >
+                      <Button sx={gridStyles.button2} type="submit">
                         Submit Registration
                       </Button>
                     }
                     on="hover"
                     position="top center"
                   >
-                    <Box
-                      sx={{
-                        padding: "5px",
-                        textAlign: "center",
-                        display: "flex",
-                        flexFlow: "column nowrap",
-                      }}
-                    >
+                    <Box sx={gridStyles.popupBox}>
                       <Typography>
                         Please fill out the remaining fields.
                       </Typography>
@@ -725,21 +461,7 @@ const Registration = () => {
                 )}
 
                 <Link href="https://ideathon.hoohacks.io">
-                  <Button
-                    sx={{
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#f82249",
-                        color: "#fff",
-                      },
-                    }}
-                    type="button"
-                  >
+                  <Button sx={gridStyles.button3} type="button">
                     Cancel
                   </Button>
                 </Link>
@@ -767,5 +489,4 @@ const Registration = () => {
     </>
   );
 };
-
 export default Registration;

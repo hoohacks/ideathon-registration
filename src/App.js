@@ -1,6 +1,7 @@
+import React from 'react';
 import { Navigate, Routes, Route } from "react-router-dom"
 import { createContext, useContext, useState, useEffect } from "react"
-import Registration from "./Registration"
+import Registration from "./Registration.tsx"
 import Search from "./Search"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";

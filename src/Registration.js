@@ -52,7 +52,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 // email format
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
-const Registration = () => {
+const Registration1 = () => {
   // text-fields
   const [firstName, setFirstName] = useState("");
   const [firstNameCheck, setFirstNameCheck] = useState(false);
@@ -215,8 +215,8 @@ const Registration = () => {
   return (
     <>
       <ThemeProvider theme={theme}>
-      <RegistrationStatusModal 
-        isOpen={successRegistration} 
+      <RegistrationStatusModal
+        isOpen={successRegistration}
         onClose={() => setSuccessRegistration(false)}
       />
         <Grid
@@ -652,4 +652,4 @@ const Registration = () => {
   );
 };
 
-export default Registration;
+export default Registration1;

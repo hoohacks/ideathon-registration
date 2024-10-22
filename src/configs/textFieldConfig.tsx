@@ -5,24 +5,24 @@ const configs = {
         id: "first-name",
         name: "first-name",
         label: "First Name",
-        variant: "outlined",
+        variant: "outlined" as "outlined",
         type: "text",
         size: "large",
         autoComplete: "first-name"
     },
-    
+
     lastNameConfig: {
         fullWidth: true,
         required: true,
         id: "last-name",
         name: "last-name",
-        variant: "outlined",
+        variant: "outlined" as "outlined",
         label: "Last Name",
         size: "large",
         type: "text",
         autoComplete: "last-name",
     },
-    
+
     emailConfig: {
         fullWidth: true,
         required: true,
@@ -34,7 +34,7 @@ const configs = {
         type: "email",
         autoComplete: "email",
     },
-    
+
     majorConfig: {
         fullWidth: true,
         required: true,
@@ -46,13 +46,13 @@ const configs = {
         type: "text",
         autoComplete: "major",
     },
-    
+
     schoolLabelConfig: {
         labelId: "school-year-select",
         label: "Expected Graduation Year",
         size: "large",
     },
-    
+
     yearLabelConfig: {
         id:"other-year",
         label:"Other Expected Graduation Year",
@@ -62,13 +62,13 @@ const configs = {
         type:"text",
         autoComplete:"selectYear"
     },
-    
+
     schoolSelectConfig: {
         labelId: "school-select",
         label: "University of Virginia School",
         size: "large",
     },
-    
+
     applicationConfig: {
         type: "file",
         size: "large",
