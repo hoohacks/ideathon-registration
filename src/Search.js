@@ -38,7 +38,7 @@ const theme = createTheme({
 
 function CheckedInProgressBar({percent})
 {
-  return (<div style={{marginBottom:"40px", marginInline: '125px'}}>
+  return (<div style={{marginBottom:"40px", marginInline: '10%'}}>
     <ProgressBar now={percent} label={percent + "%"} variant='danger'></ProgressBar>
   </div>)
 }
@@ -172,7 +172,7 @@ function Search() {
                   onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
                   style={{
                     width: '300px',
-                    height: '45px',
+                    height: '40px',
                     fontSize: '16px',
                   }}
                 >
