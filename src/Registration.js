@@ -1,15 +1,12 @@
-import React, { useState } from "react";
+import React, { isValidElement, useState } from "react";
 
 // firebase
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
-import { child, push, ref, update } from "firebase/database";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytesResumable,
-} from "firebase/storage";
 import { database, storage } from "./firebase";
+import { ref, push, child, update } from "firebase/database";
+import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref as storageRef } from "firebase/storage"; // avoid naming issues
 
 // react pop up
 import { Popup } from "reactjs-popup";
@@ -240,7 +237,7 @@ const Registration = () => {
               gap: "8px",
             }}
           >
-            <Typography>Successfully signed up for Ideathon 23-24!</Typography>
+            <Typography>Successfully signed up for Ideathon 24!</Typography>
             <Link href="https://ideathon.hoohacks.io">
               <Button
                 sx={{
@@ -324,7 +321,7 @@ const Registration = () => {
               <Typography sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
                 <span style={{ fontWeight: "bold" }}>
-                  Sunday October 27, 2024
+                  Saturday October 19, 2024
                 </span>
                 , is a networking, team-building, and pitching event designed to
                 help students with technical experience and students with
@@ -418,12 +415,7 @@ const Registration = () => {
                     <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
                       Enter your email
                     </Typography>
-                  )) ||
-                  (!isValidEmail && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Invalid Email Format
-                    </Typography>
-                  ))
+                  )) 
                 }
               />
               <TextField
@@ -453,105 +445,60 @@ const Registration = () => {
                 sx={{
                   width: "100%",
                   display: "flex",
-                  flexFlow: "column",
-                  gap: "4px",
-                }}
-              >
-                <FormGroup>
-                  <InputLabel id="gender">Gender</InputLabel>
-                  <RadioGroup
-                    name="gender-select"
-                    onChange={(e) => {
-                      setGender(e.target.value);
-                      setGenderCheck(e.target.value !== null);
-                    }}
-                  >
-                    <FormControlLabel
-                      hidden={true}
-                      control={<Radio />}
-                      label="Male"
-                      value="male"
-                    />
-                    <FormControlLabel
-                      hidden={true}
-                      control={<Radio />}
-                      label="Female"
-                      value="female"
-                    />
-                    <FormControlLabel
-                      hidden={true}
-                      control={<Radio />}
-                      label="Other"
-                      value="other"
-                    />
-                    <FormControlLabel
-                      hidden={true}
-                      control={<Radio />}
-                      label="Prefer not to say"
-                      value="prefer-not-to-say"
-                    />
-                  </RadioGroup>
-
-                  {gender == null ? (
-                    <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
-                      Please select an option
-                    </FormHelperText>
-                  ) : null}
-                </FormGroup>
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
                   flexFlow: "column nowrap",
                   gap: "8px",
                 }}
               >
                 <FormControl size="small">
-                  <InputLabel>Expected Graduation Date</InputLabel>
+                  <InputLabel>Gender</InputLabel>
                   <Select
-                    labelId="school-year-select"
-                    label="Expected Graduation Year"
-                    value={selectYear}
+                    labelId="gender-select"
+                    label="Gender"
+                    value={gender}
                     size="large"
-                    onChange={(e) => setSelectYear(e.target.value)}
+                    onChange={(e) => {
+                      setGender(e.target.value);
+                      setGenderCheck(e.target.value !== null);
+                    }}
                   >
-                    <MenuItem value={2025}>2025</MenuItem>
-                    <MenuItem value={2026}>2026</MenuItem>
-                    <MenuItem value={2027}>2027</MenuItem>
-                    <MenuItem value={2028}>2028</MenuItem>
-                    <MenuItem value={0}>Other</MenuItem>
+                    <MenuItem value="male">Male</MenuItem>
+                    <MenuItem value="female">Female</MenuItem>
+                    <MenuItem value="other">Other</MenuItem>
+                    <MenuItem value="prefer-not-to-say">Prefer not to say</MenuItem>
                   </Select>
-                  {selectYear === 0 ? (
-                    <>
-                      <TextField
-                        id="other-year"
-                        label="Other Expected Graduation Year"
-                        name="other-year"
-                        variant="outlined"
-                        size="large"
-                        type="text"
-                        autoComplete="selectYear"
-                        value={otherSelectYear}
-                        sx={{ marginTop: "8px" }}
-                        onChange={(e) => {
-                          setOtherSelectYear(e.target.value.replace(/\D/g, ""));
-                          setOtherSelectYearCheck(e.target.value !== "");
-                        }}
-                        helperText={
-                          otherSelectYear === "" && (
-                            <Typography
-                              sx={{ color: "#f82249", fontSize: "11px" }}
-                            >
-                              Enter your expected graduation year
-                            </Typography>
-                          )
-                        }
-                      />
-                    </>
+                  {gender === null ? (
+                    <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
+                      Please select an option
+                    </FormHelperText>
                   ) : null}
                 </FormControl>
               </Box>
+
+              <Box
+              sx={{
+                width: "100%",
+                display: "flex",
+                flexFlow: "column nowrap",
+                gap: "8px",
+              }}
+            >
+              <FormControl size="small">
+                <InputLabel>Expected Graduation Date</InputLabel>
+                <Select
+                  labelId="school-year-select"
+                  label="Expected Graduation Year"
+                  value={selectYear}
+                  size="large"
+                  onChange={(e) => setSelectYear(e.target.value)}
+                >
+                  <MenuItem value={2025}>2025</MenuItem>
+                  <MenuItem value={2026}>2026</MenuItem>
+                  <MenuItem value={2027}>2027</MenuItem>
+                  <MenuItem value={2028}>2028</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
               <Box
                 sx={{
                   width: "100%",
@@ -705,75 +652,34 @@ const Registration = () => {
                 />
               </Box>
               <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                }}
-              >
-                <FormGroup>
-                  <InputLabel id="dietary-restriction">
-                    Dietary Restrictions
-                  </InputLabel>
+              sx={{
+                width: "100%",
+                display: "flex",
+                flexFlow: "column nowrap",
+                gap: "8px",
+              }}
+            >
+              <FormControl size="small">
+                <InputLabel>Dietary Restrictions</InputLabel>
+                <Select
+                  labelId="dietary-restriction-select"
+                  label="Dietary Restrictions"
+                  value={dietaryRestriction}
+                  size="large"
+                  onChange={(e) => {
+                    setDietaryRestriction(e.target.value);
+                  }}
+                >
+                  <MenuItem value="vegetarian">Vegetarian</MenuItem>
+                  <MenuItem value="gluten-free">Gluten Free</MenuItem>
+                  <MenuItem value="vegan">Vegan</MenuItem>
+                  <MenuItem value="none">None</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
 
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Vegetarian"
-                    value="vegetarian"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Gluten Free"
-                    value="gluten-free"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Vegan"
-                    value="vegan"
-                  />
-                  <FormControlLabel
-                    hidden={true}
-                    control={<Checkbox onChange={selectRestrictions} />}
-                    label="Other"
-                    value="other"
-                  />
-                  {dietaryRestriction.includes("other") ? (
-                    <>
-                      <InputLabel id="dietary-specify-other">
-                        Specify Other Dietary Restriction
-                      </InputLabel>
-                      <TextField
-                        id="dietary-specify-other"
-                        name="dietary-specify-other"
-                        variant="outlined"
-                        size="large"
-                        type="text"
-                        value={otherDietaryRestriction}
-                        autoComplete="dietary-specify-other"
-                        onChange={(e) => {
-                          setOtherDietaryRestriction(e.target.value);
-                          setOtherDietaryRestrictionCheck(
-                            e.target.value !== ""
-                          );
-                        }}
-                        helperText={
-                          !otherDietaryRestrictionCheck && (
-                            <Typography
-                              sx={{ color: "#f82249", fontSize: "11px" }}
-                            >
-                              Enter Your Dietary Restriction
-                            </Typography>
-                          )
-                        }
-                      />
-                    </>
-                  ) : null}
-                </FormGroup>
-              </Box>
+
+
               <Box
                 sx={{
                   display: "flex",
@@ -781,18 +687,7 @@ const Registration = () => {
                   gap: "16px",
                 }}
               >
-                {firstNameCheck &&
-                lastNameCheck &&
-                isValidEmail &&
-                emailCheck &&
-                majorCheck &&
-                skillsCheck &&
-                genderCheck &&
-                learnCheck &&
-                (selectYear === 0 ? otherSelectYearCheck : true) &&
-                (dietaryRestriction.includes("other")
-                  ? otherDietaryRestrictionCheck
-                  : true) ? (
+
                   <Button
                     sx={{
                       backgroundColor: "#f82249",
@@ -811,44 +706,7 @@ const Registration = () => {
                   >
                     Submit Registration
                   </Button>
-                ) : (
-                  <Popup
-                    trigger={
-                      <Button
-                        sx={{
-                          backgroundColor: "#f82249",
-                          color: "#fff",
-                          boxShadow: 2,
-                          "&:hover": {
-                            transform: "scale3d(1.05, 1.05, 1)",
-                            backgroundColor: "#fff",
-                            color: "#f82249",
-                            border: "1px solid",
-                            borderColor: "#f82249",
-                          },
-                        }}
-                        type="submit"
-                      >
-                        Submit Registration
-                      </Button>
-                    }
-                    on="hover"
-                    position="top center"
-                  >
-                    <Box
-                      sx={{
-                        padding: "5px",
-                        textAlign: "center",
-                        display: "flex",
-                        flexFlow: "column nowrap",
-                      }}
-                    >
-                      <Typography>
-                        Please fill out the remaining fields.
-                      </Typography>
-                    </Box>
-                  </Popup>
-                )}
+               
 
                 <Link href="https://ideathon.hoohacks.io">
                   <Button
