@@ -44,14 +44,13 @@ function CheckedInProgressBar({percent})
 }
 
 function Search() {
-  
     
        const [Query, setQuery] = useState("")
        const [dietaryRestriction, setDietaryRestriction] = useState([])
        const [selectedDietaryRestriction, setSelectedDietaryRestriction] = useState("");
        // varun stuff
 
-
+       const handleMetricsClick = () => { window.location.href = "https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay"; };
 
        const [Data, setData] = useState({}); 
        const [checkedInCount, setCheckedInCount] = useState(0);
@@ -60,6 +59,8 @@ function Search() {
        //progress bar
       const [showProgressBar, setShowProgressBar] = useState(false); 
       const percentCheckedIn = (checkedInCount / Object.keys(Data).length * 100).toFixed(2);
+
+      // <button onclick="https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay">Metrics</button>
 
       function toggleProgressBar(e)
       {
@@ -140,9 +141,10 @@ function Search() {
         return (
           <ThemeProvider theme={theme}>
             <div className='background' style={{ textAlign: 'center', padding: '20px', color:'white' }}>
+              <button onClick={handleMetricsClick} style={{ position: 'fixed', border: "1px solid white", top: '20px', left: '20px', borderRadius: "12px", backgroundColor: "#34a0a4", color: "white", zIndex: 1000 }}>Metrics</button>
               <h1 className='label' style={{ fontSize: '60px' }}>Ideathon Admin Dashboard</h1>
               <p style={{ fontSize: '24px', textAlign: 'center' }}>
-                Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
+                Total Signed-Up: {Object.keys(Data).length} | Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
                 <Form.Check // prettier-ignore
                   inline
                   style = {{fontSize: '15px', marginLeft:'30px'}}
@@ -176,7 +178,9 @@ function Search() {
                     fontSize: '16px',
                   }}
                 >
-                  <option value="">All Dietary Restrictions</option>
+                  <option value="true">Checked In</option>
+                  <option value="false">Not Checked In</option>
+                  <option value="">No Filter</option>
                   <option value="vegetarian">Vegetarian</option>
                   <option value="gluten-free">Gluten-free</option>
                   <option value="other">Other</option>
@@ -185,25 +189,28 @@ function Search() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(250px, 1fr))", gap: "20px" }}>
                 {filteredResults.map((key, index) => {
                   const personData = Data[key]; // Access the data associated with the key(hash)
-        
-                const dietaryRestrictionValue = personData[0].dietaryRestriction; // Get dietaryRestriction from the person's data
+                
+                const dietaryRestrictionValue = personData[0].dietaryRestriction // Get dietaryRestriction from the person's data
                 const fullName = personData[0].fullName.toString();
                 
                 const isCheckedIn = personData[0].checkedIn;
+                const checkedInString = String(personData[0].checkedIn);
 
                 const HoverDiv = styled('div')({
                   transition: "transform 0.10s ease-in-out",
                   "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
                 })
         
-                if (!selectedDietaryRestriction || (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction))) {
+                if (!selectedDietaryRestriction || 
+                  (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction)) || 
+                  (checkedInString && checkedInString.includes(selectedDietaryRestriction))) {
+
                   return (
                     <HoverDiv>
                     <div className='gridBox' key={index} style={{  borderRadius: '15px', border: "10px solid #ccc", borderColor:'#013a63', padding: "20px",transition: "background 0.1s", }}
                     
                     //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
                     //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
-        
                     
                     >
                       <p className='label' style={{ fontSize: '24px', fontWeight: 'bold' }}>{fullName}</p>
