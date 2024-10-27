@@ -50,7 +50,7 @@ function Search() {
        const [selectedDietaryRestriction, setSelectedDietaryRestriction] = useState("");
        // varun stuff
 
-
+       const handleMetricsClick = () => { window.location.href = "https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay"; };
 
        const [Data, setData] = useState({}); 
        const [checkedInCount, setCheckedInCount] = useState(0);
@@ -59,6 +59,8 @@ function Search() {
        //progress bar
       const [showProgressBar, setShowProgressBar] = useState(false); 
       const percentCheckedIn = (checkedInCount / Object.keys(Data).length * 100).toFixed(2);
+
+      // <button onclick="https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay">Metrics</button>
 
       function toggleProgressBar(e)
       {
@@ -139,6 +141,7 @@ function Search() {
         return (
           <ThemeProvider theme={theme}>
             <div className='background' style={{ textAlign: 'center', padding: '20px', color:'white' }}>
+              <button onClick={handleMetricsClick} style={{ position: 'fixed', border: "1px solid white", top: '20px', left: '20px', borderRadius: "12px", backgroundColor: "#34a0a4", color: "white", zIndex: 1000 }}>Metrics</button>
               <h1 className='label' style={{ fontSize: '60px' }}>Ideathon Admin Dashboard</h1>
               <p style={{ fontSize: '24px', textAlign: 'center' }}>
                 Total Signed-Up: {Object.keys(Data).length} | Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
