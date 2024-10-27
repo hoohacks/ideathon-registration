@@ -44,7 +44,6 @@ function CheckedInProgressBar({percent})
 }
 
 function Search() {
-  
     
        const [Query, setQuery] = useState("")
        const [dietaryRestriction, setDietaryRestriction] = useState([])
@@ -142,7 +141,7 @@ function Search() {
             <div className='background' style={{ textAlign: 'center', padding: '20px', color:'white' }}>
               <h1 className='label' style={{ fontSize: '60px' }}>Ideathon Admin Dashboard</h1>
               <p style={{ fontSize: '24px', textAlign: 'center' }}>
-                Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
+                Total Signed-Up: {Object.keys(Data).length} | Checked In: {checkedInCount} | Percentage: {percentCheckedIn}%
                 <Form.Check // prettier-ignore
                   inline
                   style = {{fontSize: '15px', marginLeft:'30px'}}
@@ -176,7 +175,9 @@ function Search() {
                     fontSize: '16px',
                   }}
                 >
-                  <option value="">All Dietary Restrictions</option>
+                  <option value="true">Checked In</option>
+                  <option value="false">Not Checked In</option>
+                  <option value="">No Filter</option>
                   <option value="vegetarian">Vegetarian</option>
                   <option value="gluten-free">Gluten-free</option>
                   <option value="other">Other</option>
@@ -185,25 +186,28 @@ function Search() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(250px, 1fr))", gap: "20px" }}>
                 {filteredResults.map((key, index) => {
                   const personData = Data[key]; // Access the data associated with the key(hash)
-        
-                const dietaryRestrictionValue = personData[0].dietaryRestriction; // Get dietaryRestriction from the person's data
+                
+                const dietaryRestrictionValue = personData[0].dietaryRestriction // Get dietaryRestriction from the person's data
                 const fullName = personData[0].fullName.toString();
                 
                 const isCheckedIn = personData[0].checkedIn;
+                const checkedInString = String(personData[0].checkedIn);
 
                 const HoverDiv = styled('div')({
                   transition: "transform 0.10s ease-in-out",
                   "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
                 })
         
-                if (!selectedDietaryRestriction || (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction))) {
+                if (!selectedDietaryRestriction || 
+                  (dietaryRestrictionValue && dietaryRestrictionValue.includes(selectedDietaryRestriction)) || 
+                  (checkedInString && checkedInString.includes(selectedDietaryRestriction))) {
+
                   return (
                     <HoverDiv>
                     <div className='gridBox' key={index} style={{  borderRadius: '15px', border: "10px solid #ccc", borderColor:'#013a63', padding: "20px",transition: "background 0.1s", }}
                     
                     //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
                     //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
-        
                     
                     >
                       <p className='label' style={{ fontSize: '24px', fontWeight: 'bold' }}>{fullName}</p>
