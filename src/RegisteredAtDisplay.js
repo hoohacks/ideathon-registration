@@ -8,6 +8,7 @@ import Chart from 'chart.js/auto';
 
 function RegisteredAtDisplay() {
     const [RegisteredAt, setRegisteredAt] = useState([]);
+    const [genderCounts, setGenderCounts] = useState({});
 
     useEffect(() => { 
         onValue(ref(database), (snapshot) => {
@@ -15,8 +16,10 @@ function RegisteredAtDisplay() {
 
             if (data) {
                 const registeredAtArray = [];
+                const genderCountsTemp = {};
 
                 for (const key in data) {
+
                     if (data.hasOwnProperty(key)) {
                         const entry = data[key];
 
@@ -24,10 +27,23 @@ function RegisteredAtDisplay() {
                         if (entry.registeredAt) {
                             registeredAtArray.push(entry.registeredAt);
                         }
+
+                        if (entry.gender) {
+                            const gender = entry.gender.trim().toLowerCase();
+                            genderCountsTemp[gender] = (genderCountsTemp[gender] || 0) + 1;
+                        }
+
+                        // if (entry.uvaSchool) {
+                        //     const school = entry.uvaSchool().trim().toLowerCase();
+                        //     schoolCount[school] = (schoolCount[school] || 0) + 1;
+                        // }
+
                     }
+
                 }
 
                 setRegisteredAt(registeredAtArray);
+                setGenderCounts(genderCountsTemp);
             } else {
                 console.log('No data found');
             }
@@ -87,41 +103,100 @@ function RegisteredAtDisplay() {
                     }, []),
                     fill: false,
                     borderWidth: 4,
-                    borderColor: '#6495ed',
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: '#2a6f97',
+                    backgroundColor: '#34a0a4',
                     responsive: true,
                 },
             ],
     };
-    
 
-    
-    return (
+    const prepGenderData = () => {
+
+        const labels = Object.keys(genderCounts).map(gender => {
+            return gender.charAt(0).toUpperCase() + gender.slice(1);
+        });
+
+        const genderDataCounts = Object.values(genderCounts);
+
+        return {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Number of Participants",
+                    data: genderDataCounts,
+                    borderWidth: 4,
+                    borderColor: '#2a6f97',
+                    backgroundColor: '#34a0a4',
+                    responsive: true,
+                },
+
+            ],
+
+        };
+
+    };
+
+    // implement prepSchoolData
+
+    return ( // renders all the graphs
         <>
-        <div>
+
+        <h1 style={{textAlign: 'center', backgroundColor: '#34a0a4', color: 'white'}}>Metrics for HooHacks' Ideathon</h1>
+
+        <br></br>
+        <br></br>
+
+        <div style={{margin: '0 auto', width: '80%', minWidth: '300px'}}>
+            <h2 style={{textAlign: 'center'}}>Number of Participants that Register on a Given Day</h2>
             <Line
                 data={{
                 // x-axis label values
                 labels: makeX(),
                 datasets: [
                     {
-                    label: "# of Participants Registered",
-                    // y-axis data plotting values
-                    data: makeY(),
-                    fill: false,
-                    borderWidth:4,
-                    borderColor:'#6495ed',
-                    backgroundColor: "rgb(255, 99, 132)",
-                    responsive:true
+                        label: "# of Participants Registered",
+                        // y-axis data plotting values
+                        data: makeY(),
+                        fill: false,
+                        borderWidth:4,
+                        borderColor:'#2a6f97',
+                        backgroundColor: "#34a0a4",
+                        responsive:true
                     },
                 ],
                 }}
             />
         </div>
+        
+        <br></br>
+        <br></br>
 
-        <div>
+        <div style={{margin: '0 auto', width: '80%', minWidth: '300px'}}>
+            <h2 style={{textAlign: 'center'}}>Total Number of Registrations</h2>
             <Line data={totalParticipantsData} />
         </div>
+
+        <br></br>
+        <br></br>
+
+        <div style={{margin: '0 auto', width: '80%', minWidth: '300px'}}>
+            <h2 style={{textAlign: 'center'}}>Gender Distribution</h2>
+            <Bar 
+                data={prepGenderData()} 
+                options={{
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                    },
+                }} 
+            />
+
+        </div>
+
+        <br></br>
+        <br></br>
 
     </>
     );
