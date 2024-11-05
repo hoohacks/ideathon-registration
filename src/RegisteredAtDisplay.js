@@ -9,6 +9,7 @@ import Chart from 'chart.js/auto';
 function RegisteredAtDisplay() {
     const [RegisteredAt, setRegisteredAt] = useState([]);
     const [genderCounts, setGenderCounts] = useState({});
+    const [schoolCounts, setSchoolCounts] = useState({});
 
     useEffect(() => { 
         onValue(ref(database), (snapshot) => {
@@ -17,6 +18,7 @@ function RegisteredAtDisplay() {
             if (data) {
                 const registeredAtArray = [];
                 const genderCountsTemp = {};
+                const schoolCountsTemp = {};
 
                 for (const key in data) {
 
@@ -33,10 +35,10 @@ function RegisteredAtDisplay() {
                             genderCountsTemp[gender] = (genderCountsTemp[gender] || 0) + 1;
                         }
 
-                        // if (entry.uvaSchool) {
-                        //     const school = entry.uvaSchool().trim().toLowerCase();
-                        //     schoolCount[school] = (schoolCount[school] || 0) + 1;
-                        // }
+                         if (entry.uvaSchool) {
+                             const school = entry.uvaSchool().trim().toLowerCase();
+                             schoolCountsTemp[school] = (schoolCountsTemp[school] || 0) + 1;
+                        }
 
                     }
 
@@ -44,6 +46,7 @@ function RegisteredAtDisplay() {
 
                 setRegisteredAt(registeredAtArray);
                 setGenderCounts(genderCountsTemp);
+                setSchoolCounts(schoolCountsTemp);
             } else {
                 console.log('No data found');
             }
@@ -136,7 +139,23 @@ function RegisteredAtDisplay() {
 
     };
 
-    // implement prepSchoolData
+    const prepSchoolData = () => {
+        const labels = Object.keys(schoolCounts).map(school => school.charAt(0).toUpperCase() + school.slice(1));
+        const schoolDataCounts = Object.values(schoolCounts);
+        return {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Number of Participants per School",
+                    data: schoolDataCounts,
+                    borderWidth: 4,
+                    borderColor: '#2a6f97',
+                    backgroundColor: '#34a0a4',
+                    responsive: true,
+                },
+            ],
+        };
+    };
 
     return ( // renders all the graphs
         <>
@@ -198,8 +217,37 @@ function RegisteredAtDisplay() {
         <br></br>
         <br></br>
 
-    </>
+        <div style={{margin: '0 auto', width: '80%', minWidth: '300px'}}>
+            <h2 style={{textAlign: 'center'}}>School Distribution</h2>
+            <Bar 
+                data={prepSchoolData()} 
+                options={{ 
+                    responsive: true, 
+                    plugins: { 
+                        legend: { 
+                            position: 'top' 
+                        },
+                            tooltip: { 
+                                enabled: true 
+                            }
+                    },
+                scales: {
+                    x: { 
+                        title: { display: true, text: 'Schools' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Number of Participants' }
+                    }
+                }
+            }} 
+        />
+
+    </div>
+    
+</>
     );
+
+   
 }
 
 
