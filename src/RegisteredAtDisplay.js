@@ -36,7 +36,7 @@ function RegisteredAtDisplay() {
                         }
 
                          if (entry.uvaSchool) {
-                             const school = entry.uvaSchool().trim().toLowerCase();
+                             const school = entry.uvaSchool.trim().toLowerCase();
                              schoolCountsTemp[school] = (schoolCountsTemp[school] || 0) + 1;
                         }
 
@@ -93,8 +93,6 @@ function RegisteredAtDisplay() {
             return yArr;
     }
 
-    const totalParticipants = RegisteredAt.length;
-
     const totalParticipantsData = {
             labels: makeX(),
             datasets:[
@@ -142,6 +140,7 @@ function RegisteredAtDisplay() {
     const prepSchoolData = () => {
         const labels = Object.keys(schoolCounts).map(school => school.charAt(0).toUpperCase() + school.slice(1));
         const schoolDataCounts = Object.values(schoolCounts);
+
         return {
             labels: labels,
             datasets: [
@@ -243,12 +242,18 @@ function RegisteredAtDisplay() {
         />
 
     </div>
+
+    {/* majors Distribution graph */}
+
+
+    {/* add gap at bottom of screen */}
+    <br></br>
+    <br></br>
     
 </>
     );
 
    
 }
-
 
 export default RegisteredAtDisplay;
