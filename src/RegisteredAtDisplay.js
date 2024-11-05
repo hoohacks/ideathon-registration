@@ -18,7 +18,7 @@ function RegisteredAtDisplay() {
             if (data) {
                 const registeredAtArray = [];
                 const genderCountsTemp = {};
-                const schoolCountsTemp = {};
+                const schoolCountsTemp = {}; 
 
                 for (const key in data) {
 
