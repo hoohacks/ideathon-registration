@@ -3,7 +3,8 @@ import React, { isValidElement, useState } from "react";
 // firebase
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
-import { database, storage } from "./firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { database, storage, auth } from "./firebase";
 import { ref, push, child, update } from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage"; // avoid naming issues
@@ -67,14 +68,23 @@ const Registration = () => {
   // text-fields
   const [firstName, setFirstName] = useState("");
   const [firstNameCheck, setFirstNameCheck] = useState(false);
+
   const [lastName, setLastName] = useState("");
   const [lastNameCheck, setLastNameCheck] = useState(false);
+
   const [email, setEmail] = useState("");
   const [emailCheck, setEmailCheck] = useState(false);
+
+  const [password, setPassword] = useState("");
+  const [passwordCheck, setPasswordCheck] = useState(false);
+  const [isValidPassword, setIsValidPassword] = useState(true);
+
   const [skills, setSkills] = useState("");
   const [skillsCheck, setSkillsCheck] = useState(false);
+
   const [major, setMajor] = useState("");
   const [majorCheck, setMajorCheck] = useState(false);
+
   const [learn, setLearn] = useState("");
   const [learnCheck, setLearnCheck] = useState(false);
 
@@ -92,7 +102,7 @@ const Registration = () => {
     useState(false);
 
   // year
-  const [selectYear, setSelectYear] = useState(2024);
+  const [selectYear, setSelectYear] = useState(2026);
   const [otherSelectYear, setOtherSelectYear] = useState("");
   const [otherSelectYearCheck, setOtherSelectYearCheck] = useState("");
 
@@ -108,10 +118,15 @@ const Registration = () => {
   // successful registration upload
   const [successRegistration, setSuccessRegistration] = useState(false);
 
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+
   const changeResumeHandle = (event) => {
+    if (!event.target.files[0])
+      return;
+
     const storageReference = storageRef(
       storage,
-      `/ideathon-resume-2024/${selectYear}/${event.target.files[0].name}`
+      `/ideathon-resume-2025/${selectYear}/${event.target.files[0].name}`
     );
     const uploadResumeToDB = uploadBytesResumable(
       storageReference,
@@ -139,10 +154,26 @@ const Registration = () => {
   };
 
   async function handleSubmit() {
+    // form validation
+    if (!isValidEmail || !isValidPassword) {
+      setShowErrorPopup(true);
+      return;
+    }
+
     // update dietary restrictions with other value
     var dietRestriction = dietaryRestriction;
     if (otherDietaryRestriction !== "") {
       dietRestriction.push(otherDietaryRestriction);
+    }
+
+    // Sign in user with email and password
+    let user = null;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      user = userCredential.user;
+    } catch (error) {
+      alert("Error signing up. User already exists or email is invalid.");
+      return;
     }
 
     // checks if resume has been uploaded yet or not
@@ -167,9 +198,8 @@ const Registration = () => {
           dietRestriction.length === 0 ? "none" : dietRestriction,
       };
 
-      const newPostKey = push(child(ref(database), "posts")).key;
       const updates = {};
-      updates["/" + newPostKey] = applicant;
+      updates["/" + user.uid] = applicant;
       return update(ref(database), updates)
         .then(() => setSuccessRegistration(true))
         .catch((error) => {
@@ -195,9 +225,8 @@ const Registration = () => {
           dietRestriction.length === 0 ? "none" : dietRestriction,
       };
 
-      const newPostKey = push(child(ref(database), "posts")).key;
       const updates = {};
-      updates["/" + newPostKey] = applicant;
+      updates["/" + user.uid] = applicant;
       return update(ref(database), updates)
         .then(() => setSuccessRegistration(true))
         .catch((error) => {
@@ -237,7 +266,7 @@ const Registration = () => {
               gap: "8px",
             }}
           >
-            <Typography>Successfully signed up for Ideathon 24!</Typography>
+            <Typography>Successfully signed up for Ideathon 25!</Typography>
             <Link href="https://ideathon.hoohacks.io">
               <Button
                 sx={{
@@ -257,6 +286,39 @@ const Registration = () => {
                 View Schedule
               </Button>
             </Link>
+          </Box>
+        </Popup>
+        <Popup open={showErrorPopup} modal>
+          <Box
+            sx={{
+              borderRadius: "5px",
+              textAlign: "center",
+              padding: "15px",
+              display: "flex",
+              flexFlow: "column",
+              gap: "8px",
+            }}
+          >
+            <Typography>
+              Please enter a valid email and ensure your password is at least 6 characters.
+            </Typography>
+            <Button
+              sx={{
+                backgroundColor: "#f82249",
+                color: "#fff",
+                boxShadow: 2,
+                "&:hover": {
+                  transform: "scale3d(1.05, 1.05, 1)",
+                  backgroundColor: "#fff",
+                  color: "#f82249",
+                  border: "1px solid",
+                  borderColor: "#f82249",
+                },
+              }}
+              onClick={() => setShowErrorPopup(false)}
+            >
+              Close
+            </Button>
           </Box>
         </Popup>
         <Grid
@@ -321,7 +383,7 @@ const Registration = () => {
               <Typography sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
                 <span style={{ fontWeight: "bold" }}>
-                  Saturday October 19, 2024
+                  Saturday October 19, 2025
                 </span>
                 , is a networking, team-building, and pitching event designed to
                 help students with technical experience and students with
@@ -415,7 +477,32 @@ const Registration = () => {
                     <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
                       Enter your email
                     </Typography>
-                  )) 
+                  ))
+                }
+              />
+              <TextField
+                fullWidth={true}
+                required
+                id="Password"
+                label="Password"
+                name="Password"
+                variant="outlined"
+                size="large"
+                value={password}
+                type="password"
+                autoComplete="current-password"
+                error={!isValidPassword}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordCheck(password !== "");
+                  setIsValidPassword(password.length >= 6);
+                }}
+                helperText={
+                  (password === "" && (
+                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
+                      Enter your password (6 characters minimum)
+                    </Typography>
+                  ))
                 }
               />
               <TextField
@@ -475,29 +562,30 @@ const Registration = () => {
               </Box>
 
               <Box
-              sx={{
-                width: "100%",
-                display: "flex",
-                flexFlow: "column nowrap",
-                gap: "8px",
-              }}
-            >
-              <FormControl size="small">
-                <InputLabel>Expected Graduation Date</InputLabel>
-                <Select
-                  labelId="school-year-select"
-                  label="Expected Graduation Year"
-                  value={selectYear}
-                  size="large"
-                  onChange={(e) => setSelectYear(e.target.value)}
-                >
-                  <MenuItem value={2025}>2025</MenuItem>
-                  <MenuItem value={2026}>2026</MenuItem>
-                  <MenuItem value={2027}>2027</MenuItem>
-                  <MenuItem value={2028}>2028</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  flexFlow: "column nowrap",
+                  gap: "8px",
+                }}
+              >
+                <FormControl size="small">
+                  <InputLabel>Expected Graduation Date</InputLabel>
+                  <Select
+                    labelId="school-year-select"
+                    label="Expected Graduation Year"
+                    value={selectYear}
+                    size="large"
+                    onChange={(e) => setSelectYear(e.target.value)}
+                  >
+                    <MenuItem value={2025}>2025</MenuItem>
+                    <MenuItem value={2026}>2026</MenuItem>
+                    <MenuItem value={2027}>2027</MenuItem>
+                    <MenuItem value={2028}>2028</MenuItem>
+                    <MenuItem value={2029}>2029</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
 
               <Box
                 sx={{
@@ -652,31 +740,31 @@ const Registration = () => {
                 />
               </Box>
               <Box
-              sx={{
-                width: "100%",
-                display: "flex",
-                flexFlow: "column nowrap",
-                gap: "8px",
-              }}
-            >
-              <FormControl size="small">
-                <InputLabel>Dietary Restrictions</InputLabel>
-                <Select
-                  labelId="dietary-restriction-select"
-                  label="Dietary Restrictions"
-                  value={dietaryRestriction}
-                  size="large"
-                  onChange={(e) => {
-                    setDietaryRestriction(e.target.value);
-                  }}
-                >
-                  <MenuItem value="vegetarian">Vegetarian</MenuItem>
-                  <MenuItem value="gluten-free">Gluten Free</MenuItem>
-                  <MenuItem value="vegan">Vegan</MenuItem>
-                  <MenuItem value="none">None</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  flexFlow: "column nowrap",
+                  gap: "8px",
+                }}
+              >
+                <FormControl size="small">
+                  <InputLabel>Dietary Restrictions</InputLabel>
+                  <Select
+                    labelId="dietary-restriction-select"
+                    label="Dietary Restrictions"
+                    value={dietaryRestriction}
+                    size="large"
+                    onChange={(e) => {
+                      setDietaryRestriction(e.target.value);
+                    }}
+                  >
+                    <MenuItem value="vegetarian">Vegetarian</MenuItem>
+                    <MenuItem value="gluten-free">Gluten Free</MenuItem>
+                    <MenuItem value="vegan">Vegan</MenuItem>
+                    <MenuItem value="none">None</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
 
 
 
@@ -688,25 +776,25 @@ const Registration = () => {
                 }}
               >
 
-                  <Button
-                    sx={{
-                      backgroundColor: "#f82249",
-                      color: "#fff",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#fff",
-                        color: "#f82249",
-                        border: "1px solid",
-                        borderColor: "#f82249",
-                      },
-                    }}
-                    type="submit"
-                    onClick={() => handleSubmit()}
-                  >
-                    Submit Registration
-                  </Button>
-               
+                <Button
+                  sx={{
+                    backgroundColor: "#f82249",
+                    color: "#fff",
+                    boxShadow: 2,
+                    "&:hover": {
+                      transform: "scale3d(1.05, 1.05, 1)",
+                      backgroundColor: "#fff",
+                      color: "#f82249",
+                      border: "1px solid",
+                      borderColor: "#f82249",
+                    },
+                  }}
+                  type="submit"
+                  onClick={() => handleSubmit()}
+                >
+                  Submit Registration
+                </Button>
+
 
                 <Link href="https://ideathon.hoohacks.io">
                   <Button
