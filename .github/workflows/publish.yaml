@@ -9,6 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Build and Push
+    env:
+      CI: false
     steps:
       - name: git-checkout
         uses: actions/checkout@v2
