@@ -5,6 +5,7 @@ import Search from "./Search"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
 import { signInWithEmailAndPassword } from "firebase/auth"
+import JudgeRegistration from "./JudgeRegistration"
 
 const AuthContext = createContext(null);
 
@@ -70,6 +71,7 @@ function App() {
         <Route path="/ideathon-registration" element={<Registration />} />
         <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
         <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
+        <Route path="/judge-registration" element={<JudgeRegistration />} />
       </Routes>
     </AuthProvider>
   )
