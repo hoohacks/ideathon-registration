@@ -536,7 +536,7 @@ const Registration = () => {
                   gap: "8px",
                 }}
               >
-                <FormControl size="small">
+                <FormControl size="large">
                   <InputLabel>Gender</InputLabel>
                   <Select
                     labelId="gender-select"
