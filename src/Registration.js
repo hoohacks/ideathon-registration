@@ -536,7 +536,7 @@ const Registration = () => {
                   gap: "8px",
                 }}
               >
-                <FormControl size="small">
+                <FormControl size="large">
                   <InputLabel>Gender</InputLabel>
                   <Select
                     labelId="gender-select"
@@ -681,13 +681,17 @@ const Registration = () => {
                   helpful for Ideathon participants? This will be used primarily
                   for team building. *
                 </Typography>
+
                 <TextField
+                  fullWidth={true}
                   required
                   id="skills"
                   name="skills"
                   variant="outlined"
                   size="large"
+                  label="My skills are..."
                   multiline
+                  type="text"
                   maxRows={Infinity}
                   value={skills}
                   autoComplete="skills"
@@ -722,6 +726,7 @@ const Registration = () => {
                   name="learn"
                   variant="outlined"
                   size="large"
+                  label="I would like to learn..."
                   multiline
                   maxRows={Infinity}
                   value={learn}
@@ -747,7 +752,7 @@ const Registration = () => {
                   gap: "8px",
                 }}
               >
-                <FormControl size="small">
+                <FormControl size="large">
                   <InputLabel>Dietary Restrictions</InputLabel>
                   <Select
                     labelId="dietary-restriction-select"

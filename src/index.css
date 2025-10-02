@@ -12,7 +12,8 @@ code {
     monospace;
 }
 
-
-
-
-
+fieldset {
+  legend {
+    width: unset;
+  }
+}

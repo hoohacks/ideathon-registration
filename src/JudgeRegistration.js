@@ -26,6 +26,7 @@ import {
   Button,
   Checkbox,
   FormControlLabel,
+  FormLabel,
   FormGroup,
   FormControl,
   Grid,
@@ -39,6 +40,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 // import logo
 import Logo from "./images/logo.png";
 import { maxWidth } from "@mui/system";
+import { FormText } from "react-bootstrap";
 
 // email format
 const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
@@ -79,7 +81,7 @@ const JudgeRegistration = () => {
   const [passwordCheck, setPasswordCheck] = useState(false);
   const [isValidPassword, setIsValidPassword] = useState(true);
 
-  let [withCompany, setWithCompany] = useState(false);
+  const [withCompany, setWithCompany] = useState(false);
 
   const [company, setCompany] = useState("");
 
@@ -382,7 +384,7 @@ const JudgeRegistration = () => {
                 <span style={{ fontWeight: "bold" }}>
                   Sunday, October 19, 2025
                 </span>
-                <p>
+                <Typography>
                   Ideathon is a networking, team-building, and pitching event
                   designed to help students with technical experience and
                   students with business experience build their technical
@@ -394,7 +396,7 @@ const JudgeRegistration = () => {
                   from 10:00 AM - 7:00 PM at Rice Hall, but you do not have to
                   stay for the entire event! Fill out this form if you would
                   like to help out. Thank you!
-                </p>
+                </Typography>
               </Typography>
 
               <Box
@@ -510,39 +512,69 @@ const JudgeRegistration = () => {
                   gap: "10px",
                 }}
               >
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={withCompany}
-                      onChange={(event) => {
-                        setWithCompany(!withCompany);
-                      }}
-                      color="primary"
-                    />
-                  }
-                  label="Are you mentoring/judging on behalf of a company that is sponsoring the Ideathon?"
-                />
-                {withCompany ? (
-                  <TextField
-                    fullWidth={true}
-                    required
-                    id="company"
-                    name="company"
-                    label="Company"
-                    variant="outlined"
-                    value={company}
-                    type="text"
-                    size="large"
-                    autoComplete="company"
-                    onChange={(e) => {
-                      setCompany(e.target.value);
-                    }}
+                <hr />
+                <Typography>
+                  Are you mentoring/judging on behalf of a company that is
+                  sponsoring the Ideathon?
+                </Typography>
+                <RadioGroup>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={withCompany}
+                        onChange={(event) => {
+                          setWithCompany(true);
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Yes"
                   />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={!withCompany}
+                        onChange={(event) => {
+                          setWithCompany(false);
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="No"
+                  />
+                </RadioGroup>
+                {withCompany ? (
+                  <>
+                    <TextField
+                      fullWidth={true}
+                      required
+                      id="company"
+                      name="company"
+                      label="Company"
+                      variant="outlined"
+                      value={company}
+                      type="text"
+                      size="large"
+                      autoComplete="company"
+                      onChange={(e) => {
+                        setCompany(e.target.value);
+                      }}
+                    />
+                  </>
                 ) : null}
-                <p>
+                <hr />
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexFlow: "column nowrap",
+                  gap: "10px",
+                }}
+              >
+                <Typography>
                   Mentors help our students form their ideas and craft a pitch
                   throughout the day in shifts. Shifts are 1 hour each.
-                </p>
+                </Typography>
                 <FormControlLabel
                   control={
                     <Checkbox
@@ -553,8 +585,7 @@ const JudgeRegistration = () => {
                       color="primary"
                     />
                   }
-                  label=" Would you like to mentor for the Ideathon?
-"
+                  label=" Would you like to mentor for the Ideathon?"
                 />
                 {wantsToMentor ? (
                   <>
@@ -580,10 +611,10 @@ const JudgeRegistration = () => {
                 ) : null}
                 {wantsToMentor ? (
                   <>
-                    <p>
+                    <Typography>
                       Please select all the skills you are comfortable mentoring
                       in.
-                    </p>
+                    </Typography>
                     {skills_strs.map((str, index) => (
                       <FormControlLabel
                         control={
@@ -600,29 +631,55 @@ const JudgeRegistration = () => {
                     ))}
                   </>
                 ) : null}
-                <p>
+                <Typography>
                   Judges will evaluate and score the teams’ pitches from 5:00 pm
                   - 7:00 pm.
-                </p>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={wantsToJudge}
-                      onChange={(event) => {
-                        setWantsToJudge(!wantsToJudge);
-                      }}
-                      color="primary"
-                    />
-                  }
-                  label=" Would you like to judge for the Ideathon?
-"
-                />
-                <p>
+                </Typography>
+                <Typography>
+                  Would you like to judge for the Ideathon?
+                </Typography>
+                <RadioGroup>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={wantsToJudge}
+                        onChange={(event) => {
+                          setWantsToJudge(true);
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="Yes"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={!wantsToJudge}
+                        onChange={(event) => {
+                          setWantsToJudge(false);
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label="No"
+                  />
+                </RadioGroup>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexFlow: "column nowrap",
+                  gap: "10px",
+                }}
+              >
+                <Typography>
                   Do you have any questions or concerns? Feel free to include
-                  them here or send us an email at hackathon.virginia@gmail.com.
-                  Thank you for filling out this form!
-                  {isValidPassword + " " + isValidEmail}
-                </p>
+                  them here or send us an email at{" "}
+                  <a href="mailto:hackathon.virginia@gmail.com">
+                    hackathon.virginia@gmail.com
+                  </a>
+                  . Thank you for filling out this form!
+                </Typography>
                 <TextField
                   fullWidth={true}
                   id="Questions"
