@@ -85,6 +85,66 @@ const JudgeRegistration = () => {
 
   const [wantsToMentor, setWantsToMentor] = useState(false);
 
+  const timing_strs = [
+    "11:00 AM",
+    "12:00 PM",
+    "1:00 PM",
+    "2:00 PM",
+    "3:00 PM",
+    "4:00 PM",
+  ];
+
+  const [timings, setTimings] = useState([
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
+
+  const skills_strs = [
+    "Android Studio",
+    "Angular",
+    "AWS",
+    "Azure",
+    "C",
+    "CSS",
+    "C++",
+    "C#/ASP.NET",
+    "Django",
+    "echoAR",
+    "Firebase",
+    "Flutter",
+    "GCP",
+    "Git",
+    "Google Maps API",
+    "HTML",
+    "Idea Generation",
+    "iOS Mobile App Development",
+    "Java",
+    "JavaScript",
+    "jQuery",
+    "Machine Learning",
+    "MaxMSP",
+    "Node.js",
+    "Perl",
+    "Pitching",
+    "Python",
+    "React",
+    "Ruby/Rails",
+    "SQL",
+    "Unity",
+    "Other VR technology",
+    "Vue.js",
+  ];
+
+  const [skills, setSkills] = useState(Array(skills_strs.length).fill(false));
+
+  const toggleBool = (index, stateFunc) => {
+    stateFunc((prev) => prev.map((value, i) => (i === index ? !value : value)));
+  };
+
   const [wantsToJudge, setWantsToJudge] = useState(false);
 
   const [questionsAndConcerns, setQuestionsAndConcerns] = useState("");
@@ -96,10 +156,35 @@ const JudgeRegistration = () => {
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorString, setErrorString] = useState(false);
 
   async function handleSubmit() {
+    const checkSlots = () => {
+      if (wantsToMentor) {
+        let count = 0;
+        for (let i = 0; i < timings.length; i++) {
+          if (timings[i]) {
+            count++;
+          }
+        }
+        if (count >= 2) {
+          return true;
+        }
+        return false;
+      }
+      return true;
+    };
     // form validation
     if (!isValidEmail || !isValidPassword) {
+      setErrorString(
+        "Please enter a valid email and ensure your password is at least 6 characters."
+      );
+      setShowErrorPopup(true);
+      return;
+    }
+
+    if (!checkSlots()) {
+      setErrorString("Please select at least two time slots.");
       setShowErrorPopup(true);
       return;
     }
@@ -114,9 +199,15 @@ const JudgeRegistration = () => {
       );
       user = userCredential.user;
     } catch (error) {
-      alert("Error signing up. User already exists or email is invalid.");
+      setErrorString(
+        "Error signing up. User already exists or email is invalid."
+      );
+      setShowErrorPopup(true);
       return;
     }
+
+    let timeslots = timing_strs.filter((_, i) => timings[i]);
+    let selected_skills = skills_strs.filter((_, i) => skills[i]);
 
     let judge = {
       firstName: firstName,
@@ -125,6 +216,8 @@ const JudgeRegistration = () => {
       withCompany: withCompany,
       company: company,
       wantsToMentor: wantsToMentor,
+      timeslots: timeslots,
+      skills: selected_skills,
       wantsToJudge: wantsToJudge,
       questionsAndConcerns: questionsAndConcerns,
       registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
@@ -133,7 +226,7 @@ const JudgeRegistration = () => {
     };
 
     const updates = {};
-    updates["/" + user.uid] = judge;
+    updates["/judges/" + user.uid] = judge;
     return update(ref(database), updates)
       .then(() => setSuccessRegistration(true))
       .catch((error) => {
@@ -205,10 +298,7 @@ const JudgeRegistration = () => {
               gap: "8px",
             }}
           >
-            <Typography>
-              Please enter a valid email and ensure your password is at least 6
-              characters.
-            </Typography>
+            <Typography>{errorString}</Typography>
             <Button
               sx={{
                 backgroundColor: "#f82249",
@@ -466,6 +556,50 @@ const JudgeRegistration = () => {
                   label=" Would you like to mentor for the Ideathon?
 "
                 />
+                {wantsToMentor ? (
+                  <>
+                    <p>
+                      Please select at least 2 shifts you are available for.
+                      Shifts are 1 hour.
+                    </p>
+                    {timing_strs.map((str, index) => (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={timings[index]}
+                            onChange={() => {
+                              toggleBool(index, setTimings);
+                            }}
+                            color="primary"
+                          />
+                        }
+                        label={timing_strs[index]}
+                      />
+                    ))}
+                  </>
+                ) : null}
+                {wantsToMentor ? (
+                  <>
+                    <p>
+                      Please select all the skills you are comfortable mentoring
+                      in.
+                    </p>
+                    {skills_strs.map((str, index) => (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={skills[index]}
+                            onChange={() => {
+                              toggleBool(index, setSkills);
+                            }}
+                            color="primary"
+                          />
+                        }
+                        label={str}
+                      />
+                    ))}
+                  </>
+                ) : null}
                 <p>
                   Judges will evaluate and score the teams’ pitches from 5:00 pm
                   - 7:00 pm.
