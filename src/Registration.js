@@ -121,8 +121,7 @@ const Registration = () => {
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   const changeResumeHandle = (event) => {
-    if (!event.target.files[0])
-      return;
+    if (!event.target.files[0]) return;
 
     const storageReference = storageRef(
       storage,
@@ -169,7 +168,11 @@ const Registration = () => {
     // Sign in user with email and password
     let user = null;
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       user = userCredential.user;
     } catch (error) {
       alert("Error signing up. User already exists or email is invalid.");
@@ -226,7 +229,7 @@ const Registration = () => {
       };
 
       const updates = {};
-      updates["/" + user.uid] = applicant;
+      updates["/competitors/" + user.uid] = applicant;
       return update(ref(database), updates)
         .then(() => setSuccessRegistration(true))
         .catch((error) => {
@@ -300,7 +303,8 @@ const Registration = () => {
             }}
           >
             <Typography>
-              Please enter a valid email and ensure your password is at least 6 characters.
+              Please enter a valid email and ensure your password is at least 6
+              characters.
             </Typography>
             <Button
               sx={{
@@ -473,11 +477,11 @@ const Registration = () => {
                   setIsValidEmail(mailformat.test(email));
                 }}
                 helperText={
-                  (email === "" && (
+                  email === "" && (
                     <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
                       Enter your email
                     </Typography>
-                  ))
+                  )
                 }
               />
               <TextField
@@ -498,11 +502,11 @@ const Registration = () => {
                   setIsValidPassword(password.length >= 6);
                 }}
                 helperText={
-                  (password === "" && (
+                  password === "" && (
                     <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
                       Enter your password (6 characters minimum)
                     </Typography>
-                  ))
+                  )
                 }
               />
               <TextField
@@ -551,7 +555,9 @@ const Registration = () => {
                     <MenuItem value="male">Male</MenuItem>
                     <MenuItem value="female">Female</MenuItem>
                     <MenuItem value="other">Other</MenuItem>
-                    <MenuItem value="prefer-not-to-say">Prefer not to say</MenuItem>
+                    <MenuItem value="prefer-not-to-say">
+                      Prefer not to say
+                    </MenuItem>
                   </Select>
                   {gender === null ? (
                     <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
@@ -771,8 +777,6 @@ const Registration = () => {
                 </FormControl>
               </Box>
 
-
-
               <Box
                 sx={{
                   display: "flex",
@@ -780,7 +784,6 @@ const Registration = () => {
                   gap: "16px",
                 }}
               >
-
                 <Button
                   sx={{
                     backgroundColor: "#f82249",
@@ -799,7 +802,6 @@ const Registration = () => {
                 >
                   Submit Registration
                 </Button>
-
 
                 <Link href="https://ideathon.hoohacks.io">
                   <Button
