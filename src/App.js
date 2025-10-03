@@ -6,6 +6,12 @@ import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
 import { signInWithEmailAndPassword } from "firebase/auth"
 import JudgeRegistration from "./JudgeRegistration"
+import Login from "./Login"
+import UserHome from "./user/Home"
+import UserProfile from "./user/Profile"
+import CheckIn from "./user/CheckIn"
+import AdminScan from "./user/admin/Scan"
+import Pairs from "./user/judge/Pairs"
 
 const AuthContext = createContext(null);
 
@@ -14,19 +20,19 @@ function useAuth() {
 }
 
 function ProtectedRoute({ children }) {
-  const { token, handleLogin } = useAuth();
+  const { userCredential, handleLogin } = useAuth();
   const [authenticated, setAuthenticated] = useState(null);
 
   useEffect(() => {
     async function checkAuth() {
-      if (!token && !(await handleLogin()))
+      if (!userCredential && !(await handleLogin()))
         setAuthenticated(false);
-      else if (token)
+      else if (userCredential)
         setAuthenticated(true);
     }
 
     checkAuth();
-  }, [token, handleLogin]);
+  }, [userCredential, handleLogin]);
 
   if (authenticated === null)
     return null;
@@ -35,7 +41,7 @@ function ProtectedRoute({ children }) {
 }
 
 function AuthProvider({ children }) {
-  const [token, setToken] = useState(null);
+  const [userCredential, setUserCredential] = useState(null);
 
   const promptAuth = async () => {
     const email = prompt("Email?");
@@ -43,7 +49,7 @@ function AuthProvider({ children }) {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      return userCredential.user.getIdToken();
+      return userCredential;
     } catch (error) {
       console.error(error);
       return null;
@@ -51,13 +57,13 @@ function AuthProvider({ children }) {
   };
 
   const handleLogin = async () => {
-    const token = await promptAuth();
-    setToken(token);
-    return token !== null;
+    const userCredential = await promptAuth();
+    setUserCredential(userCredential);
+    return userCredential !== null;
   };
 
   return (
-    <AuthContext.Provider value={{ token, handleLogin }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin }}>
       {children}
     </AuthContext.Provider>
   )
@@ -72,9 +78,23 @@ function App() {
         <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
         <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/user">
+          <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          <Route path="checkin" element={<ProtectedRoute><CheckIn /></ProtectedRoute>} />
+          <Route path="admin">
+            <Route path="scan" element={<ProtectedRoute><AdminScan /></ProtectedRoute>} />
+          </Route>
+          <Route path="judge">
+            <Route path="pairs" element={<ProtectedRoute><Pairs /></ProtectedRoute>} />
+          </Route>
+        </Route>
       </Routes>
     </AuthProvider>
   )
 }
+
+export { AuthContext };
 
 export default App
