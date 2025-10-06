@@ -22,24 +22,13 @@ function useAuth() {
 }
 
 function ProtectedRoute({ children }) {
-  const { userCredential, handleLogin } = useAuth();
-  const [authenticated, setAuthenticated] = useState(null);
+  const { userCredential } = useAuth();
 
-  useEffect(() => {
-    async function checkAuth() {
-      if (!userCredential && !(await handleLogin()))
-        setAuthenticated(false);
-      else if (userCredential)
-        setAuthenticated(true);
-    }
+  if (!userCredential) {
+    return <Navigate to="/login" replace />;
+  }
 
-    checkAuth();
-  }, [userCredential, handleLogin]);
-
-  if (authenticated === null)
-    return null;
-
-  return authenticated ? children : <Navigate to="/" />;
+  return children;
 }
 
 function AuthProvider({ children }) {
@@ -79,23 +68,15 @@ function AuthProvider({ children }) {
     fetchUserData();
   }, [userCredential]);
 
-  const promptAuth = async () => {
-    const email = prompt("Email?");
-    const password = prompt("Password?");
-
+  const handleLogin = async (email, password) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      return userCredential;
+      setUserCredential(userCredential);
+      return true;
     } catch (error) {
-      console.error(error);
-      return null;
+      console.error("Login failed:", error);
+      return false;
     }
-  };
-
-  const handleLogin = async () => {
-    const userCredential = await promptAuth();
-    setUserCredential(userCredential);
-    return userCredential !== null;
   };
 
   return (
@@ -131,6 +112,6 @@ function App() {
   )
 }
 
-export { AuthContext };
+export { AuthContext, useAuth };
 
 export default App
