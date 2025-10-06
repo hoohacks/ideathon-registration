@@ -1,13 +1,18 @@
 import { AppBar, Container, MenuItem, Toolbar, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
+import { useContext } from "react";
+import { AuthContext } from "../App";
 
 function Nav() {
     const links = [
         { to: "/user/home", label: "Home" },
         { to: "/user/profile", label: "Profile" },
-        { to: "/user/checkin", label: "Check In" },
-        { to: "/user/admin/scan", label: "Admin Scan" }
+        // { to: "/user/checkin", label: "Check In" },
+        { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"] },
     ];
+
+    const userType = useContext(AuthContext).userType;
+    const filteredLinks = links.filter(link => !link.authTypes || link.authTypes.includes(userType));
 
     return (
         <AppBar position="static">
@@ -31,7 +36,7 @@ function Nav() {
                         </Typography>
                     </Link>
 
-                    {links.map((link) => (
+                    {filteredLinks.map((link) => (
                         <Link key={link.to} to={link.to} style={{ color: 'white', margin: '10px', textDecoration: 'none' }}>
                             <MenuItem key={link.label}>
                                 <Typography sx={{ textAlign: 'center' }}>{link.label}</Typography>

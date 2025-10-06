@@ -12,6 +12,8 @@ import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
 import Pairs from "./user/judge/Pairs"
+import { ref, get } from "firebase/database"
+import { database } from "./firebase"
 
 const AuthContext = createContext(null);
 
@@ -42,6 +44,40 @@ function ProtectedRoute({ children }) {
 
 function AuthProvider({ children }) {
   const [userCredential, setUserCredential] = useState(null);
+  const [token, setToken] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [userType, setUserType] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!userCredential)
+        return;
+
+        const idToken = await userCredential.user.getIdToken();
+        setToken(idToken);
+
+      // Check if user exists in /competitors or /judges
+      const userTypes = ["competitor", "judge", "admin"];
+      let userFound = false;
+
+      for (const userType of userTypes) {
+        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          setUserData(snapshot.val());
+          setUserType(userType);
+          userFound = true;
+          break;
+        }
+      }
+
+      if (!userFound) {
+        setUserData(null);
+      }
+    };
+
+    fetchUserData();
+  }, [userCredential]);
 
   const promptAuth = async () => {
     const email = prompt("Email?");
@@ -63,7 +99,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userType }}>
       {children}
     </AuthContext.Provider>
   )
