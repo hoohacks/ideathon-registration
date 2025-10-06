@@ -21,11 +21,15 @@ function useAuth() {
   return useContext(AuthContext);
 }
 
-function ProtectedRoute({ children }) {
-  const { userCredential } = useAuth();
+function ProtectedRoute({ children, requiredRole  }) {
+  const { userCredential, userType } = useAuth();
 
   if (!userCredential) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (requiredRole && userType !== requiredRole) {
+    return <Navigate to="/user/home" replace />;
   }
 
   return children;
@@ -92,19 +96,19 @@ function App() {
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
-        <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute requiredRole="admin"><Search /></ProtectedRoute>} />
         <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
-          <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="checkin" element={<ProtectedRoute><CheckIn /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute requiredRole="competitor"><UserProfile /></ProtectedRoute>} />
+          <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
           <Route path="admin">
-            <Route path="scan" element={<ProtectedRoute><AdminScan /></ProtectedRoute>} />
+            <Route path="scan" element={<ProtectedRoute requiredRole="admin"><AdminScan /></ProtectedRoute>} />
           </Route>
           <Route path="judge">
-            <Route path="pairs" element={<ProtectedRoute><Pairs /></ProtectedRoute>} />
+            <Route path="pairs" element={<ProtectedRoute requiredRole="judge"><Pairs /></ProtectedRoute>} />
           </Route>
         </Route>
       </Routes>
