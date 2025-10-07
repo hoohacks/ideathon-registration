@@ -7,6 +7,7 @@ function Nav() {
     const links = [
         { to: "/user/home", label: "Home" },
         { to: "/user/profile", label: "Profile" },
+        { to: "/user/judging", label: "Judging" },
         // { to: "/user/checkin", label: "Check In" },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"] },
     ];
