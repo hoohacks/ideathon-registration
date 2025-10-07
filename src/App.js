@@ -15,6 +15,7 @@ import ForgotPassword from "./ForgotPassword.js"
 import Pairs from "./user/judge/Pairs"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
+import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
 
 const AuthContext = createContext(null);
 
