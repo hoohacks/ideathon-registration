@@ -1,4 +1,5 @@
 import React from "react";
+import ScoreSubmission from "./ScoreSubmission";
 import "./ScheduleCard.css";
 
 /**

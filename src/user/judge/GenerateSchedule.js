@@ -8,7 +8,7 @@ function GenerateSchedule({
             type="button"
             className="generate-schedule-button"
             onClick={(e) => {
-            onButtonClick(e);
+                onButtonClick(e);
             }}
         >
             Generate Schedule

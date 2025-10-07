@@ -1,7 +1,12 @@
 
 function ScoreSubmission() {
     return (
-        <h1>Score submission</h1>
+        <div>            
+            <h1>Score Submission</h1>
+            <form>
+
+            </form>
+        </div>
     );
 }
 
