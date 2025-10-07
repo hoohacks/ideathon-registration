@@ -1,0 +1,12 @@
+.judging-page {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding: 16px;
+}
+
+.assignments__row{
+	display: flex;
+	gap: 18px;
+	align-items: flex-start;
+}

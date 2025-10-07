@@ -13,6 +13,7 @@ import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
 import ForgotPassword from "./ForgotPassword.js"
 import Pairs from "./user/judge/Pairs"
+import Assignments from "./user/judge/Assignments.js"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
 import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
@@ -109,6 +110,7 @@ function App() {
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute requiredRole="competitor"><UserProfile /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRole="admin"><AdminScan /></ProtectedRoute>} />
