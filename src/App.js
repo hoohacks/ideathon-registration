@@ -4,13 +4,14 @@ import Registration from "./Registration"
 import Search from "./Search"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
-import { signInWithEmailAndPassword } from "firebase/auth"
+import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/auth"
 import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
 import UserHome from "./user/Home"
 import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
+import ForgotPassword from "./ForgotPassword.js"
 import Pairs from "./user/judge/Pairs"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
@@ -21,7 +22,7 @@ function useAuth() {
   return useContext(AuthContext);
 }
 
-function ProtectedRoute({ children, requiredRole  }) {
+function ProtectedRoute({ children, requiredRole }) {
   const { userCredential, userType } = useAuth();
 
   if (!userCredential) {
@@ -46,8 +47,8 @@ function AuthProvider({ children }) {
       if (!userCredential)
         return;
 
-        const idToken = await userCredential.user.getIdToken();
-        setToken(idToken);
+      const idToken = await userCredential.user.getIdToken();
+      setToken(idToken);
 
       // Check if user exists in /competitors or /judges
       const userTypes = ["competitor", "judge", "admin"];
@@ -72,8 +73,11 @@ function AuthProvider({ children }) {
     fetchUserData();
   }, [userCredential]);
 
-  const handleLogin = async (email, password) => {
+  const handleLogin = async (email, password, remember = false) => {
     try {
+      if (remember) {
+        await auth.setPersistence(browserLocalPersistence);
+      }
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setUserCredential(userCredential);
       return true;
@@ -99,6 +103,7 @@ function App() {
         <Route path="/search" element={<ProtectedRoute requiredRole="admin"><Search /></ProtectedRoute>} />
         <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
