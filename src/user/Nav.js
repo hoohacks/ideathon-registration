@@ -9,6 +9,7 @@ function Nav() {
         { to: "/user/profile", label: "Profile" },
         // { to: "/user/checkin", label: "Check In" },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"] },
+        { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"] },
     ];
 
     const userType = useContext(AuthContext).userType;

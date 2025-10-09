@@ -1,7 +1,7 @@
 import { Navigate, Routes, Route } from "react-router-dom"
 import { createContext, useContext, useState, useEffect } from "react"
 import Registration from "./Registration"
-import Search from "./Search"
+import Search from "./user/admin/Search.js"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
 import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/auth"
@@ -100,7 +100,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
-        <Route path="/search" element={<ProtectedRoute requiredRole="admin"><Search /></ProtectedRoute>} />
         <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -111,6 +110,7 @@ function App() {
           <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRole="admin"><AdminScan /></ProtectedRoute>} />
+            <Route path="search" element={<ProtectedRoute requiredRole="admin"><Search /></ProtectedRoute>} />
           </Route>
           <Route path="judge">
             <Route path="pairs" element={<ProtectedRoute requiredRole="judge"><Pairs /></ProtectedRoute>} />
