@@ -1,4 +1,10 @@
 import Layout from "../Layout";
+import React, { useState } from "react";
+// qr
+import { useZxing } from "react-zxing";
+// firebase
+import { database } from "../../firebase";
+import { ref, get, update } from "firebase/database";
 
 // ------ Description ------
 //Add an endpoint /user/admin/scan (only accessible by admins) to scan a QR code and check a user in. The QR code is already generated for you, and it should represent a UID:
@@ -9,41 +15,26 @@ import Layout from "../Layout";
 
 // ------ logic ------
 // use react-qr-reader that has built-in camera feature to scan uid
+// https://www.npmjs.com/package/react-zxing
 // import firebase db
 // Firebase checked in boolean set to true
 
 function AdminScan() {
+    const [result, setResult] = useState("");
+    const { ref } = useZxing({
+        onDecodeResult(result) {
+            setResult(result.getText());
+        },
+    });
+
     return (
         <Layout>
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: "20px",
-                }}
-            >
-                <h1>Admin Scan with QR</h1>
-                {/* Set link to open scanner */}
-                <a
-                    href=""
-                    target="_blank"
-                    style={{
-                        background: "linear-gradient(220deg, #1976D2, #1d4ed8)",
-                        color: "#ffffff",
-                        fontWeight: 600,
-                        padding: "15px 25px",
-                        borderRadius: "12px",
-                        textDecoration: "none",
-                        boxShadow: "0 4px 10px rgba(37, 99, 235, 0.3)",
-                        cursor: "pointer",
-                        textAlign: "center",
-                    }}
-                >
-                    Click to Check-In Participants
-                </a>
-            </div>
+                {/* Put the qr code element here */}
+                <video ref={ref} />
+                <p>
+                    <span>Last result:</span>
+                    <span>{result}</span>
+                </p>
         </Layout>
     );
 }
