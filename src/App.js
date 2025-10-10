@@ -108,7 +108,7 @@ function App() {
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute requiredRole="competitor"><UserProfile /></ProtectedRoute>} />
-          <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
+          <Route path="checkin" element={<ProtectedRoute ><CheckIn /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRole="admin"><AdminScan /></ProtectedRoute>} />
           </Route>

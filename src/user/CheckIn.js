@@ -1,10 +1,16 @@
 import Layout from "./Layout";
 import { useAuth } from "../App";
 import { QRCodeCanvas } from "qrcode.react";
+import { Navigate } from "react-router-dom";
 
 function CheckIn() {
+  
   const { userCredential } = useAuth();
   const uid = userCredential.user.uid;
+  const { userType } = useAuth();
+  if (userType == "admin") {
+      return <Navigate to="/user/home" replace />;
+    }
 
   return (
     <Layout>
@@ -15,11 +21,12 @@ function CheckIn() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "60vh",
+          textAlign: "center"
         }}
       >
-        <h1>Check In with the QR Code Below:</h1>
+        <h1 >Check In with the QR Code Below:</h1>
         <br />
-        <QRCodeCanvas value={uid} size={400} style = {{border: "8px solid #1976d2", borderRadius: "20px", padding: "10px", backgroundColor: "white" }} />
+        <QRCodeCanvas value={uid} size={350} style = {{border: "8px solid #1976d2", borderRadius: "20px", padding: "10px", backgroundColor: "white" }} />
       </div>
     </Layout>
   );
