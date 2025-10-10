@@ -74,8 +74,8 @@ function AdminScan() {
                 } else {
                     setPopup({
                         open: true,
-                        title: "Error",
-                        message: `Failed to check-in ${userId}`,
+                        title: "User Not Found",
+                        message: `No competitor or judge found with ID: ${userId}`,
                     });
                 }
             } catch (err) {
@@ -130,43 +130,60 @@ function AdminScan() {
                     muted
                     autoPlay
                 />
-                <p style={{textAlign:"center"}}>If it is not scanning, ensure brightness is at 100%</p>
+                <p style={{ textAlign: "center" }}>
+                    If it is not scanning, ensure brightness is at 100%
+                </p>
             </div>
             {popup.open && (
-                <div
-                    style={{
-                        position: "fixed",
-                        left: "50%",
-                        top: "50%",
-                        transform: "translate(-50%, -50%)",
-                        zIndex: 1000,
-                    }}
-                >
+                <div>
+                    {/* background overlay so user cant click anything else */}
                     <div
                         style={{
-                            backgroundColor: "white",
-                            borderRadius: "20px",
-                            padding: "20px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "10px",
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-                            width: "50vw",
-                            minWidth: "300px",
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: "rgba(0, 0, 0, 0.5)",
+                            zIndex: 999,
+                        }}
+                    />
+                    {/* popup */}
+                    <div
+                        style={{
+                            position: "fixed",
+                            left: "50%",
+                            top: "50%",
+                            transform: "translate(-50%, -50%)",
+                            zIndex: 1000,
                         }}
                     >
-                        <h1
+                        <div
                             style={{
-                                margin: 0,
-                                color:
-                                    popup.title === "Error"
-                                        ? "#d32f2f"
-                                        : "#1976d2",
+                                backgroundColor: "white",
+                                borderRadius: "20px",
+                                padding: "20px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "10px",
+                                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+                                width: "50vw",
+                                minWidth: "300px",
                             }}
                         >
-                            {popup.title}
-                        </h1>
-                        <p style={{ margin: 0 }}>{popup.message}</p>
+                            <h1
+                                style={{
+                                    margin: 0,
+                                    color:
+                                        popup.title === "Error"
+                                            ? "#d32f2f"
+                                            : "#1976d2",
+                                }}
+                            >
+                                {popup.title}
+                            </h1>
+                            <p style={{ margin: 0 }}>{popup.message}</p>
+                        </div>
                     </div>
                 </div>
             )}
