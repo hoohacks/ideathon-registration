@@ -130,6 +130,7 @@ function AdminScan() {
                     muted
                     autoPlay
                 />
+                <p style={{textAlign:"center"}}>If it is not scanning, ensure brightness is at 100%</p>
             </div>
             {popup.open && (
                 <div
