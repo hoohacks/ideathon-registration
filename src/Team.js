@@ -6,7 +6,7 @@ const server = express();
 server.use(express.json()); 
 
 
-server.post("/ideathon-registration/user/team", async (req, res) => {
+server.post("/user/team", async (req, res) => {
   try {
     const teamsRef = ref(database, "teams");
     const newTeamRef = push(teamsRef);
@@ -14,7 +14,9 @@ server.post("/ideathon-registration/user/team", async (req, res) => {
     const teamData = {
       name: req.body.name,
       createdBy: req.body.userId,
-      members: [req.body.userId],
+      members: req.body.members && req.body.members.length > 0
+        ? req.body.members
+        : [req.body.userId],
     };
 
     await set(newTeamRef, teamData);
