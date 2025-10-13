@@ -6,7 +6,7 @@ const server = express();
 server.use(express.json()); 
 
 
-server.post("/user/team", async (req, res) => {
+server.post("/ideathon-registration//user/team", async (req, res) => {
   try {
     const teamsRef = ref(database, "teams");
     const newTeamRef = push(teamsRef);
