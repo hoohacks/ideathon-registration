@@ -5,12 +5,8 @@ import { Navigate } from "react-router-dom";
 
 function CheckIn() {
   
-  const { userCredential } = useAuth();
+  const { userCredential } = useAuth();u
   const uid = userCredential.user.uid;
-  const { userType } = useAuth();
-  if (userType == "admin") {
-      return <Navigate to="/user/home" replace />;
-    }
 
   return (
     <Layout>
