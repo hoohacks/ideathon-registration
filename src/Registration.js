@@ -202,7 +202,7 @@ const Registration = () => {
       };
 
       const updates = {};
-      updates["/" + user.uid] = applicant;
+      updates["/competitors/" + user.uid] = applicant;
       return update(ref(database), updates)
         .then(() => setSuccessRegistration(true))
         .catch((error) => {

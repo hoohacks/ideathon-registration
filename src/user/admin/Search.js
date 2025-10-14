@@ -1,5 +1,5 @@
 import { onValue, ref, get, set } from "firebase/database";
-import { database } from "./firebase";
+import { database } from "../../firebase";
 
 import React, { useEffect, useState } from "react";
 
@@ -271,8 +271,8 @@ function Search() {
                       transition: "background 0.1s",
                     }}
 
-                    //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
-                    //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
+                  //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
+                  //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
                   >
                     <p
                       className="label"
