@@ -5,7 +5,7 @@ import { Navigate } from "react-router-dom";
 
 function CheckIn() {
   
-  const { userCredential } = useAuth();u
+  const { userCredential } = useAuth();
   const uid = userCredential.user.uid;
 
   return (
