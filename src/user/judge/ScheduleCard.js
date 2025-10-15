@@ -1,5 +1,4 @@
 import React from "react";
-import ScoreSubmission from "./ScoreSubmission";
 import "./ScheduleCard.css";
 
 /**
@@ -15,6 +14,7 @@ function ScheduleCard({
   room = "Room 101",
   time = "10:00 AM",
   onButtonClick = () => {},
+  disabled = false,
 }) {
   return (
     <div
@@ -38,10 +38,13 @@ function ScheduleCard({
         type="button"
         className="schedule-card__button"
         onClick={(e) => {
-          onButtonClick({ teamName, room, time, event: e });
+          console.log('ScheduleCard clicked', { teamName, room, time, disabled });
+          if (!disabled) onButtonClick({ teamName, room, time, event: e });
         }}
+        disabled={disabled}
+        aria-disabled={disabled}
       >
-        Score this Team
+        {disabled ? "Scored" : "Score this Team"}
       </button>
     </div>
   );
