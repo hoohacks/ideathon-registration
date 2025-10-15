@@ -1,5 +1,5 @@
 import { ref, get } from "firebase/database";
-import { database } from "../../firebase"; 
+import { database } from "../../firebase.js"; 
 
 export async function getJudgeSchedule() {
 
