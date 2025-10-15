@@ -10,6 +10,7 @@ import { useContext } from "react";
 import { AuthContext } from "../App";
 import { FaUser, FaGavel } from "react-icons/fa";
 import { IoHome, IoQrCodeOutline, IoScan, IoSearch } from "react-icons/io5";
+import { RiTeamFill } from "react-icons/ri";
 
 function Nav() {
     const links = [
@@ -17,6 +18,7 @@ function Nav() {
         { to: "/user/profile", label: "Profile", icon: <FaUser /> },
         { to: "/user/judging", label: "Judging", icon: <FaGavel /> },
         { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"], icon: <IoQrCodeOutline /> },
+        { to: "/user/team", label: "Join Team", icon: <RiTeamFill /> },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
         { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
         { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"], icon: <IoSearch /> },
