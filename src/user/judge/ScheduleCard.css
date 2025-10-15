@@ -69,6 +69,15 @@
   transform: translateY(1px) scale(0.995);
 }
 
+.schedule-card__button:disabled{
+  background-color: #64748b;
+}
+
+.schedule-card__button:disabled:focus{
+  outline: 0px;
+  outline-offset: 0px;
+}
+
 .schedule-card__button:focus{
   outline: 3px solid rgba(99,102,241,0.18);
   outline-offset: 2px;

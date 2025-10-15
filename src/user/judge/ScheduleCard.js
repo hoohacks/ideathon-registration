@@ -41,7 +41,7 @@ function ScheduleCard({
           onButtonClick({ teamName, room, time, event: e });
         }}
       >
-        Submit Score
+        Score this Team
       </button>
     </div>
   );
