@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
 import { getJudgeSchedule } from "./getJudgeSchedule";
+import { getPersonalSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import "./Assigments.css";
 
@@ -24,6 +25,7 @@ function Assignments() {
 
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [personalAssignments, setPersonalAssignments] = useState([]);
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
@@ -38,6 +40,21 @@ function Assignments() {
       setGenerating(false);
     }
   }
+
+  useEffect(() => {
+
+    async function fetchPersonal() {
+      try {
+        const teams = await getPersonalSchedule();
+        console.log("Personal assignments for judge", teams);
+        setPersonalAssignments(teams || []);
+      } catch (err) {
+        console.error("Error fetching personal schedule:", err);
+      }
+    }
+
+    fetchPersonal();
+  }, []);
 
   function handleSubmit(scores) {
     // log scores, IRL send to backend
@@ -62,13 +79,20 @@ function Assignments() {
           disabled={generating || generated}
         />
         <div className="assignments__row">
-          <ScheduleCard
-            teamName="Fake Team"
-            room="Rice 102"
-            time="2:30 PM"
-            onButtonClick={(card) => openFor(card)}
-            disabled={!!scored["Fake Team||Rice 102"]}
-          />
+          {personalAssignments.length === 0 ? (
+            <div>No assignments yet</div>
+          ) : (
+            personalAssignments.map((teamName, idx) => (
+              <ScheduleCard
+                key={`${teamName}-${idx}`}
+                teamName={teamName}
+                room={`Room ${idx + 1}`}
+                time={`TBD`}
+                onButtonClick={(card) => openFor(card)}
+                disabled={!!scored[`${teamName}||Room ${idx + 1}`]}
+              />
+            ))
+          )}
         </div>
 
         {modalOpen && selected && (
