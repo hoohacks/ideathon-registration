@@ -3,6 +3,7 @@ import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
 import ScoreSubmission from "./ScoreSubmission";
+import { useAuth } from "../../App";
 import "./Assigments.css";
 
 function Assignments() {
@@ -22,7 +23,6 @@ function Assignments() {
   }
 
   function handleSubmit(scores) {
-    // For now just log the scores. In a real app you'd send to backend.
     console.log("Submitted scores for", selected, scores);
     alert(`Submitted scores for ${selected?.teamName || "team"}`);
 
@@ -34,6 +34,10 @@ function Assignments() {
 
     closeModal();
   }
+  const { userType } = useAuth();
+  const canManageSchedule = userType === "admin";
+  const canViewAssignments = userType === "judge" || userType === "admin";
+
   const firstRoundAssignments = [
     {
       teamName: "Team Alpha",
@@ -53,51 +57,50 @@ function Assignments() {
   return (
     <Layout>
       <div className="judging-page">
-        <h1>Judging Assignments</h1>
-        <GenerateSchedule
-          onButtonClick={() => {
-            console.log("Generate Schedule");
-            alert(`Generate Schedule Clicked`);
-          }}
-        />
-        <div className="assignments__section">
-          <h2 className="assignments__subheader">First Round</h2>
-          <div className="assignments__row">
-            {firstRoundAssignments.map((assignment) => (
-              <ScheduleCard
-                key={`first-${assignment.teamName}`}
-                teamName={assignment.teamName}
-                room={assignment.room}
-                time={assignment.time}
-              	onButtonClick={openFor}
-	      />
-            ))}
-          </div>
-        </div>
-        <hr className="assignments__divider" />
-        <div className="assignments__section">
-          <h2 className="assignments__subheader">Final Round</h2>
-          <div className="assignments__row">
-            {finalRoundAssignments.map((assignment) => (
-              <ScheduleCard
-                key={`final-${assignment.teamName}`}
-                teamName={assignment.teamName}
-                room={assignment.room}
-                time={assignment.time}
-             	onButtonClick={openFor} 
-	      />
-            ))}
-          </div>
-        </div>
-
-        {modalOpen && selected && (
-          <ScoreSubmission
-            teamName={selected.teamName}
-            room={selected.room}
-            time={selected.time}
-            onClose={closeModal}
-            onSubmit={handleSubmit}
+        <h1>Judge Assignments</h1>
+        {canManageSchedule && (
+          <GenerateSchedule
+            onButtonClick={() => {
+              console.log("Generate Schedule");
+              alert(`Generate Schedule Clicked`);
+            }}
           />
+        )}
+        {canViewAssignments && (
+          <>
+            <div className="assignments__section">
+              <h2 className="assignments__subheader">First Round</h2>
+              <div className="assignments__row">
+                {firstRoundAssignments.map((assignment) => (
+                  <ScheduleCard
+                    key={`first-${assignment.teamName}`}
+                    teamName={assignment.teamName}
+                    room={assignment.room}
+                    time={assignment.time}
+                    onButtonClick={openFor}
+                  />
+                ))}
+              </div>
+            </div>
+            <hr className="assignments__divider" />
+            <div className="assignments__section">
+              <h2 className="assignments__subheader">Final Round</h2>
+              <div className="assignments__row">
+                {finalRoundAssignments.map((assignment) => (
+                  <ScheduleCard
+                    key={`final-${assignment.teamName}`}
+                    teamName={assignment.teamName}
+                    room={assignment.room}
+                    time={assignment.time}
+                    onButtonClick={openFor}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        {!canViewAssignments && (
+          <p className="assignments__empty">You do not have assigned judging duties.</p>
         )}
       </div>
     </Layout>
