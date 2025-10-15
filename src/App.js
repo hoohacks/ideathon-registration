@@ -8,6 +8,7 @@ import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/au
 import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
 import UserHome from "./user/Home"
+import NewJoinTeam from "./user/NewJoinTeam"
 import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
@@ -114,6 +115,7 @@ function App() {
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
+          <Route path="team" element={<ProtectedRoute><NewJoinTeam /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
