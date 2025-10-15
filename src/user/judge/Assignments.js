@@ -7,6 +7,8 @@ import { getPersonalSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import "./Assigments.css";
+import { findTeamIdByName, writeTeamScore } from "./getTeamInfo";
+
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -57,18 +59,47 @@ function Assignments() {
     fetchPersonal();
   }, []);
 
-  function handleSubmit(scores) {
-    console.log("Submitted scores for", selected, scores);
-    alert(`Submitted scores for ${selected?.teamName || "team"}`);
 
-    // mark this team as scored so the card button can be disabled
-    if (selected) {
-      const key = `${selected.teamName}||${selected.room}`;
-      setScored((prev) => ({ ...prev, [key]: true }));
+async function handleSubmit(scores) {
+  try {
+    // selected has teamName/room/time from ScheduleCard
+    const teamName = selected?.teamName;
+    if (!teamName) throw new Error("No team selected");
+
+    // find the teamId
+    const teamId = await findTeamIdByName(teamName);
+    if (!teamId) {
+      alert(`Could not find teamId for "${teamName}"`);
+      return;
     }
 
+    // write the score
+    await writeTeamScore({ teamId, teamName, score: scores });
+
+    alert(`Submitted scores for ${teamName}`);
+    const key = `${teamName}||${selected.room}`;
+    setScored((prev) => ({ ...prev, [key]: true }));
+  } catch (e) {
+    console.error(e);
+    alert(`Failed to submit score: ${e.message}`);
+  } finally {
     closeModal();
   }
+}
+
+  // function handleSubmit(scores) {
+  //   console.log("Submitted scores for", selected, scores);
+  //   alert(`Submitted scores for ${selected?.teamName || "team"}`);
+
+  //   // mark this team as scored so the card button can be disabled
+  //   if (selected) {
+  //     const key = `${selected.teamName}||${selected.room}`;
+  //     setScored((prev) => ({ ...prev, [key]: true }));
+  //   }
+
+  //   closeModal();
+  // }
+
   const { userType } = useAuth();
   const canManageSchedule = userType === "admin";
   const canViewAssignments = userType === "judge";
