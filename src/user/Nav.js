@@ -63,7 +63,7 @@ function Nav() {
                         <Link
                             key={link.to}
                             to={link.to}
-                            style={{ color: "white", margin: "10px", textDecoration: "none" }}
+                            style={{ color: "white", margin: { xs: "5px", md: "10px" }, textDecoration: "none" }}
                         >
                             <MenuItem key={link.label}>
                                 <div>
