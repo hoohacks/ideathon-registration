@@ -71,36 +71,53 @@ function Assignments() {
             <div className="assignments__section">
               <h2 className="assignments__subheader">First Round</h2>
               <div className="assignments__row">
-                {firstRoundAssignments.map((assignment) => (
-                  <ScheduleCard
-                    key={`first-${assignment.teamName}`}
-                    teamName={assignment.teamName}
-                    room={assignment.room}
-                    time={assignment.time}
-                    onButtonClick={openFor}
-                  />
-                ))}
+                {firstRoundAssignments.map((assignment) => {
+                  const key = `${assignment.teamName}||${assignment.room}`;
+                  return (
+                    <ScheduleCard
+                      key={`first-${assignment.teamName}`}
+                      teamName={assignment.teamName}
+                      room={assignment.room}
+                      time={assignment.time}
+                      disabled={Boolean(scored[key])}
+                      onButtonClick={openFor}
+                    />
+                  );
+                })}
               </div>
             </div>
             <hr className="assignments__divider" />
             <div className="assignments__section">
               <h2 className="assignments__subheader">Final Round</h2>
               <div className="assignments__row">
-                {finalRoundAssignments.map((assignment) => (
-                  <ScheduleCard
-                    key={`final-${assignment.teamName}`}
-                    teamName={assignment.teamName}
-                    room={assignment.room}
-                    time={assignment.time}
-                    onButtonClick={openFor}
-                  />
-                ))}
+                {finalRoundAssignments.map((assignment) => {
+                  const key = `${assignment.teamName}||${assignment.room}`;
+                  return (
+                    <ScheduleCard
+                      key={`final-${assignment.teamName}`}
+                      teamName={assignment.teamName}
+                      room={assignment.room}
+                      time={assignment.time}
+                      disabled={Boolean(scored[key])}
+                      onButtonClick={openFor}
+                    />
+                  );
+                })}
               </div>
             </div>
           </>
         )}
         {!canViewAssignments && (
           <p className="assignments__empty">You do not have assigned judging duties.</p>
+        )}
+        {modalOpen && selected && (
+          <ScoreSubmission
+            teamName={selected.teamName}
+            room={selected.room}
+            time={selected.time}
+            onClose={closeModal}
+            onSubmit={handleSubmit}
+          />
         )}
       </div>
     </Layout>
