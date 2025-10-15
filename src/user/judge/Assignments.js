@@ -22,7 +22,7 @@ function Assignments() {
   }
 
   function handleSubmit(scores) {
-    // For now just log the scores. In a real app you'd send to backend.
+    // log scores, IRL send to backend
     console.log("Submitted scores for", selected, scores);
     alert(`Submitted scores for ${selected?.teamName || "team"}`);
 
