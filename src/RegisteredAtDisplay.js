@@ -53,7 +53,17 @@ function RegisteredAtDisplay() {
       uniqueDates.add(formattedDate.slice(0, 2) + "/" + formattedDate.slice(2)); // Insert "/"
     });
 
-    return [...uniqueDates];
+    const sortedDates = Array.from(uniqueDates).sort((a, b) => {
+      const [aMonth, aDay] = a.split("/").map(Number);
+      const [bMonth, bDay] = b.split("/").map(Number);
+    
+      // Compare by month, then day
+      if (aMonth === bMonth) return aDay - bDay;
+      return aMonth - bMonth;
+    });
+
+
+    return sortedDates;
   }
 
   function makeY() {
@@ -78,6 +88,8 @@ function RegisteredAtDisplay() {
   }
 
   const totalParticipants = RegisteredAt.length;
+
+  console.log("here");
 
   const totalParticipantsData = {
     labels: makeX(),
