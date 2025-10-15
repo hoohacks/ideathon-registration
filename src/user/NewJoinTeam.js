@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { getAuth } from "firebase/auth";
-import { set, ref, get } from "firebase/database";
+import { update, ref, get } from "firebase/database";
 import { database } from '../firebase.js'
 
 function NewJoinTeam() {
@@ -45,10 +45,12 @@ function NewJoinTeam() {
       // Append current UID if not already in the array
       if (!members.includes(userCredential.uid)) {
         members.push(userCredential.uid);
+        await update(teamRef, { members });
+      } else {
+        alert("You're already a member of this team!");
+        return;
       }
-  
-      // Overwrite members attribute in Firebase
-      await set(ref(database, `teams/${teamId}/members`), members);
+      
   
       console.log(`User ${userCredential.uid} added to team ${teamId}`);
       alert(`Successfully joined team ${teamId}!`);
