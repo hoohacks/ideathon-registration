@@ -16,6 +16,7 @@ import Pairs from "./user/judge/Pairs"
 import Assignments from "./user/judge/Assignments.js"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
+import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
 
 const AuthContext = createContext(null);
 
