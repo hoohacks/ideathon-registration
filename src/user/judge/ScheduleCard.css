@@ -218,6 +218,29 @@
 .btn--primary { background: #4f46e5; color: white; }
 .btn--primary:hover { background: #4338ca; }
 
+.score-help {
+  color: #6b7280;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  margin-top: -2px;
+  white-space: pre-line;
+}
+
+.score-help-collapsible summary {
+  font-size: 0.85rem;
+  color: #2563eb;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.score-help-collapsible[open] summary {
+  color: #1d4ed8;
+}
+
+.score-help-collapsible summary:hover {
+  text-decoration: underline;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; } to { opacity: 1; }
 }
