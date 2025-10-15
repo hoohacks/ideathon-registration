@@ -13,7 +13,7 @@ function Assignments() {
   useEffect(() => {
     async function fetchData() {
       const judges = await getJudgeSchedule();
-      console.log("Judges:", judges);
+      console.log("func output:", judges);
     }
     fetchData();
   }, []);
