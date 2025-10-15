@@ -24,15 +24,15 @@ function useAuth() {
 }
 
 function ProtectedRoute({ children, requiredRoles }) {
-  const { userCredential, userType } = useAuth();
+  const { userCredential, userTypes } = useAuth();
 
   if (!userCredential) {
     return <Navigate to="/login" replace />;
   }
-  console.log("User type:", userType);
+  console.log("User types:", userTypes);
   console.log("Required roles:", requiredRoles);
 
-  if (requiredRoles && !requiredRoles.includes(userType)) {
+  if (requiredRoles && !requiredRoles.some(role => userTypes.includes(role))) {
     return <Navigate to="/user/home" replace />;
   }
 
@@ -43,7 +43,7 @@ function AuthProvider({ children }) {
   const [userCredential, setUserCredential] = useState(null);
   const [token, setToken] = useState(null);
   const [userData, setUserData] = useState(null);
-  const [userType, setUserType] = useState(null);
+  const [userTypes, setUserTypes] = useState([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -58,13 +58,16 @@ function AuthProvider({ children }) {
       let userFound = false;
 
       for (const userType of userTypes) {
-        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-          setUserData(snapshot.val());
-          setUserType(userType);
-          userFound = true;
-          break;
+        try {
+          const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            setUserData(snapshot.val());
+            setUserTypes(userTypes => [...userTypes, userType]);
+            userFound = true;
+          }
+        } catch (error) {
+          console.log(`Checked ${userType} data`);
         }
       }
 
@@ -91,7 +94,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userType }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userTypes }}>
       {children}
     </AuthContext.Provider>
   )

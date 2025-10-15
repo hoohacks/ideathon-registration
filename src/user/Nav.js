@@ -19,9 +19,9 @@ function Nav() {
         { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"] },
     ];
 
-    const userType = useContext(AuthContext).userType;
+    const userTypes = useContext(AuthContext).userTypes;
     const filteredLinks = links.filter(
-        (link) => !link.authTypes || link.authTypes.includes(userType)
+        (link) => !link.authTypes || link.authTypes.some(type => userTypes.includes(type))
     );
 
     return (
