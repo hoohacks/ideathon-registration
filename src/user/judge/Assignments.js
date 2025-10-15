@@ -7,8 +7,11 @@ import { getPersonalSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import "./Assigments.css";
-import { findTeamIdByName, writeTeamScore, getMyScoredTeamsByName } from "./getTeamInfo";
-
+import {
+  findTeamIdByName,
+  writeTeamScore,
+  getMyScoredTeamsByName,
+} from "./getTeamInfo";
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -29,7 +32,7 @@ function Assignments() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [personalAssignments, setPersonalAssignments] = useState([]);
-  const [scoredTeamNames, setScoredTeamNames] = useState([]);
+  const [scoredTeamNames, setScoredTeamNames] = useState(new Set());
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
@@ -46,13 +49,12 @@ function Assignments() {
   }
 
   useEffect(() => {
-
     async function fetchPersonal() {
       try {
         const teams = await getPersonalSchedule();
         console.log("Personal assignments for judge", teams);
         setPersonalAssignments(teams || []);
-        if (teams?.length){
+        if (teams?.length) {
           const scoredMap = await getMyScoredTeamsByName(teams);
           setScoredTeamNames(new Set(Object.keys(scoredMap)));
         } else {
@@ -66,42 +68,41 @@ function Assignments() {
     fetchPersonal();
   }, []);
 
+  async function handleSubmit(scores) {
+    try {
+      // selected has teamName/room/time from ScheduleCard
+      const teamName = selected?.teamName;
+      if (!teamName) throw new Error("No team selected");
 
-async function handleSubmit(scores) {
-  try {
-    // selected has teamName/room/time from ScheduleCard
-    const teamName = selected?.teamName;
-    if (!teamName) throw new Error("No team selected");
+      // if you already submitted a score, don't allow to resubmit
+      if (scoredTeamNames.has(teamName)) {
+        alert(`You already submitted a score for ${teamName}`);
+        return;
+      }
 
-    // if you already submitted a score, don't allow to resubmit
-    if (scoredTeamNames.has(teamName)){
-      alert(`You already submitted a score for ${teamName}`);
-      return;
+      // find the teamId
+      const teamId = await findTeamIdByName(teamName);
+      if (!teamId) {
+        alert(`Could not find teamId for "${teamName}"`);
+        return;
+      }
+
+      // write the score
+      await writeTeamScore({ teamId, teamName, score: scores });
+
+      // update scored keys
+      setScoredTeamNames((prev) => new Set(prev).add(teamName));
+
+      alert(`Submitted scores for ${teamName}`);
+      const key = `${teamName}||${selected.room}`;
+      setScored((prev) => ({ ...prev, [key]: true }));
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to submit score: ${e.message}`);
+    } finally {
+      closeModal();
     }
-
-    // find the teamId
-    const teamId = await findTeamIdByName(teamName);
-    if (!teamId) {
-      alert(`Could not find teamId for "${teamName}"`);
-      return;
-    }
-
-    // write the score
-    await writeTeamScore({ teamId, teamName, score: scores });
-
-    // update scored keys
-    setScoredTeamNames(prev => new Set(prev).add(teamName));
-
-    alert(`Submitted scores for ${teamName}`);
-    const key = `${teamName}||${selected.room}`;
-    setScored((prev) => ({ ...prev, [key]: true }));
-  } catch (e) {
-    console.error(e);
-    alert(`Failed to submit score: ${e.message}`);
-  } finally {
-    closeModal();
   }
-}
 
   const { userType } = useAuth();
   const canManageSchedule = userType === "admin";
@@ -176,7 +177,9 @@ async function handleSubmit(scores) {
           </>
         )}
         {!canViewAssignments && (
-          <p className="assignments__empty">You do not have assigned judging duties.</p>
+          <p className="assignments__empty">
+            You do not have assigned judging duties.
+          </p>
         )}
         {modalOpen && selected && (
           <ScoreSubmission
