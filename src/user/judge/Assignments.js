@@ -3,20 +3,8 @@ import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import "./Assigments.css";
-import getJudgeSchedule from "./getJudgeSchedule";
-import { use, useEffect } from "react";
-import { get } from "firebase/database";
 
 function Assignments() {
-
-  // test for fetching judge list:
-  useEffect(() => {
-    async function fetchData() {
-      const judges = await getJudgeSchedule();
-      console.log("func output:", judges);
-    }
-    fetchData();
-  }, []);
 
   return (
     <Layout>
