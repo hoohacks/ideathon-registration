@@ -104,9 +104,9 @@ function Assignments() {
     }
   }
 
-  const { userType } = useAuth();
-  const canManageSchedule = userType === "admin";
-  const canViewAssignments = userType === "judge";
+  const { userTypes } = useAuth();
+  const canManageSchedule = userTypes.includes("admin");
+  const canViewAssignments = userTypes.includes("judge");
 
   const firstRoundAssignments = [
     {
