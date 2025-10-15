@@ -69,10 +69,8 @@ function Assignments() {
                 teamName={assignment.teamName}
                 room={assignment.room}
                 time={assignment.time}
-                onButtonClick={(card) => {
-                  <ScoreSubmission />;
-                }}
-              />
+              	onButtonClick={openFor}
+	      />
             ))}
           </div>
         </div>
@@ -86,10 +84,8 @@ function Assignments() {
                 teamName={assignment.teamName}
                 room={assignment.room}
                 time={assignment.time}
-                onButtonClick={(card) => {
-                  <ScoreSubmission />;
-                }}
-              />
+             	onButtonClick={openFor} 
+	      />
             ))}
           </div>
         </div>
