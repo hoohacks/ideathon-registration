@@ -155,8 +155,8 @@ function Assignments() {
                 )}
               </div>
             </div>
-            <hr className="assignments__divider" />
-            <div className="assignments__section">
+            {/* <hr className="assignments__divider" /> */}
+            {/* <div className="assignments__section">
               <h2 className="assignments__subheader">Final Round</h2>
               <div className="assignments__row">
                 {finalRoundAssignments.map((assignment) => {
@@ -173,7 +173,7 @@ function Assignments() {
                   );
                 })}
               </div>
-            </div>
+            </div> */}
           </>
         )}
         {!canViewAssignments && (
