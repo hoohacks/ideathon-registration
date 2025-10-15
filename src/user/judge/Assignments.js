@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
+import { getJudgeSchedule } from "./getJudgeSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import "./Assigments.css";
 
@@ -11,7 +12,7 @@ function Assignments() {
   const [scored, setScored] = useState({});
 
   function openFor(card) {
-    console.log('Assignments.openFor called with', card);
+    console.log("Assignments.openFor called with", card);
     setSelected(card);
     setModalOpen(true);
   }
@@ -19,6 +20,23 @@ function Assignments() {
   function closeModal() {
     setModalOpen(false);
     setSelected(null);
+  }
+
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState(false);
+
+  async function handleGenerateClick() {
+    if (generated) return; // already generated once
+    try {
+      setGenerating(true);
+      const assignments = await getJudgeSchedule();
+      console.log("Generated schedule:", assignments);
+      setGenerated(true);
+    } catch (err) {
+      console.error("Error generating schedule:", err);
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function handleSubmit(scores) {
@@ -40,10 +58,8 @@ function Assignments() {
       <div className="judging-page">
         <h1>Judging Assignments</h1>
         <GenerateSchedule
-          onButtonClick={() => {
-            console.log("Generate Schedule");
-            alert(`Generate Schedule Clicked`);
-          }}
+          onButtonClick={handleGenerateClick}
+          disabled={generating || generated}
         />
         <div className="assignments__row">
           <ScheduleCard

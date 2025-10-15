@@ -2,16 +2,18 @@ import "./GenerateSchedule.css";
 
 function GenerateSchedule({
   onButtonClick = () => {},
+  disabled = false,
 }) {
     return (
         <button
             type="button"
             className="generate-schedule-button"
             onClick={(e) => {
-                onButtonClick(e);
+                if (!disabled) onButtonClick(e);
             }}
+            disabled={disabled}
         >
-            Generate Schedule
+            {disabled ? "Generated" : "Generate Schedule"}
         </button>
     );
 }
