@@ -34,6 +34,21 @@ function Assignments() {
 
     closeModal();
   }
+  const firstRoundAssignments = [
+    {
+      teamName: "Team Alpha",
+      room: "Rice 102",
+      time: "2:30 PM",
+    },
+  ];
+
+  const finalRoundAssignments = [
+    {
+      teamName: "Team Omega",
+      room: "Rice 201",
+      time: "6:00 PM",
+    },
+  ];
 
   return (
     <Layout>
@@ -45,14 +60,38 @@ function Assignments() {
             alert(`Generate Schedule Clicked`);
           }}
         />
-        <div className="assignments__row">
-          <ScheduleCard
-            teamName="Fake Team"
-            room="Rice 102"
-            time="2:30 PM"
-            onButtonClick={(card) => openFor(card)}
-            disabled={!!scored["Fake Team||Rice 102"]}
-          />
+        <div className="assignments__section">
+          <h2 className="assignments__subheader">First Round</h2>
+          <div className="assignments__row">
+            {firstRoundAssignments.map((assignment) => (
+              <ScheduleCard
+                key={`first-${assignment.teamName}`}
+                teamName={assignment.teamName}
+                room={assignment.room}
+                time={assignment.time}
+                onButtonClick={(card) => {
+                  <ScoreSubmission />;
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        <hr className="assignments__divider" />
+        <div className="assignments__section">
+          <h2 className="assignments__subheader">Final Round</h2>
+          <div className="assignments__row">
+            {finalRoundAssignments.map((assignment) => (
+              <ScheduleCard
+                key={`final-${assignment.teamName}`}
+                teamName={assignment.teamName}
+                room={assignment.room}
+                time={assignment.time}
+                onButtonClick={(card) => {
+                  <ScoreSubmission />;
+                }}
+              />
+            ))}
+          </div>
         </div>
 
         {modalOpen && selected && (

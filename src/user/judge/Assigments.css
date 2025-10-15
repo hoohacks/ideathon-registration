@@ -10,3 +10,21 @@
 	gap: 18px;
 	align-items: flex-start;
 }
+
+.assignments__section {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.assignments__subheader {
+	margin: 0;
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+.assignments__divider {
+	margin: 16px 0;
+	border: none;
+	border-top: 1px solid #d0d0d0;
+}
