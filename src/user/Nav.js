@@ -8,15 +8,17 @@ import {
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../App";
+import { FaUser } from "react-icons/fa";
+import { IoHome, IoQrCodeOutline, IoScan, IoSearch } from "react-icons/io5";
 
 function Nav() {
     const links = [
-        { to: "/user/home", label: "Home" },
-        { to: "/user/profile", label: "Profile" },
-        { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"] },
-        { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"] },
-        { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"] },
-        { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"] },
+        { to: "/user/home", label: "Home", icon: <IoHome /> },
+        { to: "/user/profile", label: "Profile", icon: <FaUser /> },
+        { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"], icon: <IoQrCodeOutline /> },
+        { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
+        { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
+        { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"], icon: <IoSearch /> },
     ];
 
     const userTypes = useContext(AuthContext).userTypes;
@@ -44,7 +46,7 @@ function Nav() {
                             noWrap
                             sx={{
                                 mr: 2,
-                                display: { xs: "none", md: "flex" },
+                                display: { xs: "none", sm: "flex" },
                                 fontFamily: "monospace",
                                 fontWeight: 700,
                                 letterSpacing: ".3rem",
@@ -63,9 +65,14 @@ function Nav() {
                             style={{ color: "white", margin: "10px", textDecoration: "none" }}
                         >
                             <MenuItem key={link.label}>
-                                <Typography sx={{ textAlign: "center" }}>
-                                    {link.label}
-                                </Typography>
+                                <div>
+                                    <Typography sx={{ textAlign: "center", display: { xs: "none", md: "block" } }}>
+                                        {link.label}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: "1.5em", display: { sm: "block", md: "none" } }}>
+                                        {link.icon}
+                                    </Typography>
+                                </div>
                             </MenuItem>
                         </Link>
                     ))}
