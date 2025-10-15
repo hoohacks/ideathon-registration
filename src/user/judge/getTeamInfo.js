@@ -28,3 +28,26 @@ export async function writeTeamScore({ teamId, teamName, score }) {
 
   await set(ref(database, `teams/${teamId}/scores/${user.uid}`), payload);
 }
+
+export async function getMyScoredTeamsByName(teamNames) {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Must be signed in");
+
+  // check to see if team has already been scored
+  const pairs = await Promise.all(
+    teamNames.map(async (name) => {
+      const id = await findTeamIdByName(name);
+      if (!id) return [name, false];
+      const snap = await get(ref(database, `teams/${id}/scores/${user.uid}`));
+      return [name, snap.exists()];
+    })
+  );
+
+  const map = {};
+  for (const [name, hasScore] of pairs) {
+    if (hasScore) map[name] = true;
+  }
+  console.log(map);
+  return map;
+}

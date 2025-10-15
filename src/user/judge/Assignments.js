@@ -7,7 +7,7 @@ import { getPersonalSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import "./Assigments.css";
-import { findTeamIdByName, writeTeamScore } from "./getTeamInfo";
+import { findTeamIdByName, writeTeamScore, getMyScoredTeamsByName } from "./getTeamInfo";
 
 
 function Assignments() {
@@ -29,6 +29,7 @@ function Assignments() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [personalAssignments, setPersonalAssignments] = useState([]);
+  const [scoredTeamNames, setScoredTeamNames] = useState([]);
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
@@ -51,6 +52,12 @@ function Assignments() {
         const teams = await getPersonalSchedule();
         console.log("Personal assignments for judge", teams);
         setPersonalAssignments(teams || []);
+        if (teams?.length){
+          const scoredMap = await getMyScoredTeamsByName(teams);
+          setScoredTeamNames(new Set(Object.keys(scoredMap)));
+        } else {
+          setScoredTeamNames(new Set());
+        }
       } catch (err) {
         console.error("Error fetching personal schedule:", err);
       }
@@ -66,6 +73,12 @@ async function handleSubmit(scores) {
     const teamName = selected?.teamName;
     if (!teamName) throw new Error("No team selected");
 
+    // if you already submitted a score, don't allow to resubmit
+    if (scoredTeamNames.has(teamName)){
+      alert(`You already submitted a score for ${teamName}`);
+      return;
+    }
+
     // find the teamId
     const teamId = await findTeamIdByName(teamName);
     if (!teamId) {
@@ -75,6 +88,9 @@ async function handleSubmit(scores) {
 
     // write the score
     await writeTeamScore({ teamId, teamName, score: scores });
+
+    // update scored keys
+    setScoredTeamNames(prev => new Set(prev).add(teamName));
 
     alert(`Submitted scores for ${teamName}`);
     const key = `${teamName}||${selected.room}`;
@@ -86,19 +102,6 @@ async function handleSubmit(scores) {
     closeModal();
   }
 }
-
-  // function handleSubmit(scores) {
-  //   console.log("Submitted scores for", selected, scores);
-  //   alert(`Submitted scores for ${selected?.teamName || "team"}`);
-
-  //   // mark this team as scored so the card button can be disabled
-  //   if (selected) {
-  //     const key = `${selected.teamName}||${selected.room}`;
-  //     setScored((prev) => ({ ...prev, [key]: true }));
-  //   }
-
-  //   closeModal();
-  // }
 
   const { userType } = useAuth();
   const canManageSchedule = userType === "admin";
@@ -145,7 +148,7 @@ async function handleSubmit(scores) {
                       room={`Room ${idx + 1}`}
                       time={`TBD`}
                       onButtonClick={(card) => openFor(card)}
-                      disabled={!!scored[`${teamName}||Room ${idx + 1}`]}
+                      disabled={scoredTeamNames.has(teamName)}
                     />
                   ))
                 )}

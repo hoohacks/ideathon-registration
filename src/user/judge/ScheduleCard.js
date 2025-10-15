@@ -36,7 +36,7 @@ function ScheduleCard({
 
       <button
         type="button"
-        className="schedule-card__button"
+        className={`schedule-card__button ${disabled ? "is-disabled" : ""}`}
         onClick={(e) => {
           console.log('ScheduleCard clicked', { teamName, room, time, disabled });
           if (!disabled) onButtonClick({ teamName, room, time, event: e });

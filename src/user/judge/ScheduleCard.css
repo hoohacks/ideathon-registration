@@ -69,8 +69,10 @@
   transform: translateY(1px) scale(0.995);
 }
 
+.schedule-card__button.is-disabled,
 .schedule-card__button:disabled{
   background-color: #64748b;
+  cursor: not-allowed;
 }
 
 .schedule-card__button:disabled:focus{
