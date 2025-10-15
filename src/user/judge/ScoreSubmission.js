@@ -1,5 +1,5 @@
 import "./ScheduleCard.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 function ScoreSubmission({
   teamName = "Team Name",
@@ -9,9 +9,12 @@ function ScoreSubmission({
   onSubmit = () => {},
 }) {
   const [values, setValues] = useState({
-    creativity: "5",
-    cost: "5",
-    idea: "5",
+    problem: "5",
+    innovation: "5",
+    impact: "5",
+    viability: "5",
+    pitch_quality: "5",
+    fundable: "5",
     notes: "",
   });
   const dialogRef = useRef(null);
@@ -27,9 +30,12 @@ function ScoreSubmission({
   function handleSubmit(e) {
     e.preventDefault();
     const score = {
-      creativity: Number(values.creativity),
-      cost: Number(values.cost),
-      idea: Number(values.idea),
+      problem: Number(values.problem),
+      innovation: Number(values.innovation),
+      impact: Number(values.impact),
+      viability: Number(values.viability),
+      pitch_quality: Number(values.pitch_quality),
+      fundable: Number(values.fundable),
       notes: values.notes,
       teamName,
       room,
@@ -62,75 +68,120 @@ function ScoreSubmission({
           </button>
         </header>
 
-        <div className="score-modal-team-info">
-          <span className="score-chip">{teamName}</span>
-          <span className="score-chip">{room}</span>
-          <span className="score-chip">{time}</span>
+        <div className="score-modal__body">
+          <div className="score-modal-team-info">
+            <span className="score-chip">{teamName}</span>
+            <span className="score-chip">{room}</span>
+            <span className="score-chip">{time}</span>
+          </div>
+
+          <form className="score-modal__form" onSubmit={handleSubmit}>
+            <label className="score-field">
+              <span>Problem</span>
+              <select
+                name="problem"
+                value={values.problem}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>Innovation</span>
+              <select
+                name="innovation"
+                value={values.innovation}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>Impact</span>
+              <select
+                name="impact"
+                value={values.impact}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>Viability</span>
+              <select
+                name="viability"
+                value={values.viability}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>Pitch Quality</span>
+              <select
+                name="pitch_quality"
+                value={values.pitch_quality}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field">
+              <span>Fundable</span>
+              <select
+                name="fundable"
+                value={values.fundable}
+                onChange={handleChange}
+                required
+              >
+                {oneToTen.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="score-field score-field--textarea">
+              <span>Notes</span>
+              <textarea
+                name="notes"
+                value={values.notes}
+                onChange={handleChange}
+                placeholder="Optional notes for judges…"
+                rows={4}
+              />
+            </label>
+
+            <div className="score-modal__actions">
+              <button type="button" className="btn btn--ghost" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn--primary">
+                Submit Score
+              </button>
+            </div>
+          </form>
         </div>
 
-        <form className="score-modal__form" onSubmit={handleSubmit}>
-          <label className="score-field">
-            <span>Creativity</span>
-            <select
-              name="creativity"
-              value={values.creativity}
-              onChange={handleChange}
-              required
-            >
-              {oneToTen.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="score-field">
-            <span>Cost</span>
-            <select
-              name="cost"
-              value={values.cost}
-              onChange={handleChange}
-              required
-            >
-              {oneToTen.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="score-field">
-            <span>Idea</span>
-            <select
-              name="idea"
-              value={values.idea}
-              onChange={handleChange}
-              required
-            >
-              {oneToTen.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="score-field score-field--textarea">
-            <span>Notes</span>
-            <textarea
-              name="notes"
-              value={values.notes}
-              onChange={handleChange}
-              placeholder="Optional notes for judges…"
-              rows={4}
-            />
-          </label>
-
-          <div className="score-modal__actions">
-            <button type="button" className="btn btn--ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn--primary">
-              Submit Score
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );
