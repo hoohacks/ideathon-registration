@@ -6,7 +6,7 @@ import { auth } from "../firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
 
 function Profile() {
-    const { userData, userType } = useContext(AuthContext);
+    const { userData } = useContext(AuthContext);
     const [sentReset, setSentReset] = useState(false);
 
 

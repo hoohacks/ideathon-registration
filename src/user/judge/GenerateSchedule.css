@@ -1,0 +1,28 @@
+.generate-schedule-button{
+  margin-top: 8px;
+  align-self: stretch;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.generate-schedule-button:active{
+  transform: translateY(1px) scale(0.995);
+}
+
+.generate-schedule-button:focus{
+  outline: 3px solid rgba(99,102,241,0.18);
+  outline-offset: 2px;
+}
+
+.generate-schedule-button:disabled{
+  background-color: #64748b;
+  cursor: not-allowed;
+  opacity: 0.9;
+}

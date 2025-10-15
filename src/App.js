@@ -8,14 +8,17 @@ import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/au
 import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
 import UserHome from "./user/Home"
+import NewJoinTeam from "./user/NewJoinTeam"
 import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
 import JudgeDashboard from "./user/admin/JudgeSearch.js"
 import ForgotPassword from "./ForgotPassword.js"
 import Pairs from "./user/judge/Pairs"
+import Assignments from "./user/judge/Assignments.js"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
+import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
 
 const AuthContext = createContext(null);
 
@@ -24,15 +27,15 @@ function useAuth() {
 }
 
 function ProtectedRoute({ children, requiredRoles }) {
-  const { userCredential, userType } = useAuth();
+  const { userCredential, userTypes } = useAuth();
 
   if (!userCredential) {
     return <Navigate to="/login" replace />;
   }
-  console.log("User type:", userType);
+  console.log("User types:", userTypes);
   console.log("Required roles:", requiredRoles);
 
-  if (requiredRoles && !requiredRoles.includes(userType)) {
+  if (requiredRoles && !requiredRoles.some(role => userTypes.includes(role))) {
     return <Navigate to="/user/home" replace />;
   }
 
@@ -43,7 +46,7 @@ function AuthProvider({ children }) {
   const [userCredential, setUserCredential] = useState(null);
   const [token, setToken] = useState(null);
   const [userData, setUserData] = useState(null);
-  const [userType, setUserType] = useState(null);
+  const [userTypes, setUserTypes] = useState([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -58,13 +61,16 @@ function AuthProvider({ children }) {
       let userFound = false;
 
       for (const userType of userTypes) {
-        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-          setUserData(snapshot.val());
-          setUserType(userType);
-          userFound = true;
-          break;
+        try {
+          const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            setUserData(snapshot.val());
+            setUserTypes(userTypes => [...userTypes, userType]);
+            userFound = true;
+          }
+        } catch (error) {
+          console.log(`Checked ${userType} data`);
         }
       }
 
@@ -91,7 +97,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userType }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userTypes }}>
       {children}
     </AuthContext.Provider>
   )
@@ -109,8 +115,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
-          <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute requiredRole="competitor"><UserProfile /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+          <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
+          <Route path="team" element={<ProtectedRoute><NewJoinTeam /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
