@@ -15,8 +15,10 @@ import AdminScan from "./user/admin/Scan"
 import JudgeDashboard from "./user/admin/JudgeSearch.js"
 import ForgotPassword from "./ForgotPassword.js"
 import Pairs from "./user/judge/Pairs"
+import Assignments from "./user/judge/Assignments.js"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
+import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
 
 const AuthContext = createContext(null);
 
@@ -113,8 +115,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
-          <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute requiredRole="competitor"><UserProfile /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
+          <Route path="checkin" element={<ProtectedRoute requiredRole="competitor"><CheckIn /></ProtectedRoute>} />
           <Route path="team" element={<ProtectedRoute><NewJoinTeam /></ProtectedRoute>} />
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />

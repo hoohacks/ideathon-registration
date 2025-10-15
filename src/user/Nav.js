@@ -8,13 +8,14 @@ import {
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../App";
-import { FaUser } from "react-icons/fa";
+import { FaUser, FaGavel } from "react-icons/fa";
 import { IoHome, IoQrCodeOutline, IoScan, IoSearch } from "react-icons/io5";
 
 function Nav() {
     const links = [
         { to: "/user/home", label: "Home", icon: <IoHome /> },
         { to: "/user/profile", label: "Profile", icon: <FaUser /> },
+        { to: "/user/judging", label: "Judging", icon: <FaGavel /> },
         { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"], icon: <IoQrCodeOutline /> },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
         { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
