@@ -13,6 +13,7 @@ import {
   writeTeamScore,
   getMyScoredTeamsByName,
 } from "./getTeamInfo";
+import { removeJudgeSchedule } from "./removeJudgeSchedule";
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -45,6 +46,9 @@ function Assignments() {
 
       await writeGenerateScheduleFlag(true);
       setGenerateFlag(true);
+
+      const teams = await getPersonalSchedule();
+      setPersonalAssignments(teams || []);
     } catch (err) {
       console.error("Error generating schedule:", err);
     } finally {
@@ -54,9 +58,11 @@ function Assignments() {
 
   async function handleUndoToggle() {
     try {
+      await removeJudgeSchedule();
       await writeGenerateScheduleFlag(false);
       setGenerateFlag(false);
       setGenerated(false);
+      setPersonalAssignments([]);
     } catch (err) {
       console.error('Failed toggling generate flag', err);
     }
