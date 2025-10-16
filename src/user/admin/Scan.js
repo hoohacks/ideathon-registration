@@ -11,6 +11,10 @@ function AdminScan() {
     const [paused, setPaused] = useState(false);
     const [popup, setPopup] = useState({ open: false, title: "", message: "" });
 
+    // state for type of check in. This can be "event" or "food" that the user can pick to scan.
+    // use radio button for ui
+    const [checkinType, setCheckinType] = useState("event")
+
     // zxing library for qr code
     const { ref: videoRef } = useZxing({
         // this runs whenever a code is detected
