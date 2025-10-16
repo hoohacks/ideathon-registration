@@ -18,7 +18,8 @@ import Pairs from "./user/judge/Pairs"
 import Assignments from "./user/judge/Assignments.js"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
-import JudgeSchedule from "./user/judge/getJudgeSchedule.js"
+import { onAuthStateChanged } from "firebase/auth"
+import Layout from "./user/Layout.js"
 
 const AuthContext = createContext(null);
 
@@ -27,7 +28,17 @@ function useAuth() {
 }
 
 function ProtectedRoute({ children, requiredRoles }) {
-  const { userCredential, userTypes } = useAuth();
+  const { userCredential, userTypes, loadingAuth, loadingUserData } = useAuth();
+
+  if (loadingAuth || loadingUserData) {
+    return (
+      <Layout>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+          Loading...
+        </div>
+      </Layout>
+    );
+  }
 
   if (!userCredential) {
     return <Navigate to="/login" replace />;
@@ -47,6 +58,18 @@ function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [userData, setUserData] = useState(null);
   const [userTypes, setUserTypes] = useState([]);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loadingUserData, setLoadingUserData] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed:", user);
+      setUserCredential(user ? { user } : null);
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -77,6 +100,8 @@ function AuthProvider({ children }) {
       if (!userFound) {
         setUserData(null);
       }
+
+      setLoadingUserData(false);
     };
 
     fetchUserData();
@@ -84,9 +109,8 @@ function AuthProvider({ children }) {
 
   const handleLogin = async (email, password, remember = false) => {
     try {
-      if (remember) {
+      if (remember)
         await auth.setPersistence(browserLocalPersistence);
-      }
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setUserCredential(userCredential);
       return true;
@@ -97,7 +121,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userTypes }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userTypes, loadingAuth, loadingUserData }}>
       {children}
     </AuthContext.Provider>
   )
