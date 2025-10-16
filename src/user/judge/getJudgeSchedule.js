@@ -29,13 +29,13 @@ export async function getJudgeSchedule() {
         const teamData = teamSnapshot.val();
         const teamsList = Object.entries(teamData).map(([id, details]) => ({ id, ...details }));
         
-        // step 1: initialize assignments with empty arrays
+        // initialize assignments with empty arrays
         const assignmentsDict = {};
         for (const judge of judgesList) {
             assignmentsDict[judge.id] = []; // each judge gets 2 slots total
         }
 
-        // round 1
+        // first wave of judging assignments, round 1
         let round1Assignments = {};
         teamsList.forEach(team => {
             round1Assignments[team.name] = [];
@@ -48,7 +48,7 @@ export async function getJudgeSchedule() {
             assignmentsDict[judge.id].push(teamName);
         });
         
-        // round 2, shift each team index by 1 to the right then just repeat the same logic
+        // second wave of judging assignments, round 2
         let round2Assignments = {};
         teamsList.forEach(team => {
             round2Assignments[team.name] = [];
