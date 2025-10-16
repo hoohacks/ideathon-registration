@@ -10,31 +10,7 @@ import ProgressBar from "react-bootstrap/ProgressBar";
 import Button from "react-bootstrap/Button";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Form from "react-bootstrap/Form";
-
-import "./search.css";
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: "#013a63", // Adjust primary color
-    },
-    secondary: {
-      main: "#F82249", // Adjust secondary color
-    },
-  },
-  typography: {
-    fontFamily: "Arial, sans-serif", // Change font family
-    h1: {
-      fontSize: "32px", // Adjust heading font size
-      fontWeight: "bold",
-      color: "#E2F1E7", // Bold headings
-    },
-    h2: {
-      fontSize: "24px",
-    },
-    // Add more typography styles as needed
-  },
-});
+import Layout from "../Layout";
 
 function CheckedInProgressBar({ percent }) {
   return (
@@ -153,174 +129,161 @@ function Search() {
   });
 
   return (
-    <ThemeProvider theme={theme}>
-      <div
-        className="background"
-        style={{ textAlign: "center", padding: "20px", color: "white" }}
+    <Layout>
+      <button
+        onClick={handleMetricsClick}
+        style={{
+          position: "fixed",
+          border: "1px solid white",
+          top: "20px",
+          left: "20px",
+          borderRadius: "12px",
+          backgroundColor: "#34a0a4",
+          color: "white",
+          zIndex: 1000,
+        }}
       >
-        <button
-          onClick={handleMetricsClick}
+        Metrics
+      </button>
+      <h1 className="label" style={{ fontSize: "48px", textAlign: "center" }}>
+        Ideathon Admin Dashboard
+      </h1>
+      <p style={{ fontSize: "24px", textAlign: "center" }}>
+        Total Signed-Up: {Object.keys(Data).length} | Checked In:{" "}
+        {checkedInCount} | Percentage: {percentCheckedIn}%
+        <Form.Check // prettier-ignore
+          inline
+          style={{ fontSize: "15px", marginLeft: "30px" }}
+          type="switch"
+          id="custom-switch"
+          label="Show Progress Bar"
+          onChange={(e) => toggleProgressBar(e)}
+        />
+      </p>
+      {showProgressBar && (
+        <CheckedInProgressBar
+          percent={percentCheckedIn}
+        ></CheckedInProgressBar>
+      )}
+      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Name and Emails</h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "20px",
+        }}
+      >
+        {/* Search input */}
+        <input
+          type="text"
+          placeholder="Search by name or email"
+          value={Query}
+          onChange={(e) => setQuery(e.target.value)}
           style={{
-            position: "fixed",
-            border: "1px solid white",
-            top: "20px",
-            left: "20px",
-            borderRadius: "12px",
-            backgroundColor: "#34a0a4",
-            color: "white",
-            zIndex: 1000,
+            width: "300px",
+            height: "40px",
+            fontSize: "16px",
+          }}
+        />
+        <select
+          value={selectedDietaryRestriction}
+          onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
+          style={{
+            width: "300px",
+            height: "40px",
+            fontSize: "16px",
           }}
         >
-          Metrics
-        </button>
-        <h1 className="label" style={{ fontSize: "60px" }}>
-          Ideathon Admin Dashboard
-        </h1>
-        <p style={{ fontSize: "24px", textAlign: "center" }}>
-          Total Signed-Up: {Object.keys(Data).length} | Checked In:{" "}
-          {checkedInCount} | Percentage: {percentCheckedIn}%
-          <Form.Check // prettier-ignore
-            inline
-            style={{ fontSize: "15px", marginLeft: "30px" }}
-            type="switch"
-            id="custom-switch"
-            label="Show Progress Bar"
-            onChange={(e) => toggleProgressBar(e)}
-          />
-        </p>
-        {showProgressBar && (
-          <CheckedInProgressBar
-            percent={percentCheckedIn}
-          ></CheckedInProgressBar>
-        )}
-        <h2 className="label">Name and Emails</h2>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginBottom: "20px",
-          }}
-        >
-          {/* Search input */}
-          <input
-            type="text"
-            placeholder="Search by name or email"
-            value={Query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{
-              width: "300px",
-              height: "40px",
-              fontSize: "16px",
-            }}
-          />
-          <select
-            value={selectedDietaryRestriction}
-            onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
-            style={{
-              width: "300px",
-              height: "40px",
-              fontSize: "16px",
-            }}
-          >
-            <option value="true">Checked In</option>
-            <option value="false">Not Checked In</option>
-            <option value="">No Filter</option>
-            <option value="vegetarian">Vegetarian</option>
-            <option value="gluten-free">Gluten-free</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(250px, 1fr))",
-            gap: "20px",
-          }}
-        >
-          {filteredResults.map((key, index) => {
-            const personData = Data[key]; // Access the data associated with the key(hash)
-
-            const dietaryRestrictionValue = personData[0].dietaryRestriction; // Get dietaryRestriction from the person's data
-            const fullName = personData[0].fullName.toString();
-
-            const isCheckedIn = personData[0].checkedIn;
-            const checkedInString = String(personData[0].checkedIn);
-
-            const HoverDiv = styled("div")({
-              transition: "transform 0.10s ease-in-out",
-              "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
-            });
-
-            if (
-              !selectedDietaryRestriction ||
-              (dietaryRestrictionValue &&
-                dietaryRestrictionValue.includes(selectedDietaryRestriction)) ||
-              (checkedInString &&
-                checkedInString.includes(selectedDietaryRestriction))
-            ) {
-              return (
-                <HoverDiv>
-                  <div
-                    className="gridBox"
-                    key={index}
-                    style={{
-                      borderRadius: "15px",
-                      border: "10px solid #ccc",
-                      borderColor: "#013a63",
-                      padding: "20px",
-                      transition: "background 0.1s",
-                    }}
-
-                  //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
-                  //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
-                  >
-                    <p
-                      className="label"
-                      style={{ fontSize: "24px", fontWeight: "bold" }}
-                    >
-                      {fullName}
-                    </p>
-
-                    <p>{dietaryRestrictionValue}</p>
-                    <p>{personData[0].email}</p>
-                    {personData.map((data, dataIndex) => (
-                      <div key={dataIndex}>
-                        {data.resume ? (
-                          <p>
-                            <a
-                              href={data.resume}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#89c2d9" }}
-                            >
-                              {fullName} resume
-                            </a>
-                          </p>
-                        ) : null}
-                        <Button
-                          onClick={() => handleCheckIn(key)}
-                          style={{
-                            borderRadius: "12px",
-                            backgroundColor: isCheckedIn
-                              ? "#34a0a4"
-                              : "#2a6f97",
-                            color: "white",
-                          }}
-                        >
-                          {isCheckedIn ? "Checked In" : "Check In"}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </HoverDiv>
-              );
-            } else {
-              return null; // Do not render if the dietary restriction does not match
-            }
-          })}
-        </div>
+          <option value="true">Checked In</option>
+          <option value="false">Not Checked In</option>
+          <option value="">No Filter</option>
+          <option value="vegetarian">Vegetarian</option>
+          <option value="gluten-free">Gluten-free</option>
+          <option value="other">Other</option>
+        </select>
       </div>
-    </ThemeProvider>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "20px",
+        }}
+      >
+        {filteredResults.map((key, index) => {
+          const personData = Data[key]; // Access the data associated with the key(hash)
+
+          const dietaryRestrictionValue = personData[0].dietaryRestriction; // Get dietaryRestriction from the person's data
+          const fullName = personData[0].fullName.toString();
+
+          const isCheckedIn = personData[0].checkedIn;
+          const checkedInString = String(personData[0].checkedIn);
+
+          if (
+            !selectedDietaryRestriction ||
+            (dietaryRestrictionValue &&
+              dietaryRestrictionValue.includes(selectedDietaryRestriction)) ||
+            (checkedInString &&
+              checkedInString.includes(selectedDietaryRestriction))
+          ) {
+            return (
+              <div>
+                <div
+                  key={index}
+                  style={{
+                    borderRadius: "15px",
+                    border: isCheckedIn ? "1px solid #34a0a4" : "1px solid #ccc",
+                    padding: "30px",
+                  }}
+
+                //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
+                //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
+                >
+                  <p
+                    className="label"
+                    style={{ fontSize: "24px", fontWeight: "bold" }}
+                  >
+                    {fullName}
+                  </p>
+
+                  <p>{dietaryRestrictionValue}</p>
+                  <p>{personData[0].email}</p>
+                  {personData.map((data, dataIndex) => (
+                    <div key={dataIndex}>
+                      {data.resume ? (
+                        <p>
+                          <a
+                            href={data.resume}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          // style={{ color: "#89c2d9" }}
+                          >
+                            {fullName} resume
+                          </a>
+                        </p>
+                      ) : null}
+                      <Button
+                        onClick={() => handleCheckIn(key)}
+                        style={{
+                          borderRadius: "12px",
+                          backgroundColor: isCheckedIn
+                            ? "#34a0a4"
+                            : "#2a6f97",
+                          color: "white",
+                        }}
+                      >
+                        {isCheckedIn ? "Checked In" : "Check In"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          } else {
+            return null; // Do not render if the dietary restriction does not match
+          }
+        })}
+      </div>
+    </Layout>
   );
 }
 
