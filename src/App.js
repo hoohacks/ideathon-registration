@@ -139,7 +139,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
-          <Route path="profile" element={<ProtectedRoute requiredRoles={["competitor"]}><UserProfile /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="judging" element={<ProtectedRoute requiredRoles={["judge"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
           <Route path="team" element={<ProtectedRoute requiredRoles={["competitor"]}><NewJoinTeam /></ProtectedRoute>} />
