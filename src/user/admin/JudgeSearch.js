@@ -96,6 +96,10 @@ function JudgeSearch() {
               wantsToMentor,
               isHooHacksMember,
               checkedIn,
+              teamAssignments,
+              withCompany,
+              company,
+              timeslots
             } = entry;
             const fullName = `${firstName} ${lastName}`;
 
@@ -111,6 +115,10 @@ function JudgeSearch() {
                   wantsToJudge,
                   wantsToMentor,
                   checkedIn,
+                  teamAssignments,
+                  withCompany,
+                  company,
+                  timeslots
                 });
 
                 if (checkedIn) {
@@ -252,6 +260,13 @@ function JudgeSearch() {
             const isCheckedIn = personData[0].checkedIn;
             const checkedInString = String(personData[0].checkedIn);
 
+            const {
+              teamAssignments,
+              withCompany,
+              company,
+              timeslots
+            } = personData[0];
+
             const HoverDiv = styled("div")({
               transition: "transform 0.10s ease-in-out",
               "&:hover": { transform: "scale3d(1.07, 1.07, 1)" },
@@ -286,6 +301,22 @@ function JudgeSearch() {
 
                     <p>{personData[0].email}</p>
                     <p>{roles}</p>
+                    {withCompany ? (
+                      <p>
+                        <span>{company}</span>
+                      </p>
+                    ) : null}
+                    {teamAssignments ? (
+                      <p>
+                        <span>Judging Assignments: {teamAssignments.join(", ")}</span>
+                      </p>
+                    ) : null}
+                    {timeslots ? (
+                      <p>
+                        <span>Mentorship Timeslots: {timeslots.join(", ")}</span>
+                      </p>
+                    ) : null
+                    }
                     {personData.map((data, dataIndex) => (
                       <div key={dataIndex}>
                         {data.resume ? (
