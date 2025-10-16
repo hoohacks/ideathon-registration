@@ -10,7 +10,7 @@ function GenerateSchedule({ onButtonClick = () => {}, disabled = false }) {
       }}
       disabled={disabled}
     >
-      {disabled ? "Generated" : "Generate Schedule"}
+      {disabled ? "Judging Schedule Generated" : "Generate New Judging Schedule"}
     </button>
   );
 }

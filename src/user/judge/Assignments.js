@@ -4,6 +4,7 @@ import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
 import { getJudgeSchedule } from "./getJudgeSchedule";
 import { getPersonalSchedule } from "./getPersonalSchedule";
+import { readGenerateScheduleFlag, writeGenerateScheduleFlag } from "./generateScheduleFlag";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import "./Assigments.css";
@@ -30,21 +31,34 @@ function Assignments() {
   }
 
   const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [generated, setGenerated] = useState(true);
+  const [generateFlag, setGenerateFlag] = useState(true);
   const [personalAssignments, setPersonalAssignments] = useState([]);
   const [scoredTeamNames, setScoredTeamNames] = useState(new Set());
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
     try {
-      setGenerating(true);
       const assignments = await getJudgeSchedule();
       console.log("Generated schedule:", assignments);
       setGenerated(true);
+
+      await writeGenerateScheduleFlag(true);
+      setGenerateFlag(true);
     } catch (err) {
       console.error("Error generating schedule:", err);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleUndoToggle() {
+    try {
+      await writeGenerateScheduleFlag(false);
+      setGenerateFlag(false);
+      setGenerated(false);
+    } catch (err) {
+      console.error('Failed toggling generate flag', err);
     }
   }
 
@@ -66,6 +80,19 @@ function Assignments() {
     }
 
     fetchPersonal();
+  }, []);
+
+  // read the generate flag 
+  useEffect(() => {
+    async function fetchFlag() {
+      try {
+        const val = await readGenerateScheduleFlag();
+        setGenerateFlag(Boolean(val));
+      } catch (err) {
+        console.error('Failed reading generate schedule flag', err);
+      }
+    }
+    fetchFlag();
   }, []);
 
   async function handleSubmit(scores) {
@@ -129,10 +156,20 @@ function Assignments() {
       <div className="judging-page">
         <h1>Judge Assignments</h1>
         {canManageSchedule && (
-          <GenerateSchedule
-            onButtonClick={handleGenerateClick}
-            disabled={generating || generated}
-          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <GenerateSchedule
+              onButtonClick={handleGenerateClick}
+              disabled={generating || generated || generateFlag}
+            />
+            <button
+              className="undo-generate-schedule-button"
+              type="button"
+              onClick={handleUndoToggle}
+              disabled={!generateFlag}
+            >
+              Undo Generated Schedule
+            </button>
+          </div>
         )}
         {canViewAssignments && (
           <>
@@ -155,25 +192,6 @@ function Assignments() {
                 )}
               </div>
             </div>
-            {/* <hr className="assignments__divider" /> */}
-            {/* <div className="assignments__section">
-              <h2 className="assignments__subheader">Final Round</h2>
-              <div className="assignments__row">
-                {finalRoundAssignments.map((assignment) => {
-                  const key = `${assignment.teamName}||${assignment.room}`;
-                  return (
-                    <ScheduleCard
-                      key={`final-${assignment.teamName}`}
-                      teamName={assignment.teamName}
-                      room={assignment.room}
-                      time={assignment.time}
-                      disabled={Boolean(scored[key])}
-                      onButtonClick={openFor}
-                    />
-                  );
-                })}
-              </div>
-            </div> */}
           </>
         )}
         {!canViewAssignments && (
