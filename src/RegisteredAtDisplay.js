@@ -50,13 +50,14 @@ function RegisteredAtDisplay() {
 
     RegisteredAt.forEach((date) => {
       const formattedDate = convertDateToInt(date);
+      console.log(formattedDate);
       uniqueDates.add(formattedDate.slice(0, 2) + "/" + formattedDate.slice(2)); // Insert "/"
     });
 
     const sortedDates = Array.from(uniqueDates).sort((a, b) => {
       const [aMonth, aDay] = a.split("/").map(Number);
       const [bMonth, bDay] = b.split("/").map(Number);
-    
+
       // Compare by month, then day
       if (aMonth === bMonth) return aDay - bDay;
       return aMonth - bMonth;
@@ -67,22 +68,17 @@ function RegisteredAtDisplay() {
   }
 
   function makeY() {
-    const yArr = [];
-    let count = 1;
+    const yMap = new Map();
 
     for (let i = 1; i < RegisteredAt.length; i++) {
-      if (
-        convertDateToInt(RegisteredAt[i - 1]) ===
-        convertDateToInt(RegisteredAt[i])
-      ) {
-        count++;
-      } else {
-        yArr.push(count);
-        count = 1;
-      }
+      const date = convertDateToInt(RegisteredAt[i]);
+      yMap.set(date, (yMap.get(date) || 0) + 1);
     }
 
-    yArr.push(count);
+    const yArr = makeX().map((date) => {
+      const formattedDate = date.replace("/", "");
+      return yMap.get(formattedDate) || 0;
+    });
 
     return yArr;
   }
