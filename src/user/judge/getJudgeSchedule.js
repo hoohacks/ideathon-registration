@@ -29,29 +29,43 @@ export async function getJudgeSchedule() {
         const teamData = teamSnapshot.val();
         const teamsList = Object.entries(teamData).map(([id, details]) => ({ id, ...details }));
         
-        // assign each judge to a team (round-robin)
+        // initialize assignments with empty arrays
         const assignmentsDict = {};
-
-        // giving each judge an empty array of assignments
-        for (const j of judgesList) {
-            assignmentsDict[j.id] = [];
+        for (const judge of judgesList) {
+            assignmentsDict[judge.id] = []; // each judge gets 2 slots total
         }
 
-        // round-robin algorithm
-        teamsList.forEach((team, index) => {
-            const judgeIndex = index % judgesList.length;
-            const judgeKey = judgesList[judgeIndex].id;
-            assignmentsDict[judgeKey].push(team);
+        // first wave of judging assignments, round 1
+        let round1Assignments = {};
+        teamsList.forEach(team => {
+            round1Assignments[team.name] = [];
+        });
+
+        judgesList.forEach((judge, index) => {
+            const teamIndex = index % teamsList.length;
+            const teamName = teamsList[teamIndex].name;
+            round1Assignments[teamName].push(judge.id);
+            assignmentsDict[judge.id].push(teamName);
+        });
+        
+        // second wave of judging assignments, round 2
+        let round2Assignments = {};
+        teamsList.forEach(team => {
+            round2Assignments[team.name] = [];
+        });
+
+        judgesList.forEach((judge, index) => {
+            const teamIndex = (index + 1) % teamsList.length; // shift by 1
+            const teamName = teamsList[teamIndex].name;
+            round2Assignments[teamName].push(judge.id);
+            assignmentsDict[judge.id].push(teamName);
         });
 
         // write all the team names to the judges in the db under the new attribute teamAssignments
         try {
             const writes = Object.entries(assignmentsDict).map(async ([judgeId, teams]) => {
                 const judgeRef = ref(database, `judges/${judgeId}/teamAssignments`);
-                const teamNames = teams.map(team => team.name);
-                
-                // persist to db
-                const value = teamNames.length > 0 ? teamNames : [""]; // write empty array as [""] so it still shows up in firebase
+                const value = teams.length > 0 ? teams : [""]; // write empty array as [""]
                 return set(judgeRef, value);
             });
             await Promise.all(writes);
