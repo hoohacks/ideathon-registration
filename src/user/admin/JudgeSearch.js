@@ -79,6 +79,8 @@ function JudgeSearch() {
   useEffect(() => {
     onValue(ref(database, "/judges/"), (snapshot) => {
       const data = snapshot.val();
+      // Remove data where the isHooHacksJudge=true
+
       if (data) {
         const newData = {};
         let newCheckedInCount = 0;
@@ -92,9 +94,13 @@ function JudgeSearch() {
               email,
               wantsToJudge,
               wantsToMentor,
+              isHooHacksMember,
               checkedIn,
             } = entry;
             const fullName = `${firstName} ${lastName}`;
+
+            if (isHooHacksMember)
+              continue;
 
             if (key != null) {
               if (!newData[key]) {
@@ -173,12 +179,12 @@ function JudgeSearch() {
           Metrics
         </button>
         <h1 className="label" style={{ fontSize: "60px" }}>
-           Admin Judge Dashboard
+          Admin Judge Dashboard
         </h1>
         <p style={{ fontSize: "24px", textAlign: "center" }}>
           Total Signed-Up: {Object.keys(Data).length} | Checked In:{" "}
           {checkedInCount} | Percentage: {percentCheckedIn}%
-          <Form.Check 
+          <Form.Check
             inline
             style={{ fontSize: "15px", marginLeft: "30px" }}
             type="switch"
@@ -239,10 +245,10 @@ function JudgeSearch() {
 
             const fullName = personData[0].fullName.toString();
             const roles = [
-                personData[0].wantsToJudge && "Judging",
-                personData[0].wantsToMentor && "Mentoring"
-              ].filter(Boolean).join(" & ");
-              
+              personData[0].wantsToJudge && "Judging",
+              personData[0].wantsToMentor && "Mentoring"
+            ].filter(Boolean).join(" & ");
+
             const isCheckedIn = personData[0].checkedIn;
             const checkedInString = String(personData[0].checkedIn);
 
