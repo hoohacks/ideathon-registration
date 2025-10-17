@@ -4,9 +4,10 @@ import { AuthContext } from "../App";
 import { Button, Typography } from "@mui/material";
 import { auth } from "../firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { Navigate } from "react-router-dom";
 
 function Profile() {
-    const { userData } = useContext(AuthContext);
+    const { userData, userTypes } = useContext(AuthContext);
     const [sentReset, setSentReset] = useState(false);
 
 
@@ -17,6 +18,15 @@ function Profile() {
             setSentReset(true);
         } catch (error) {
             console.error("Error sending password reset email:", error);
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await auth.signOut();
+            return <Navigate to="/login" replace />;
+        } catch (error) {
+            console.error("Error during logout:", error);
         }
     };
 
@@ -46,6 +56,10 @@ function Profile() {
                                 </Button>
                             )
                         }
+                        < hr />
+                        <Button variant="outlined" color="secondary" onClick={handleLogout}>
+                            Logout
+                        </Button>
                     </div>
                 ) : (
                     <p>No user data found. Please contact HooHacks at <a href="mailto:support@hoohacks.com">support@hoohacks.com</a></p>
