@@ -14,8 +14,11 @@ import {
   getMyScoredTeamsByName,
   getMyFinalRoundScoredTeamsByName,
 } from "./getTeamInfo";
-
-const FINAL_ROUND_TEST_TEAMS = ["Team 3", "Team 4"];
+import {
+  activateFinalRound,
+  deactivateFinalRound,
+  subscribeToFinalRoundState,
+} from "./finalRoundService";
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -39,6 +42,10 @@ function Assignments() {
   const [finalRoundScoredTeamNames, setFinalRoundScoredTeamNames] = useState(
     () => new Set()
   );
+  const [finalRoundState, setFinalRoundState] = useState({ active: false });
+  const [finalRoundLoading, setFinalRoundLoading] = useState(true);
+  const [togglingFinalRound, setTogglingFinalRound] = useState(false);
+  const [finalRoundError, setFinalRoundError] = useState(null);
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
@@ -51,6 +58,39 @@ function Assignments() {
       console.error("Error generating schedule:", err);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleActivateFinalRound() {
+    setTogglingFinalRound(true);
+    setFinalRoundError(null);
+    try {
+      await activateFinalRound();
+    } catch (err) {
+      console.error("Failed to activate final round:", err);
+      setFinalRoundError(err.message || "Failed to activate final round.");
+      alert(`Failed to activate final round: ${err.message}`);
+    } finally {
+      setTogglingFinalRound(false);
+    }
+  }
+
+  async function handleDeactivateFinalRound() {
+    const confirmed = window.confirm(
+      "Deactivate final round judging? This will hide final-round assignments until reactivated."
+    );
+    if (!confirmed) return;
+
+    setTogglingFinalRound(true);
+    setFinalRoundError(null);
+    try {
+      await deactivateFinalRound();
+    } catch (err) {
+      console.error("Failed to deactivate final round:", err);
+      setFinalRoundError(err.message || "Failed to deactivate final round.");
+      alert(`Failed to deactivate final round: ${err.message}`);
+    } finally {
+      setTogglingFinalRound(false);
     }
   }
 
@@ -93,7 +133,8 @@ function Assignments() {
       }
 
       // find the teamId
-      const teamId = await findTeamIdByName(teamName);
+      const teamId =
+        selected?.teamId ?? (await findTeamIdByName(teamName));
       if (!teamId) {
         alert(`Could not find teamId for "${teamName}"`);
         return;
@@ -130,28 +171,54 @@ function Assignments() {
     }
   }
 
-  const { userTypes } = useAuth();
-  const canManageSchedule = userTypes.includes("admin");
-  const canViewAssignments = userTypes.includes("judge");
+  useEffect(() => {
+    const unsubscribe = subscribeToFinalRoundState((state) => {
+      setFinalRoundState(state || { active: false });
+      setFinalRoundLoading(false);
+      setFinalRoundError(state?.error ?? null);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const finalRoundDisplayTeams = useMemo(() => {
-    const matches = personalAssignments.filter((teamName) =>
-      FINAL_ROUND_TEST_TEAMS.includes(teamName)
+  const finalRoundTeams = useMemo(() => {
+    if (!finalRoundState?.active || !finalRoundState?.teams) return [];
+    return Object.entries(finalRoundState.teams).map(([teamId, details]) => ({
+      teamId,
+      name: details?.name ?? "Unnamed Team",
+      averageScore: details?.averageScore ?? null,
+      excludedJudges: details?.excludedJudges ?? {},
+    }));
+  }, [finalRoundState]);
+
+  const { userTypes, userCredential } = useAuth();
+  const currentUserId = userCredential?.user?.uid;
+  const userRoles = Array.isArray(userTypes) ? userTypes : [];
+  const canManageSchedule = userRoles.includes("admin");
+  const canViewAssignments = userRoles.includes("judge");
+
+  const finalAssignmentsForJudge = useMemo(() => {
+    if (!finalRoundTeams.length || !currentUserId) return [];
+    return finalRoundTeams.filter(
+      (team) => !team.excludedJudges?.[currentUserId]
     );
-    return matches.length > 0 ? matches : FINAL_ROUND_TEST_TEAMS;
-  }, [personalAssignments]);
+  }, [finalRoundTeams, currentUserId]);
+
+  const finalRoundTeamNamesForJudge = useMemo(() => {
+    return finalAssignmentsForJudge
+      .map((team) => team.name)
+      .filter((name) => Boolean(name));
+  }, [finalAssignmentsForJudge]);
 
   useEffect(() => {
     async function fetchFinalRoundScores() {
       try {
-        const uniqueNames = Array.from(
-          new Set(finalRoundDisplayTeams.filter(Boolean))
-        );
-        if (uniqueNames.length === 0) {
+        if (!finalRoundState?.active || finalRoundTeamNamesForJudge.length === 0) {
           setFinalRoundScoredTeamNames(new Set());
           return;
         }
-        const scoredMap = await getMyFinalRoundScoredTeamsByName(uniqueNames);
+        const scoredMap = await getMyFinalRoundScoredTeamsByName(
+          finalRoundTeamNamesForJudge
+        );
         const keys = scoredMap ? Object.keys(scoredMap) : [];
         setFinalRoundScoredTeamNames(new Set(keys));
       } catch (err) {
@@ -160,14 +227,15 @@ function Assignments() {
     }
 
     fetchFinalRoundScores();
-  }, [finalRoundDisplayTeams]);
+  }, [finalRoundState?.active, finalRoundTeamNamesForJudge]);
 
-  const finalRoundAssignments = finalRoundDisplayTeams.map((teamName, idx) => {
-    const firstRoundIndex = personalAssignments.indexOf(teamName);
+  const finalRoundAssignments = finalAssignmentsForJudge.map((team) => {
+    const firstRoundIndex = personalAssignments.indexOf(team.name);
     const derivedRoom =
-      firstRoundIndex >= 0 ? `Room ${firstRoundIndex + 1}` : `Final Room ${idx + 1}`;
+      firstRoundIndex >= 0 ? `Room ${firstRoundIndex + 1}` : "Final Room";
     return {
-      teamName,
+      teamId: team.teamId,
+      teamName: team.name,
       room: derivedRoom,
       time: "TBD",
     };
@@ -178,10 +246,45 @@ function Assignments() {
       <div className="judging-page">
         <h1>Judge Assignments</h1>
         {canManageSchedule && (
-          <GenerateSchedule
-            onButtonClick={handleGenerateClick}
-            disabled={generating || generated}
-          />
+          <>
+            <div className="assignments__admin-controls">
+              <GenerateSchedule
+                onButtonClick={handleGenerateClick}
+                disabled={generating || generated}
+              />
+              {finalRoundState?.active ? (
+                <>
+                  <button
+                    type="button"
+                    className="assignments__toggle-button assignments__toggle-button--disabled"
+                    disabled
+                  >
+                    Final Round Active
+                  </button>
+                  <button
+                    type="button"
+                    className="assignments__toggle-button assignments__toggle-button--danger"
+                    onClick={handleDeactivateFinalRound}
+                    disabled={togglingFinalRound || finalRoundLoading}
+                  >
+                    Deactivate Final Round
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="assignments__toggle-button"
+                  onClick={handleActivateFinalRound}
+                  disabled={togglingFinalRound || finalRoundLoading}
+                >
+                  Activate Final Round
+                </button>
+              )}
+            </div>
+            {finalRoundError && (
+              <p className="assignments__error">{finalRoundError}</p>
+            )}
+          </>
         )}
         {canViewAssignments && (
           <>
@@ -199,9 +302,7 @@ function Assignments() {
                       time={`TBD`}
                       onButtonClick={(card) =>
                         openFor({
-                          teamName: card.teamName,
-                          room: card.room,
-                          time: card.time,
+                          ...card,
                           round: "first",
                         })
                       }
@@ -211,34 +312,41 @@ function Assignments() {
                 )}
               </div>
             </div>
-            {<hr className="assignments__divider" />}
-            {<div className="assignments__section">
-              <h2 className="assignments__subheader">Final Round</h2>
-              <div className="assignments__row">
-                {finalRoundAssignments.map((assignment) => {
-                  const isFinalScored = finalRoundScoredTeamNames.has(
-                    assignment.teamName
-                  );
-                  return (
-                    <ScheduleCard
-                      key={`final-${assignment.teamName}`}
-                      teamName={assignment.teamName}
-                      room={assignment.room}
-                      time={assignment.time}
-                      disabled={isFinalScored}
-                      onButtonClick={(card) =>
-                        openFor({
-                          teamName: card.teamName,
-                          room: card.room,
-                          time: card.time,
-                          round: "final",
-                        })
-                      }
-                    />
-                  );
-                })}
-              </div>
-            </div>}
+            {finalRoundState?.active && (
+              <>
+                <hr className="assignments__divider" />
+                <div className="assignments__section">
+                  <h2 className="assignments__subheader">Final Round</h2>
+                  <div className="assignments__row">
+                    {finalRoundAssignments.length === 0 ? (
+                      <div>No final round assignments for you.</div>
+                    ) : (
+                      finalRoundAssignments.map((assignment) => {
+                        const isFinalScored = finalRoundScoredTeamNames.has(
+                          assignment.teamName
+                        );
+                        return (
+                          <ScheduleCard
+                            key={`final-${assignment.teamName}`}
+                            teamName={assignment.teamName}
+                            room={assignment.room}
+                            time={assignment.time}
+                            disabled={isFinalScored}
+                            onButtonClick={(card) =>
+                              openFor({
+                                ...card,
+                                teamId: assignment.teamId,
+                                round: "final",
+                              })
+                            }
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
         {!canViewAssignments && (
