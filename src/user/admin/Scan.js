@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useZxing } from "react-zxing";
 // firebase
 import { database } from "../../firebase";
-import { ref, get, update } from "firebase/database";
+import { ref, get, update, set } from "firebase/database";
 
 function AdminScan() {
     // pause scanner and popup
@@ -12,8 +12,8 @@ function AdminScan() {
     const [popup, setPopup] = useState({ open: false, title: "", message: "" });
 
     // state for type of check in. This can be "event" or "food" that the user can pick to scan.
-    // use radio button for ui
-    const [checkinType, setCheckinType] = useState("event")
+    // uses radio button for ui
+    const [checkinType, setCheckinType] = useState("event");
 
     // zxing library for qr code
     const { ref: videoRef } = useZxing({
@@ -38,42 +38,82 @@ function AdminScan() {
                 if (competitorData.exists()) {
                     //gets their data in json
                     const data = competitorData.val();
-                    // if they are checked in open the pop up showing they're already checked in
-                    if (data.checkedIn === true) {
-                        setPopup({
-                            open: true,
-                            title: "Already Checked-in",
-                            message: `Competitor ${data.firstName} ${data.lastName} is already checked-in`,
-                        });
-                    } else {
-                        // checks them in firebase
-                        await update(competitorRef, { checkedIn: true });
 
-                        setPopup({
-                            open: true,
-                            title: "Success",
-                            message: `Checked-in competitor ${data.firstName} ${data.lastName}`,
-                        });
+                    if (checkinType === "event") {
+                        // if they are checked in open the pop up showing they're already checked in
+                        if (data.checkedIn === true) {
+                            setPopup({
+                                open: true,
+                                title: "Already Checked-in",
+                                message: `Competitor ${data.firstName} ${data.lastName} is already checked-in`,
+                            });
+                        } else {
+                            // checks them in firebase
+                            await update(competitorRef, { checkedIn: true });
+
+                            setPopup({
+                                open: true,
+                                title: "Success",
+                                message: `Checked-in competitor ${data.firstName} ${data.lastName}`,
+                            });
+                        }
+                    } else if (checkinType === "food") {
+                        if (data.foodCheckIn === true) {
+                            setPopup({
+                                open: true,
+                                title: "Already Received Food",
+                                message: `Competitor ${data.firstName} ${data.lastName} already received food`,
+                            });
+                        } else {
+                            // checks them in firebase
+                            await update(competitorRef, { foodCheckIn: true });
+
+                            setPopup({
+                                open: true,
+                                title: "Success",
+                                message: `Checked-in competitor ${data.firstName} ${data.lastName} for food`,
+                            });
+                        }
                     }
                 } else if (judgeData.exists()) {
                     //gets their data in json
                     const data = judgeData.val();
-                    // if they are checked in open the pop up showing they're already checked in
-                    if (data.checkedIn === true) {
-                        setPopup({
-                            open: true,
-                            title: "Already Checked-in",
-                            message: `Judge ${data.firstName} ${data.lastName} is already checked-in`,
-                        });
-                    } else {
-                        // checks them in firebase
-                        await update(judgeRef, { checkedIn: true });
 
-                        setPopup({
-                            open: true,
-                            title: "Success",
-                            message: `Checked-in judge ${data.firstName} ${data.lastName}`,
-                        });
+                    if (checkinType === "event") {
+                        // if they are checked in open the pop up showing they're already checked in
+                        if (data.checkedIn === true) {
+                            setPopup({
+                                open: true,
+                                title: "Already Checked-in",
+                                message: `Judge ${data.firstName} ${data.lastName} is already checked-in`,
+                            });
+                        } else {
+                            // checks them in firebase
+                            await update(judgeRef, { checkedIn: true });
+
+                            setPopup({
+                                open: true,
+                                title: "Success",
+                                message: `Checked-in judge ${data.firstName} ${data.lastName}`,
+                            });
+                        }
+                    } else if (checkinType === "food") {
+                        if (data.foodCheckIn === true) {
+                            setPopup({
+                                open: true,
+                                title: "Already Received Food",
+                                message: `Judge ${data.firstName} ${data.lastName} already received food`,
+                            });
+                        } else {
+                            // checks them in firebase
+                            await update(judgeRef, { foodCheckIn: true });
+
+                            setPopup({
+                                open: true,
+                                title: "Success",
+                                message: `Checked-in judge ${data.firstName} ${data.lastName} for food`,
+                            });
+                        }
                     }
                 } else {
                     setPopup({
@@ -117,10 +157,50 @@ function AdminScan() {
                     justifyContent: "center",
                     minHeight: "80vh",
                     padding: "16px",
-                    gap: "16px",
+                    gap: "20px",
                 }}
             >
-                <h1>Check-in QR</h1>
+                <h1 style={{ lineHeight: "10px" }}>Check-in QR</h1>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: "10px",
+                        backgroundColor: "#edededff",
+                        borderRadius: "10px",
+                        padding: "5px",
+                    }}
+                >
+                    <button
+                        onClick={() => setCheckinType("event")}
+                        style={{
+                            border: "0px",
+                            borderRadius: "10px",
+                            padding: "10px 20px",
+                            fontWeight: "600",
+                            transition: "all 0.2s ease",
+                            backgroundColor:
+                                checkinType === "event" ? "#1976D2" : "white",
+                            color: checkinType === "event" ? "white" : "black",
+                        }}
+                    >
+                        Event Check-in
+                    </button>
+                    <button
+                        onClick={() => setCheckinType("food")}
+                        style={{
+                            border: "0px",
+                            borderRadius: "10px",
+                            padding: "10px 20px",
+                            fontWeight: "600",
+                            transition: "all 0.2s ease",
+                            backgroundColor:
+                                checkinType === "food" ? "#d21919ff" : "white",
+                            color: checkinType === "food" ? "white" : "black",
+                        }}
+                    >
+                        Food Check-in
+                    </button>
+                </div>
                 <video
                     ref={videoRef}
                     style={{
