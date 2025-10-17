@@ -224,6 +224,7 @@ const JudgeRegistration = () => {
       questionsAndConcerns: questionsAndConcerns,
       registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
       checkedIn: false,
+      foodCheckIn: false,
       isJudge: true,
     };
 

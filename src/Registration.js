@@ -197,6 +197,7 @@ const Registration = () => {
         major: major,
         registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
         checkedIn: false,
+        foodCheckIn: false,
         dietaryRestriction:
           dietRestriction.length === 0 ? "none" : dietRestriction,
       };
@@ -224,6 +225,7 @@ const Registration = () => {
         major: major,
         registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
         checkedIn: false,
+        foodCheckIn: false,
         dietaryRestriction:
           dietRestriction.length === 0 ? "none" : dietRestriction,
       };
