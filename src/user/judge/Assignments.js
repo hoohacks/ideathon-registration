@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
@@ -10,13 +10,16 @@ import "./Assigments.css";
 import {
   findTeamIdByName,
   writeTeamScore,
+  writeFinalRoundScore,
   getMyScoredTeamsByName,
+  getMyFinalRoundScoredTeamsByName,
 } from "./getTeamInfo";
+
+const FINAL_ROUND_TEST_TEAMS = ["Team 3", "Team 4"];
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [scored, setScored] = useState({});
 
   function openFor(card) {
     console.log("Assignments.openFor called with", card);
@@ -32,7 +35,10 @@ function Assignments() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [personalAssignments, setPersonalAssignments] = useState([]);
-  const [scoredTeamNames, setScoredTeamNames] = useState(new Set());
+  const [scoredTeamNames, setScoredTeamNames] = useState(() => new Set());
+  const [finalRoundScoredTeamNames, setFinalRoundScoredTeamNames] = useState(
+    () => new Set()
+  );
 
   async function handleGenerateClick() {
     if (generated) return; // already generated once
@@ -75,8 +81,14 @@ function Assignments() {
       if (!teamName) throw new Error("No team selected");
 
       // if you already submitted a score, don't allow to resubmit
-      if (scoredTeamNames.has(teamName)) {
+      const isFinalRound = selected?.round === "final";
+
+      if (!isFinalRound && scoredTeamNames.has(teamName)) {
         alert(`You already submitted a score for ${teamName}`);
+        return;
+      }
+      if (isFinalRound && finalRoundScoredTeamNames.has(teamName)) {
+        alert(`You already submitted a final round score for ${teamName}`);
         return;
       }
 
@@ -88,14 +100,28 @@ function Assignments() {
       }
 
       // write the score
-      await writeTeamScore({ teamId, teamName, score: scores });
+      if (isFinalRound) {
+        await writeFinalRoundScore({ teamId, teamName, score: scores });
+      } else {
+        await writeTeamScore({ teamId, teamName, score: scores });
+      }
 
       // update scored keys
-      setScoredTeamNames((prev) => new Set(prev).add(teamName));
+      if (isFinalRound) {
+        setFinalRoundScoredTeamNames((prev) => {
+          const copy = new Set(prev);
+          copy.add(teamName);
+          return copy;
+        });
+      } else {
+        setScoredTeamNames((prev) => {
+          const copy = new Set(prev);
+          copy.add(teamName);
+          return copy;
+        });
+      }
 
       alert(`Submitted scores for ${teamName}`);
-      const key = `${teamName}||${selected.room}`;
-      setScored((prev) => ({ ...prev, [key]: true }));
     } catch (e) {
       console.error(e);
       alert(`Failed to submit score: ${e.message}`);
@@ -108,21 +134,44 @@ function Assignments() {
   const canManageSchedule = userTypes.includes("admin");
   const canViewAssignments = userTypes.includes("judge");
 
-  const firstRoundAssignments = [
-    {
-      teamName: "Team Alpha",
-      room: "Rice 102",
-      time: "2:30 PM",
-    },
-  ];
+  const finalRoundDisplayTeams = useMemo(() => {
+    const matches = personalAssignments.filter((teamName) =>
+      FINAL_ROUND_TEST_TEAMS.includes(teamName)
+    );
+    return matches.length > 0 ? matches : FINAL_ROUND_TEST_TEAMS;
+  }, [personalAssignments]);
 
-  const finalRoundAssignments = [
-    {
-      teamName: "Team Omega",
-      room: "Rice 201",
-      time: "6:00 PM",
-    },
-  ];
+  useEffect(() => {
+    async function fetchFinalRoundScores() {
+      try {
+        const uniqueNames = Array.from(
+          new Set(finalRoundDisplayTeams.filter(Boolean))
+        );
+        if (uniqueNames.length === 0) {
+          setFinalRoundScoredTeamNames(new Set());
+          return;
+        }
+        const scoredMap = await getMyFinalRoundScoredTeamsByName(uniqueNames);
+        const keys = scoredMap ? Object.keys(scoredMap) : [];
+        setFinalRoundScoredTeamNames(new Set(keys));
+      } catch (err) {
+        console.error("Error fetching final round scores:", err);
+      }
+    }
+
+    fetchFinalRoundScores();
+  }, [finalRoundDisplayTeams]);
+
+  const finalRoundAssignments = finalRoundDisplayTeams.map((teamName, idx) => {
+    const firstRoundIndex = personalAssignments.indexOf(teamName);
+    const derivedRoom =
+      firstRoundIndex >= 0 ? `Room ${firstRoundIndex + 1}` : `Final Room ${idx + 1}`;
+    return {
+      teamName,
+      room: derivedRoom,
+      time: "TBD",
+    };
+  });
 
   return (
     <Layout>
@@ -148,32 +197,48 @@ function Assignments() {
                       teamName={teamName}
                       room={`Room ${idx + 1}`}
                       time={`TBD`}
-                      onButtonClick={(card) => openFor(card)}
+                      onButtonClick={(card) =>
+                        openFor({
+                          teamName: card.teamName,
+                          room: card.room,
+                          time: card.time,
+                          round: "first",
+                        })
+                      }
                       disabled={scoredTeamNames.has(teamName)}
                     />
                   ))
                 )}
               </div>
             </div>
-            {/* <hr className="assignments__divider" /> */}
-            {/* <div className="assignments__section">
+            {<hr className="assignments__divider" />}
+            {<div className="assignments__section">
               <h2 className="assignments__subheader">Final Round</h2>
               <div className="assignments__row">
                 {finalRoundAssignments.map((assignment) => {
-                  const key = `${assignment.teamName}||${assignment.room}`;
+                  const isFinalScored = finalRoundScoredTeamNames.has(
+                    assignment.teamName
+                  );
                   return (
                     <ScheduleCard
                       key={`final-${assignment.teamName}`}
                       teamName={assignment.teamName}
                       room={assignment.room}
                       time={assignment.time}
-                      disabled={Boolean(scored[key])}
-                      onButtonClick={openFor}
+                      disabled={isFinalScored}
+                      onButtonClick={(card) =>
+                        openFor({
+                          teamName: card.teamName,
+                          room: card.room,
+                          time: card.time,
+                          round: "final",
+                        })
+                      }
                     />
                   );
                 })}
               </div>
-            </div> */}
+            </div>}
           </>
         )}
         {!canViewAssignments && (
