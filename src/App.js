@@ -9,6 +9,7 @@ import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
 import UserHome from "./user/Home"
 import NewJoinTeam from "./user/NewJoinTeam"
+import CreateTeam from "./user/CreateTeam"
 import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
@@ -142,7 +143,10 @@ function App() {
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="judging" element={<ProtectedRoute requiredRoles={["judge"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
-          <Route path="team" element={<ProtectedRoute requiredRoles={["competitor"]}><NewJoinTeam /></ProtectedRoute>} />
+          <Route path="team">
+            <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><NewJoinTeam /></ProtectedRoute>} />
+            <Route path="create" element={<ProtectedRoute requiredRoles={["competitor"]}><CreateTeam /></ProtectedRoute>} />
+          </Route>
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
