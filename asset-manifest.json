@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/ideathon-registration/static/css/main.d705aafe.css",
-    "main.js": "/ideathon-registration/static/js/main.de9ab7bc.js",
+    "main.js": "/ideathon-registration/static/js/main.4dbfe20b.js",
     "static/js/787.c7ba16c6.chunk.js": "/ideathon-registration/static/js/787.c7ba16c6.chunk.js",
     "static/media/logo.png": "/ideathon-registration/static/media/logo.3f64e9d9387cfcddb5c4.png",
     "index.html": "/ideathon-registration/index.html",
     "main.d705aafe.css.map": "/ideathon-registration/static/css/main.d705aafe.css.map",
-    "main.de9ab7bc.js.map": "/ideathon-registration/static/js/main.de9ab7bc.js.map",
+    "main.4dbfe20b.js.map": "/ideathon-registration/static/js/main.4dbfe20b.js.map",
     "787.c7ba16c6.chunk.js.map": "/ideathon-registration/static/js/787.c7ba16c6.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.d705aafe.css",
-    "static/js/main.de9ab7bc.js"
+    "static/js/main.4dbfe20b.js"
   ]
 }
