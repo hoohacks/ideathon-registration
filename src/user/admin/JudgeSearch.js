@@ -94,7 +94,8 @@ function JudgeSearch() {
                   teamAssignments,
                   withCompany,
                   company,
-                  timeslots
+                  timeslots,
+                  id: key
                 });
 
                 if (checkedIn) {
@@ -238,7 +239,8 @@ function JudgeSearch() {
             teamAssignments,
             withCompany,
             company,
-            timeslots
+            timeslots,
+            id
           } = personData[0];
 
           if (
@@ -254,7 +256,7 @@ function JudgeSearch() {
                   {fullName}
                 </p>
 
-                <p>{personData[0].email}</p>
+                <p>{personData[0].email} ({id})</p>
                 <p>{roles}</p>
                 {withCompany ? (
                   <p>
@@ -263,7 +265,7 @@ function JudgeSearch() {
                 ) : null}
                 {teamAssignments ? (
                   <p>
-                    <span>Judging Assignments: {teamAssignments.join(", ")}</span>
+                    <span>Judging Assignments: {teamAssignments.map(assignment => assignment.teamName).join(", ")}</span>
                   </p>
                 ) : null}
                 {timeslots ? (
