@@ -105,6 +105,7 @@ export async function getJudgeSchedule() {
             });
         });
 
+        // third wave of judging assignments, round 3
         judgesList.forEach((judge, index) => {
             const teamIndex = (index * 233) % Math.floor(teamsList.length / 3) + (2 * Math.ceil(teamsList.length / 3)); 
             const teamId = teamsList[teamIndex].id;
