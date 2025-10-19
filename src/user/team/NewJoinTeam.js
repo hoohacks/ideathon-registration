@@ -64,9 +64,6 @@ function NewJoinTeam() {
       // Attach teamId to user's profile
       await set(ref(database, `competitors/${userCredential.uid}/teamId`), teamId);
 
-      console.log(`User ${userCredential.uid} added to team ${teamId}`);
-      alert(`Successfully joined team ${teamId}!`);
-
       // Trigger user data refresh in AuthContext if needed
       await refreshUserData();
 

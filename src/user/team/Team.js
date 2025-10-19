@@ -59,13 +59,15 @@ function Profile() {
                 Team Information
             </Typography>
             {
-                userData ? (
+                teamData ? (
                     <div style={{ textAlign: 'center' }}>
                         <Typography variant="h5" style={{ fontWeight: 'bold' }}>
-                            {teamId}
+                            {teamData.name}
+                        </Typography>
+                        <Typography variant="h6" style={{ fontStyle: 'italic' }}>
+                            Team ID: {teamId}
                         </Typography>
                         <hr />
-                        { /* Display team members or other relevant information here */}
                         <Typography variant="h6" style={{ fontWeight: 'bold' }}>
                             Team Members
                         </Typography>
@@ -78,7 +80,9 @@ function Profile() {
                         </ul>
                     </div>
                 ) : (
-                    <p>No user data found. Please contact HooHacks at <a href="mailto:support@hoohacks.com">support@hoohacks.com</a></p>
+                    <Typography variant="body1" style={{ textAlign: 'center', marginTop: '20px' }}>
+                        Loading team information...
+                    </Typography>
                 )
             }
         </Layout>

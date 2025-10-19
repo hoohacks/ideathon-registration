@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect } from "react";
 import { getAuth } from "firebase/auth";
-import { ref, set, get } from "firebase/database";
+import { ref, set, push } from "firebase/database";
 import { database } from "../../firebase.js";
 import Layout from "../Layout.js";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +26,7 @@ function CreateTeam() {
     setInputValue("");
   };
 
-  const createTeam = async (teamId) => {
+  const createTeam = async (teamName) => {
     const auth = getAuth();
     const userCredential = auth.currentUser;
 
@@ -36,18 +36,13 @@ function CreateTeam() {
     }
 
     try {
-      const teamRef = ref(database, "teams/" + teamId);
-      const snapshot = await get(teamRef);
-
-      // Prevent overwriting an existing team
-      if (snapshot.exists()) {
-        alert(`A team with ID "${teamId}" already exists.`);
-        return;
-      }
+      // push a new team to the "teams" collection
+      const teamsRef = ref(database, "teams/");
+      const teamRef = push(teamsRef);
 
       // Create a new team object
       const teamData = {
-        name: teamId,
+        name: teamName,
         createdBy: userCredential.uid,
         members: [userCredential.uid]
       };
@@ -55,8 +50,8 @@ function CreateTeam() {
       // Write the new team to Firebase
       await set(teamRef, teamData);
 
-      console.log(`Team "${teamId}" created by ${userCredential.uid}`);
-      alert(`Team "${teamId}" created successfully!`);
+      // Attach teamId to user's profile
+      await set(ref(database, `competitors/${userCredential.uid}/teamId`), teamRef.key);
 
       await refreshUserData();
 
