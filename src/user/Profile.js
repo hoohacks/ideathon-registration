@@ -60,7 +60,7 @@ function Profile() {
                         <Typography variant="h6" style={{ fontStyle: 'bold' }}>
                             {userData.email}
                         </Typography>
-                        {
+                        {/* {
                             userTypes.includes("competitor") && (
                                 <Typography variant="h6" style={{ fontStyle: 'italic' }}>
                                     {
@@ -69,7 +69,7 @@ function Profile() {
 
                                 </Typography>
                             )
-                        }
+                        } */}
                         <br />
                         {
                             userTypes.includes("competitor") && (
