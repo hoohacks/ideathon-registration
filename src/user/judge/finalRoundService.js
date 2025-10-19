@@ -8,7 +8,7 @@ import {
 import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
 
-const SCORE_FIELDS = ["creativity", "cost", "idea"];
+const SCORE_FIELDS = ["impact", "innovation", "pitch_quality", "problem"];
 
 function calculateAverageScore(scores = {}) {
   const entries = Object.values(scores);
@@ -54,9 +54,9 @@ export async function activateFinalRound({ limit = 4 } = {}) {
     const averageScore = calculateAverageScore(team?.scores);
     const excludedJudges = team?.scores
       ? Object.keys(team.scores).reduce((acc, judgeId) => {
-          acc[judgeId] = true;
-          return acc;
-        }, {})
+        acc[judgeId] = true;
+        return acc;
+      }, {})
       : {};
 
     return {
