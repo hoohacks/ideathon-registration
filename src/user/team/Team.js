@@ -1,25 +1,55 @@
 import Layout from "../Layout";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../App";
-import { Typography } from "@mui/material";
-import { ref, get } from "firebase/database";
+import { Button, Typography } from "@mui/material";
+import { ref, get, set } from "firebase/database";
 import { database } from "../../firebase";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Profile() {
-    const { userData } = useContext(AuthContext);
+    const navigate = useNavigate();
+    const { userData, userCredential, refreshUserData } = useContext(AuthContext);
     const [teamData, setTeamData] = useState(null);
 
     // Get team ID from userData if available
     const teamId = userData ? userData.teamId : null;
 
+    const handleLeaveTeam = async () => {
+        const teamRef = ref(database, "teams/" + teamId);
+        const snapshot = await get(teamRef);
+
+        if (!snapshot.exists()) {
+            alert(`Team with ID "${teamId}" does not exist.`);
+            return;
+        }
+
+        // Remove user from team's member list
+        const teamData = snapshot.val();
+        let members = [];
+
+        // Coerce existing members into an array if possible
+        if (Array.isArray(teamData.members)) {
+            members = teamData.members.filter(Boolean); // remove any null/undefined
+        }
+
+        // Remove current UID from the array
+        const uid = userCredential.user.uid;
+        members = members.filter(memberUid => memberUid !== uid);
+
+        // Update the team in the database
+        await set(ref(database, "teams/" + teamId + "/members"), members);
+
+        // Remove teamId from user's profile
+        await set(ref(database, `competitors/${uid}/teamId`), null);
+
+        await refreshUserData();
+
+        navigate('/user/team');
+    }
+
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
         const fetchTeamData = async () => {
-            if (!teamId) {
-                return;
-            }
-
             const teamRef = ref(database, "teams/" + teamId);
             const snapshot = await get(teamRef);
 
@@ -78,6 +108,10 @@ function Profile() {
                                 </li>
                             ))}
                         </ul>
+                        <hr />
+                        <Button onClick={handleLeaveTeam} variant="outlined" color="secondary">
+                            Leave Team
+                        </Button>
                     </div>
                 ) : (
                     <Typography variant="body1" style={{ textAlign: 'center', marginTop: '20px' }}>
