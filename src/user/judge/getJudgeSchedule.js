@@ -46,7 +46,7 @@ export async function getJudgeSchedule() {
 
         const teamData = teamSnapshot.val();
         const teamsList = Object.entries(teamData)
-            // .filter(([_, details]) => details.submitted)
+            .filter(([_, details]) => details.submitted)
             .map(([id, details]) => ({ id, ...details }));
 
         // initialize assignments with empty arrays
