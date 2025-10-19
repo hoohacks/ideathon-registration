@@ -62,6 +62,17 @@ function Profile() {
                         </Typography>
                         {
                             userTypes.includes("competitor") && (
+                                <Typography variant="h6" style={{ fontStyle: 'italic' }}>
+                                    {
+                                        userData.teamId ? userData.teamId : "Not in a team"
+                                    }
+
+                                </Typography>
+                            )
+                        }
+                        <br />
+                        {
+                            userTypes.includes("competitor") && (
                                 <>
                                     <FormControl size="large" style={{ marginTop: '20px', minWidth: 300, textAlign: 'left' }}>
                                         <InputLabel>Dietary Restrictions</InputLabel>

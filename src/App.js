@@ -8,7 +8,9 @@ import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/au
 import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
 import UserHome from "./user/Home"
-import NewJoinTeam from "./user/NewJoinTeam"
+import NewJoinTeam from "./user/team/NewJoinTeam.js"
+import CreateTeam from "./user/team/CreateTeam.js"
+import Team from "./user/team/Team.js"
 import UserProfile from "./user/Profile"
 import CheckIn from "./user/CheckIn"
 import AdminScan from "./user/admin/Scan"
@@ -71,40 +73,40 @@ function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!userCredential)
-        return;
+  const refreshUserData = async () => {
+    if (!userCredential)
+      return;
 
-      const idToken = await userCredential.user.getIdToken();
-      setToken(idToken);
+    const idToken = await userCredential.user.getIdToken();
+    setToken(idToken);
 
-      // Check if user exists in /competitors or /judges
-      const userTypes = ["competitor", "judge", "admin"];
-      let userFound = false;
+    // Check if user exists in /competitors or /judges
+    const userTypes = ["competitor", "judge", "admin"];
+    let userFound = false;
 
-      for (const userType of userTypes) {
-        try {
-          const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
-          const snapshot = await get(userRef);
-          if (snapshot.exists()) {
-            setUserData(snapshot.val());
-            setUserTypes(userTypes => [...userTypes, userType]);
-            userFound = true;
-          }
-        } catch (error) {
-          console.log(`Checked ${userType} data`);
+    for (const userType of userTypes) {
+      try {
+        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          setUserData(snapshot.val());
+          setUserTypes(userTypes => [...userTypes, userType]);
+          userFound = true;
         }
+      } catch (error) {
+        console.log(`Checked ${userType} data`);
       }
+    }
 
-      if (!userFound) {
-        setUserData(null);
-      }
+    if (!userFound) {
+      setUserData(null);
+    }
 
-      setLoadingUserData(false);
-    };
+    setLoadingUserData(false);
+  };
 
-    fetchUserData();
+  useEffect(() => {
+    refreshUserData();
   }, [userCredential]);
 
   const handleLogin = async (email, password, remember = false) => {
@@ -121,7 +123,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin, token, userData, userTypes, loadingAuth, loadingUserData }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, refreshUserData, token, userData, userTypes, loadingAuth, loadingUserData }}>
       {children}
     </AuthContext.Provider>
   )
@@ -142,7 +144,11 @@ function App() {
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="judging" element={<ProtectedRoute requiredRoles={["judge"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
-          <Route path="team" element={<ProtectedRoute requiredRoles={["competitor"]}><NewJoinTeam /></ProtectedRoute>} />
+          <Route path="team">
+            <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><Team /></ProtectedRoute>} />
+            <Route path="join" element={<ProtectedRoute requiredRoles={["competitor"]}><NewJoinTeam /></ProtectedRoute>} />
+            <Route path="create" element={<ProtectedRoute requiredRoles={["competitor"]}><CreateTeam /></ProtectedRoute>} />
+          </Route>
           <Route path="admin">
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
