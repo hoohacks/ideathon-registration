@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useEffect, useContext } from "react";
 import { getAuth } from "firebase/auth";
 import { set, ref, get } from "firebase/database";
 import { database } from '../../firebase.js'
@@ -8,9 +8,14 @@ import { AuthContext } from "../../App";
 
 function NewJoinTeam() {
   const navigate = useNavigate();
-  const { refreshUserData } = useContext(AuthContext);
-
+  const { refreshUserData, userData } = useContext(AuthContext);
   const [inputValue, setInputValue] = useState("");
+
+  // If user data already has a teamId, redirect to team page
+  useEffect(() => {
+    if (userData && userData.teamId)
+      navigate('/user/team');
+  }, [userData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
