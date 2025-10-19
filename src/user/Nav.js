@@ -16,12 +16,13 @@ function Nav() {
     const links = [
         { to: "/user/home", label: "Home", icon: <IoHome /> },
         { to: "/user/profile", label: "Profile", icon: <FaUser /> },
-        { to: "/user/judging", label: "Judging", icon: <FaGavel /> },
+        { to: "/user/judging", label: "Judging", authTypes: ["judge"], icon: <FaGavel /> },
         { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"], icon: <IoQrCodeOutline /> },
-        { to: "/user/team", label: "Join Team", authTypes: ["competitor"], icon: <RiTeamFill /> },
+        { to: "/user/team", label: "Team", authTypes: ["competitor"], icon: <RiTeamFill /> },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
         { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
         { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"], icon: <IoSearch /> },
+        { to: "/user/admin/teams", label: "Team Search", authTypes: ["admin"], icon: <IoSearch /> },
     ];
 
     const userTypes = useContext(AuthContext).userTypes;

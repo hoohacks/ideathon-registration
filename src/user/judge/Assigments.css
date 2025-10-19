@@ -34,3 +34,49 @@
 	font-size: 1rem;
 	color: #555;
 }
+
+.assignments__admin-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+.assignments__toggle-button {
+	padding: 8px 14px;
+	border-radius: 10px;
+	border: none;
+	background: #2563eb;
+	color: white;
+	font-weight: 600;
+	cursor: pointer;
+	transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.assignments__toggle-button:hover {
+	opacity: 0.9;
+}
+
+.assignments__toggle-button:active {
+	transform: translateY(1px) scale(0.99);
+}
+
+.assignments__toggle-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.65;
+}
+
+.assignments__toggle-button--disabled {
+	background: #6b7280;
+	cursor: default;
+}
+
+.assignments__toggle-button--danger {
+	background: #dc2626;
+}
+
+.assignments__error {
+	margin: 8px 0 0;
+	color: #b91c1c;
+	font-size: 0.9rem;
+}
