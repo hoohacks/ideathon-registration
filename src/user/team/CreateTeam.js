@@ -71,7 +71,7 @@ function CreateTeam() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Enter New Team ID"
+            placeholder="Enter New Team Name"
             style={styles.input}
           />
           <button type="submit" style={styles.button}>
