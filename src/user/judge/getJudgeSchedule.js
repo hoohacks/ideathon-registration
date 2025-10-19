@@ -37,7 +37,7 @@ export async function getJudgeSchedule() {
 
         const judgeData = judgeSnapshot.val();
         const judgesList = Object.entries(judgeData)
-            .filter(([_, details]) => (!details.isHooHacksMember && details.wantsToJudge) || (details.isHooHacksMember && details.isRound1Judge))
+            .filter(([_, details]) => ((details.isHooHacksMember) && (details.isRound1Judge)))
             .map(([id, details]) => ({ id, ...details }));
 
         // fetch teams
