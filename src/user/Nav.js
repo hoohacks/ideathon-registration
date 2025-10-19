@@ -22,6 +22,7 @@ function Nav() {
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
         { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
         { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"], icon: <IoSearch /> },
+        { to: "/user/admin/teams", label: "Team Search", authTypes: ["admin"], icon: <IoSearch /> },
     ];
 
     const userTypes = useContext(AuthContext).userTypes;
