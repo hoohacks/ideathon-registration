@@ -187,6 +187,8 @@ function Assignments() {
       name: details?.name ?? "Unnamed Team",
       averageScore: details?.averageScore ?? null,
       excludedJudges: details?.excludedJudges ?? {},
+      room: details?.room ?? "TBD",
+      timeslot: details?.timeslot ?? "TBD",
     }));
   }, [finalRoundState]);
 
@@ -230,14 +232,11 @@ function Assignments() {
   }, [finalRoundState?.active, finalRoundTeamNamesForJudge]);
 
   const finalRoundAssignments = finalAssignmentsForJudge.map((team) => {
-    const firstRoundIndex = personalAssignments.indexOf(team.name);
-    const derivedRoom =
-      firstRoundIndex >= 0 ? `Room ${firstRoundIndex + 1}` : "Final Room";
     return {
       teamId: team.teamId,
       teamName: team.name,
-      room: derivedRoom,
-      time: "TBD",
+      room: team.room,
+      time: team.timeslot,
     };
   });
 
