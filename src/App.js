@@ -21,6 +21,7 @@ import { ref, get } from "firebase/database"
 import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.js"
+import TeamDashboard from "./user/admin/TeamSearch.js"
 
 const AuthContext = createContext(null);
 
@@ -152,6 +153,7 @@ function App() {
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
             <Route path="judges" element={<ProtectedRoute requiredRoles={["admin"]}><JudgeDashboard /></ProtectedRoute>} />
+            <Route path="teams" element={<ProtectedRoute requiredRoles={["admin"]}><TeamDashboard /></ProtectedRoute>} />
           </Route>
         </Route>
       </Routes>
