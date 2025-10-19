@@ -76,9 +76,11 @@ function Profile() {
     if (!teamId) {
         return (
             <Layout>
-                <Typography variant="body1" style={{ textAlign: 'center', marginTop: '20px' }}>
-                    You are not currently part of a team. Please <Link to="/user/team/join">join</Link> or <Link to="/user/team/create">create</Link> a team to view team information.
-                </Typography>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+                    <div>
+                        You are not currently part of a team. Please <Link to="/user/team/join">join</Link> or <Link to="/user/team/create">create</Link> a team to view team information.
+                    </div>
+                </div>
             </Layout>
         );
     }
@@ -114,9 +116,9 @@ function Profile() {
                         </Button>
                     </div>
                 ) : (
-                    <Typography variant="body1" style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
                         Loading team information...
-                    </Typography>
+                    </div>
                 )
             }
         </Layout>
