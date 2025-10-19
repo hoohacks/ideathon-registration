@@ -1,5 +1,6 @@
 import { onValue, ref, get, set } from "firebase/database";
 import { database } from "../../firebase";
+import { calculateAverageScore } from "../judge/finalRoundService";
 
 import React, { useEffect, useState } from "react";
 
@@ -201,6 +202,7 @@ function TeamSearch() {
               {teamData.scores && (
                 <div style={{ marginTop: "20px" }}>
                   <h3>Scores:</h3>
+                  <p>Aggregate Score: {calculateAverageScore(teamData.scores)}</p>
                   {Object.entries(teamData.scores).map(
                     ([judgeId, scoreObj]) => (
                       <div key={judgeId} style={{ marginBottom: "10px" }}>
