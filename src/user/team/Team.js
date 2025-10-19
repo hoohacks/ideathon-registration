@@ -38,6 +38,7 @@ function Profile() {
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
+    const [finalRound, setFinalRound] = useState(null);
 
 
     // Get team ID from userData if available
@@ -139,6 +140,16 @@ function Profile() {
         navigate('/user/team');
     }
 
+    useEffect(() => {
+        const finalRoundRef = ref(database, "finalRound");
+        onValue(finalRoundRef, async (snapshot) => {
+            if (snapshot.exists()) {
+                const finalRoundData = snapshot.val();
+                setFinalRound(finalRoundData);
+            }
+        });
+    }, []);
+
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
         const teamRef = ref(database, "teams/" + teamId);
@@ -221,6 +232,18 @@ function Profile() {
                                             Time: {teamData.schedule.time} <br />
                                             Room: {teamData.schedule.room}
                                         </Typography>
+                                        <hr />
+                                        {finalRound.active && (teamId in finalRound.teams) ? (
+                                            <>
+                                                <Typography variant="h6" style={{ fontWeight: 'bold' }}>
+                                                    Final Round Details
+                                                </Typography>
+                                                <Typography variant="body1">
+                                                    Time: {finalRound.teams[teamId].timeslot} <br />
+                                                    Room: {finalRound.teams[teamId].room}
+                                                </Typography>
+                                            </>
+                                        ) : null}
                                     </>
                                 ) : <>
                                     <Typography variant="h5" style={{ fontWeight: 'bold' }}>
