@@ -62,8 +62,8 @@ export async function getJudgeSchedule() {
 
         const teamAssignments = {};
         teamsList.forEach((team, index) => {
-            const numTeamsPerBatch = Math.ceil(teamsList.length / 2);
-            const batchNum = index < numTeamsPerBatch ? 1 : 2;
+            const numTeamsPerBatch = Math.ceil(teamsList.length / 3);
+            const batchNum = Math.floor(index / numTeamsPerBatch) + 1;
             const judgingAssignment = {
                 teamName: teamsList[index].name,
                 id: teamsList[index].id,
