@@ -77,7 +77,7 @@ export async function activateFinalRound({ limit = 4 } = {}) {
     throw new Error("No teams have scores yet. Final round cannot be activated.");
   }
 
-  const timeslots = ["6:00 PM", "6:12 PM", "6:24 PM", "6:36 PM"];
+  const timeslots = ["Slot 1", "Slot 2", "Slot 3", "Slot 4"];
 
   const teamsPayload = eligibleTeams.reduce((acc, team) => {
     acc[team.teamId] = {
