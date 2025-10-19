@@ -13,7 +13,7 @@ function Home() {
         const difference = Math.floor(target - now);
 
         if (difference <= 0) {
-            return "The event has started!";
+            return null;
         }
         const days = Math.floor(difference / (1000 * 60 * 60 * 24));
         const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
@@ -38,12 +38,20 @@ function Home() {
                 Welcome to Ideathon{userData && userData.firstName ? `, ${userData.firstName}` : ""}!
             </Typography>
             <hr />
-            <Typography variant="h2" style={{ fontStyle: 'italic', textAlign: 'center' }}>
-                {time}
-            </Typography>
-            <Typography variant="h4" style={{ textAlign: 'center' }}>
-                Until Ideathon
-            </Typography>
+            {time ? (
+                <>
+                    <Typography variant="h2" style={{ fontStyle: 'italic', textAlign: 'center' }}>
+                        {time}
+                    </Typography>
+                    <Typography variant="h4" style={{ textAlign: 'center' }}>
+                        Until Ideathon
+                    </Typography>
+                </>
+            ) : (
+                <Typography variant="h4" style={{ textAlign: 'center' }}>
+                    Ideathon is Live!
+                </Typography>
+            )}
         </Layout>
     );
 }
