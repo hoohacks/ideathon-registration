@@ -294,19 +294,14 @@ function Assignments() {
                 {personalAssignments.length === 0 ? (
                   <div>No assignments yet</div>
                 ) : (
-                  personalAssignments.map((teamName, idx) => (
+                  personalAssignments.map((assignment, idx) => (
                     <ScheduleCard
-                      key={`${teamName}-${idx}`}
-                      teamName={teamName}
-                      room={`Room ${idx + 1}`}
-                      time={`TBD`}
-                      onButtonClick={(card) =>
-                        openFor({
-                          ...card,
-                          round: "first",
-                        })
-                      }
-                      disabled={scoredTeamNames.has(teamName)}
+                      key={`${assignment.teamName}-${idx}`}
+                      teamName={assignment.teamName}
+                      room={assignment.room}
+                      time={assignment.time}
+                      onButtonClick={(card) => openFor({ ...card, round: "first" })}
+                      disabled={scoredTeamNames.has(assignment.teamName)}
                     />
                   ))
                 )}
