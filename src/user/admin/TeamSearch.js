@@ -1,6 +1,5 @@
 import { onValue, ref, get, set } from "firebase/database";
 import { database } from "../../firebase";
-import { calculateAverageScore } from "../judge/finalRoundService.js";
 
 import React, { useEffect, useState } from "react";
 
@@ -23,19 +22,6 @@ function SubmissionProgressBar({ percent }) {
       ></ProgressBar>
     </div>
   );
-}
-
-async function getTeamAverageScore(teamId) {
-  const teamRef = ref(database, `teams/${teamId}/scores`);
-  const snapshot = await get(teamRef);
-
-  if (!snapshot.exists()) {
-    throw new Error(`No scores found for team ${teamId}`);
-  }
-
-  const scores = snapshot.val();
-  const average = calculateAverageScore(scores);
-  return average;
 }
 
 function TeamSearch() {
@@ -61,14 +47,30 @@ function TeamSearch() {
   }
 
   useEffect(() => {
-    onValue(ref(database, "/teams/"), (snapshot) => {
+    onValue(ref(database, "/teams/"), async (snapshot) => {
       const data = snapshot.val();
+
+      // Get team members' names
 
       let s = 0;
       for (const key in data) {
         if (data[key].submitted) {
           s += 1;
         }
+
+        if (!data[key].members)
+          continue;
+        data[key].members = await Promise.all(
+          data[key].members.map(async (uid) => {
+            const userRef = ref(database, `competitors/${uid}`);
+            const userSnapshot = await get(userRef);
+            if (userSnapshot.exists()) {
+              const userInfo = userSnapshot.val();
+              return `${userInfo.firstName} ${userInfo.lastName}`;
+            }
+            return "Unknown User";
+          })
+        );
       }
       setSubmittedCount(s);
 
@@ -172,6 +174,13 @@ function TeamSearch() {
 
               <p>ID: {key}</p>
 
+              <strong>Members: {teamData.members ? teamData.members.length : 0}</strong>
+              <ul>
+                {teamData.members && teamData.members.map((memberName, idx) => (
+                  <li key={idx}>{memberName}</li>
+                ))}
+              </ul>
+
               {teamData.submitted && teamData.submission && (
                 <>
                   <p>
@@ -192,7 +201,6 @@ function TeamSearch() {
               {teamData.scores && (
                 <div style={{ marginTop: "20px" }}>
                   <h3>Scores:</h3>
-                  <p>Aggregate Score: {calculateAverageScore(teamData.scores)}</p>
                   {Object.entries(teamData.scores).map(
                     ([judgeId, scoreObj]) => (
                       <div key={judgeId} style={{ marginBottom: "10px" }}>
