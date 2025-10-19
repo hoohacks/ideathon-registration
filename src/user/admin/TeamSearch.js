@@ -1,5 +1,6 @@
 import { onValue, ref, get, set } from "firebase/database";
 import { database } from "../../firebase";
+import { calculateAverageScore } from "../judge/finalRoundService.js";
 
 import React, { useEffect, useState } from "react";
 
@@ -22,6 +23,19 @@ function SubmissionProgressBar({ percent }) {
       ></ProgressBar>
     </div>
   );
+}
+
+async function getTeamAverageScore(teamId) {
+  const teamRef = ref(database, `teams/${teamId}/scores`);
+  const snapshot = await get(teamRef);
+
+  if (!snapshot.exists()) {
+    throw new Error(`No scores found for team ${teamId}`);
+  }
+
+  const scores = snapshot.val();
+  const average = calculateAverageScore(scores);
+  return average;
 }
 
 function TeamSearch() {
@@ -178,6 +192,7 @@ function TeamSearch() {
               {teamData.scores && (
                 <div style={{ marginTop: "20px" }}>
                   <h3>Scores:</h3>
+                  <p>Aggregate Score: {calculateAverageScore(teamData.scores)}</p>
                   {Object.entries(teamData.scores).map(
                     ([judgeId, scoreObj]) => (
                       <div key={judgeId} style={{ marginBottom: "10px" }}>

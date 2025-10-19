@@ -10,7 +10,8 @@ import { database } from "../../firebase.js";
 
 const SCORE_FIELDS = ["impact", "innovation", "pitch_quality", "problem"];
 
-function calculateAverageScore(scores = {}) {
+export function calculateAverageScore(scores = {}) {
+  console.log(scores);
   const entries = Object.values(scores);
   if (!entries.length) return null;
 
