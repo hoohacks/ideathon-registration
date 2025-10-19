@@ -170,10 +170,10 @@ function Profile() {
             }));
             const teamData = { ...snapshot.val(), memberNames };
 
-            setIdeaName(teamData.submission.ideaName || "");
-            setProblemStatement(teamData.submission.problemStatement || "");
-            setTargetIndustry(teamData.submission.targetIndustry || "");
-            setPitchDeckName(teamData.submission.pitchDeckName || "");
+            setIdeaName(teamData.submission?.ideaName || "");
+            setProblemStatement(teamData.submission?.problemStatement || "");
+            setTargetIndustry(teamData.submission?.targetIndustry || "");
+            setPitchDeckName(teamData.submission?.pitchDeckName || "");
             setTeamData(teamData);
         });
     }, [teamId]);
