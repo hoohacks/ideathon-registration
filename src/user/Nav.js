@@ -16,7 +16,7 @@ function Nav() {
     const links = [
         { to: "/user/home", label: "Home", icon: <IoHome /> },
         { to: "/user/profile", label: "Profile", icon: <FaUser /> },
-        { to: "/user/judging", label: "Judging", icon: <FaGavel /> },
+        { to: "/user/judging", label: "Judging", authTypes: ["judge"], icon: <FaGavel /> },
         { to: "/user/checkin", label: "Check In", authTypes: ["competitor", "judge"], icon: <IoQrCodeOutline /> },
         { to: "/user/team", label: "Team", authTypes: ["competitor"], icon: <RiTeamFill /> },
         { to: "/user/admin/scan", label: "Admin Scan", authTypes: ["admin"], icon: <IoScan /> },
