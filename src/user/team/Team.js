@@ -1,7 +1,7 @@
 import Layout from "../Layout";
 import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../../App";
-import { ref, get, set } from "firebase/database";
+import { ref, get, set, onValue } from "firebase/database";
 import { database, storage } from "../../firebase";
 import { Link, useNavigate } from "react-router-dom";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -34,6 +34,7 @@ function Profile() {
     const [uploadPitchDeck, setUploadPitchDeck] = useState(null);
     const [pitchDeckName, setPitchDeckName] = useState("");
     const [isPitchDeckPicked, setIsPitchDeckPicked] = useState(false);
+    const [ideaName, setIdeaName] = useState(userData ? userData.ideaName : "");
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
@@ -81,6 +82,7 @@ function Profile() {
 
             // Save project submission data to Firebase
             await set(ref(database, `teams/${teamId}/submission`), {
+                ideaName,
                 problemStatement,
                 targetIndustry,
                 pitchDeckName,
@@ -92,6 +94,7 @@ function Profile() {
         } else {
             // Pitch deck not changed, just update other fields
             await set(ref(database, `teams/${teamId}/submission`), {
+                ideaName,
                 problemStatement,
                 targetIndustry,
                 pitchDeckName: teamData.submission.pitchDeckName,
@@ -138,10 +141,8 @@ function Profile() {
 
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
-        const fetchTeamData = async () => {
-            const teamRef = ref(database, "teams/" + teamId);
-            const snapshot = await get(teamRef);
-
+        const teamRef = ref(database, "teams/" + teamId);
+        onValue(teamRef, async (snapshot) => {
             if (!snapshot.exists())
                 return;
 
@@ -158,12 +159,12 @@ function Profile() {
             }));
             const teamData = { ...snapshot.val(), memberNames };
 
+            setIdeaName(teamData.submission.ideaName || "");
             setProblemStatement(teamData.submission.problemStatement || "");
             setTargetIndustry(teamData.submission.targetIndustry || "");
             setPitchDeckName(teamData.submission.pitchDeckName || "");
             setTeamData(teamData);
-        };
-        fetchTeamData();
+        });
     }, [teamId]);
 
     if (!teamId) {
@@ -210,61 +211,84 @@ function Profile() {
                                 Team ID: {teamId}
                             </Typography>
                             <hr />
-                            <Typography variant="h5" style={{ fontWeight: 'bold' }}>
-                                Project Submission
-                            </Typography>
-
-                            { /* Problem Statement - Give a quick description as to what problem your project aims to solve and why it is important */}
-                            <FormControl fullWidth margin="normal">
-                                {/* <InputLabel htmlFor="problem-statement">Problem Statement</InputLabel> */}
-                                <TextField
-                                    id="problem-statement"
-                                    multiline
-                                    label="Problem Statement"
-                                    minRows={3}
-                                    value={problemStatement}
-                                    onChange={(e) => setProblemStatement(e.target.value)}
-                                    helperText="Give a quick description as to what problem your project aims to solve and why it is important."
-                                />
-                            </FormControl>
-                            { /* Which industry or industries does your idea primarily target? (e.g., Technology, Finance, Healthcare, Energy, Fitness, etc.) */}
-                            <Box>
-                                <FormControl fullWidth margin="normal">
-                                    <TextField
-                                        id="target-industry"
-                                        multiline
-                                        label="Target Industry"
-                                        minRows={2}
-                                        value={targetIndustry}
-                                        onChange={(e) => setTargetIndustry(e.target.value)}
-                                        helperText="e.g., Technology, Finance, Healthcare, Energy, Fitness, etc."
-                                    />
-                                </FormControl>
-                            </Box>
-
-                            { /* Upload your pitch slide deck (in .ppt/.pptx format) */}
-                            <Box mb={2}>
-                                <FormControl fullWidth margin="normal">
-                                    <Button
-                                        variant="outlined"
-                                        component="label"
-                                    >
-                                        {pitchDeckName || "Upload Pitch Deck (.ppt/.pptx)"}
-                                        <input
-                                            type="file"
-                                            size="large"
-                                            hidden={true}
-                                            accept=".ppt,.pptx"
-                                            onChange={(e) => uploadFileToFirebase(e)}
+                            {
+                                teamData.schedule ? (
+                                    <>
+                                        <Typography variant="h6" style={{ fontWeight: 'bold' }}>
+                                            Pitch Presentation Details
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            Time: {teamData.schedule.time} <br />
+                                            Room: {teamData.schedule.room}
+                                        </Typography>
+                                    </>
+                                ) : <>
+                                    <Typography variant="h5" style={{ fontWeight: 'bold' }}>
+                                        Project Submission
+                                    </Typography>
+                                    { /* Idea Name */}
+                                    <FormControl fullWidth margin="normal">
+                                        {/* <InputLabel htmlFor="problem-statement">Problem Statement</InputLabel> */}
+                                        <TextField
+                                            id="idea-name"
+                                            label="Idea Name"
+                                            value={ideaName}
+                                            onChange={(e) => setIdeaName(e.target.value)}
                                         />
-                                    </Button>
-                                    <FormHelperText>Upload your pitch slide deck (in .ppt/.pptx format).</FormHelperText>
-                                </FormControl>
-                            </Box>
+                                    </FormControl>
+                                    { /* Problem Statement - Give a quick description as to what problem your project aims to solve and why it is important */}
+                                    <FormControl fullWidth margin="normal">
+                                        {/* <InputLabel htmlFor="problem-statement">Problem Statement</InputLabel> */}
+                                        <TextField
+                                            id="problem-statement"
+                                            multiline
+                                            label="Problem Statement"
+                                            minRows={3}
+                                            value={problemStatement}
+                                            onChange={(e) => setProblemStatement(e.target.value)}
+                                            helperText="Give a quick description as to what problem your project aims to solve and why it is important."
+                                        />
+                                    </FormControl>
+                                    { /* Which industry or industries does your idea primarily target? (e.g., Technology, Finance, Healthcare, Energy, Fitness, etc.) */}
+                                    <Box>
+                                        <FormControl fullWidth margin="normal">
+                                            <TextField
+                                                id="target-industry"
+                                                multiline
+                                                label="Target Industry"
+                                                minRows={2}
+                                                value={targetIndustry}
+                                                onChange={(e) => setTargetIndustry(e.target.value)}
+                                                helperText="e.g., Technology, Finance, Healthcare, Energy, Fitness, etc."
+                                            />
+                                        </FormControl>
+                                    </Box>
 
-                            <Button variant="contained" color="primary" onClick={handleSubmitProject}>
-                                Save Project Submission
-                            </Button>
+                                    { /* Upload your pitch slide deck (in .ppt/.pptx format) */}
+                                    <Box mb={2}>
+                                        <FormControl fullWidth margin="normal">
+                                            <Button
+                                                variant="outlined"
+                                                component="label"
+                                            >
+                                                {pitchDeckName || "Upload Pitch Deck (.ppt/.pptx)"}
+                                                <input
+                                                    type="file"
+                                                    size="large"
+                                                    hidden={true}
+                                                    accept=".ppt,.pptx"
+                                                    onChange={(e) => uploadFileToFirebase(e)}
+                                                />
+                                            </Button>
+                                            <FormHelperText>Upload your pitch slide deck (in .ppt/.pptx format).</FormHelperText>
+                                        </FormControl>
+                                    </Box>
+
+                                    <Button variant="contained" color="primary" onClick={handleSubmitProject}>
+                                        Save Project Submission
+                                    </Button>
+                                </>
+                            }
                             <hr />
                             <Typography variant="h6" style={{ fontWeight: 'bold' }}>
                                 Team Members
