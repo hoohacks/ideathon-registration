@@ -20,7 +20,8 @@ export async function getJudgeSchedule() {
 
     const batchTimes = {
         1: '5:00 PM',
-        2: '5:15 PM'
+        2: '5:15 PM',
+        3: '5:30 PM'
     }
 
     try {
@@ -76,7 +77,7 @@ export async function getJudgeSchedule() {
 
         // first wave of judging assignments, round 1
         judgesList.forEach((judge, index) => {
-            const teamIndex = index % Math.ceil(teamsList.length / 2);
+            const teamIndex = index % Math.ceil(teamsList.length / 3);
             const teamId = teamsList[teamIndex].id;
             assignmentsDict[judge.id].push(teamAssignments[teamId]);
             if (teamAssignments[teamId].batch !== 1) {
@@ -91,7 +92,7 @@ export async function getJudgeSchedule() {
         // second wave of judging assignments, round 2
         // assign with prime multiple mix up judge-team pairings
         judgesList.forEach((judge, index) => {
-            const teamIndex = (index * 149) % Math.floor(teamsList.length / 2) + Math.ceil(teamsList.length / 2);
+            const teamIndex = (index * 149) % Math.floor(teamsList.length / 3) + Math.ceil(teamsList.length / 3);
             console.log("Assigning judge", judge.id, "to team index", teamIndex);
             const teamId = teamsList[teamIndex].id;
             assignmentsDict[judge.id].push(teamAssignments[teamId]);
@@ -104,7 +105,22 @@ export async function getJudgeSchedule() {
             });
         });
 
+        judgesList.forEach((judge, index) => {
+            const teamIndex = (index * 233) % Math.floor(teamsList.length / 3) + (2 * Math.ceil(teamsList.length / 3)); 
+            const teamId = teamsList[teamIndex].id;
+            assignmentsDict[judge.id].push(teamAssignments[teamId]);
+            if (teamAssignments[teamId].batch !== 3) {
+                console.error("Assignment batch mismatch in round 3");
+            }
+            teamAssignments[teamId].judges.push({
+                judgeName: judge.firstName + " " + judge.lastName,
+                judgeId: judge.id
+            });
+        });
+
         // count number of violations (judge assigned to room with same judge from round 1)
+        
+        // not essential to functionatlity -----------
         const prevSeenPairs = new Set();
         let violationCount = 0;
         Object.entries(teamAssignments).forEach(([teamId, assignment]) => {
@@ -122,6 +138,7 @@ export async function getJudgeSchedule() {
             }
         });
         console.log(`Total judge-team assignment violations: ${violationCount}`);
+        // above code not essential to functionality ----------
 
         Object.entries(teamAssignments).forEach(([teamId, assignment]) => {
             console.log(`Team ${assignment.teamName} in room ${assignment.room} at ${assignment.time} has judges: ${assignment.judges.map(j => j.judgeName).join(", ")}`);
