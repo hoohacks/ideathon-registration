@@ -4,14 +4,18 @@ import { database } from "../../firebase.js";
 export async function getJudgeSchedule() {
 
     const rooms = [
-        'Rice 103',
-        'Rice 108',
-        'Rice 109',
         'Rice 110',
-        'TBD',
-        'TBD',
-        'TBD',
-        'TBD',
+        'Rice 109',
+        'Rice 108',
+        'Rice 103',
+        'Rice 204',
+        'Rice 011',
+        'Rice 032',
+        'Rice 303',
+        'Rice 314',
+        'Rice 514',
+        'Rice 540',
+        'Rice 414',
     ]
 
     const batchTimes = {
