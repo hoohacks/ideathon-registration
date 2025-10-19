@@ -1,9 +1,15 @@
-import React, { useState } from "react";
+import { useState, useContext } from "react";
 import { getAuth } from "firebase/auth";
 import { ref, set, get } from "firebase/database";
-import { database } from "../firebase.js";
+import { database } from "../../firebase.js";
+import Layout from "../Layout.js";
+import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { AuthContext } from "../../App";
 
 function CreateTeam() {
+  const navigate = useNavigate();
+  const { refreshUserData } = useContext(AuthContext);
   const [inputValue, setInputValue] = useState("");
 
   const handleSubmit = async (e) => {
@@ -45,6 +51,10 @@ function CreateTeam() {
 
       console.log(`Team "${teamId}" created by ${userCredential.uid}`);
       alert(`Team "${teamId}" created successfully!`);
+
+      await refreshUserData();
+
+      return navigate('/user/team');
     } catch (error) {
       console.error("Error creating team:", error);
       alert("Failed to create team. Check console for details.");
@@ -52,21 +62,27 @@ function CreateTeam() {
   };
 
   return (
-    <div className="create-team-page" style={styles.container}>
-      <h2 style={styles.title}>Create a Team</h2>
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Enter New Team ID"
-          style={styles.input}
-        />
-        <button type="submit" style={styles.button}>
-          Create
-        </button>
-      </form>
-    </div>
+    <Layout>
+      <div className="create-team-page" style={styles.container}>
+        <h2 style={styles.title}>Create a Team</h2>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Enter New Team ID"
+            style={styles.input}
+          />
+          <button type="submit" style={styles.button}>
+            Create
+          </button>
+
+          <p>
+            or <Link to="/user/team/join">Join an Existing Team</Link>
+          </p>
+        </form>
+      </div>
+    </Layout>
   );
 }
 
