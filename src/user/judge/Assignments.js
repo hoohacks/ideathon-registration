@@ -4,6 +4,7 @@ import ScheduleCard from "./ScheduleCard";
 import GenerateSchedule from "./GenerateSchedule";
 import { getJudgeSchedule } from "./getJudgeSchedule";
 import { getPersonalSchedule } from "./getPersonalSchedule";
+import { readGenerateScheduleFlag, writeGenerateScheduleFlag } from "./generateScheduleFlag";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import "./Assigments.css";
@@ -14,6 +15,7 @@ import {
   getMyScoredTeamsByName,
   getMyFinalRoundScoredTeamsByName,
 } from "./getTeamInfo";
+import { removeJudgeSchedule } from "./removeJudgeSchedule";
 import {
   activateFinalRound,
   deactivateFinalRound,
@@ -36,7 +38,8 @@ function Assignments() {
   }
 
   const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [generated, setGenerated] = useState(true);
+  const [generateFlag, setGenerateFlag] = useState(true);
   const [personalAssignments, setPersonalAssignments] = useState([]);
   const [scoredTeamNames, setScoredTeamNames] = useState(() => new Set());
   const [finalRoundScoredTeamNames, setFinalRoundScoredTeamNames] = useState(
@@ -50,10 +53,15 @@ function Assignments() {
   async function handleGenerateClick() {
     if (generated) return; // already generated once
     try {
-      setGenerating(true);
       const assignments = await getJudgeSchedule();
       console.log("Generated schedule:", assignments);
       setGenerated(true);
+
+      await writeGenerateScheduleFlag(true);
+      setGenerateFlag(true);
+
+      const teams = await getPersonalSchedule();
+      setPersonalAssignments(teams || []);
     } catch (err) {
       console.error("Error generating schedule:", err);
     } finally {
@@ -61,6 +69,15 @@ function Assignments() {
     }
   }
 
+  async function handleUndoToggle() {
+    try {
+      await removeJudgeSchedule();
+      await writeGenerateScheduleFlag(false);
+      setGenerateFlag(false);
+      setGenerated(false);
+      setPersonalAssignments([]);
+    } catch (err) {
+      console.error('Failed toggling generate flag', err);
   async function handleActivateFinalRound() {
     setTogglingFinalRound(true);
     setFinalRoundError(null);
@@ -112,6 +129,19 @@ function Assignments() {
     }
 
     fetchPersonal();
+  }, []);
+
+  // read the generate flag 
+  useEffect(() => {
+    async function fetchFlag() {
+      try {
+        const val = await readGenerateScheduleFlag();
+        setGenerateFlag(Boolean(val));
+      } catch (err) {
+        console.error('Failed reading generate schedule flag', err);
+      }
+    }
+    fetchFlag();
   }, []);
 
   async function handleSubmit(scores) {
@@ -245,6 +275,20 @@ function Assignments() {
       <div className="judging-page">
         <h1>Judge Assignments</h1>
         {canManageSchedule && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <GenerateSchedule
+              onButtonClick={handleGenerateClick}
+              disabled={generating || generated || generateFlag}
+            />
+            <button
+              className="undo-generate-schedule-button"
+              type="button"
+              onClick={handleUndoToggle}
+              disabled={!generateFlag}
+            >
+              Undo Generated Schedule
+            </button>
+          </div>
           <>
             <div className="assignments__admin-controls">
               <GenerateSchedule
@@ -293,6 +337,14 @@ function Assignments() {
                 {personalAssignments.length === 0 ? (
                   <div>No assignments yet</div>
                 ) : (
+                  personalAssignments.map((teamName, idx) => (
+                    <ScheduleCard
+                      key={`${teamName}-${idx}`}
+                      teamName={teamName}
+                      room={`Room ${idx + 1}`}
+                      time={`TBD`}
+                      onButtonClick={(card) => openFor(card)}
+                      disabled={scoredTeamNames.has(teamName)}
                   personalAssignments.map((assignment, idx) => (
                     <ScheduleCard
                       key={`${assignment.teamName}-${idx}`}
