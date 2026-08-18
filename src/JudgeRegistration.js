@@ -365,10 +365,11 @@ const JudgeRegistration = () => {
                   },
                 }}
               >
-                <img
+                <Box
+                  component="img"
                   src={Logo}
                   alt="HooHacks Ideathon logo"
-                  style={{
+                  sx={{
                     borderRadius: "5px",
                     width: "582px",
                     objectFit: "cover",
@@ -379,7 +380,7 @@ const JudgeRegistration = () => {
                 />
               </Link>
 
-              <Typography sx={{ textAlign: "center" }}>
+              <Typography component="div" sx={{ textAlign: "center" }}>
                 The fifth annual Ideathon,{" "}
                 <span style={{ fontWeight: "bold" }}>
                   Sunday, October 19, 2025

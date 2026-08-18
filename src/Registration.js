@@ -90,17 +90,14 @@ const Registration = () => {
   const [learnCheck, setLearnCheck] = useState(false);
 
   // gender
-  const [gender, setGender] = useState(null);
+  const [gender, setGender] = useState("");
   const [genderCheck, setGenderCheck] = useState(false);
 
   // email check
   const [isValidEmail, setIsValidEmail] = useState(true);
 
   // dietary restrictions
-  const [dietaryRestriction, setDietaryRestriction] = useState([]);
-  const [otherDietaryRestriction, setOtherDietaryRestriction] = useState("");
-  const [otherDietaryRestrictionCheck, setOtherDietaryRestrictionCheck] =
-    useState(false);
+  const [dietaryRestriction, setDietaryRestriction] = useState("");
 
   // year
   const [selectYear, setSelectYear] = useState(2026);
@@ -142,17 +139,6 @@ const Registration = () => {
     setIsResumePicked(true);
   };
 
-  // add multiple dietary restrictions
-  const selectRestrictions = (event) => {
-    if (dietaryRestriction.includes(event.target.value)) {
-      setDietaryRestriction((current) =>
-        current.filter((diet) => diet !== event.target.value)
-      );
-    } else {
-      setDietaryRestriction((current) => [...current, event.target.value]);
-    }
-  };
-
   async function handleSubmit() {
     // form validation
     if (!isValidEmail || !isValidPassword) {
@@ -160,11 +146,7 @@ const Registration = () => {
       return;
     }
 
-    // update dietary restrictions with other value
-    var dietRestriction = dietaryRestriction;
-    if (otherDietaryRestriction !== "") {
-      dietRestriction.push(otherDietaryRestriction);
-    }
+    const dietRestriction = dietaryRestriction;
 
     // Sign in user with email and password
     let user = null;
@@ -193,7 +175,7 @@ const Registration = () => {
         uvaSchool: selectSchool,
         resume: url,
         skills: skills,
-        gender: gender,
+        gender: gender || null,
         learn: learn,
         major: major,
         registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
@@ -221,7 +203,7 @@ const Registration = () => {
         uvaSchool: selectSchool,
         resume: "none",
         skills: skills,
-        gender: gender,
+        gender: gender || null,
         learn: learn,
         major: major,
         registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
@@ -373,10 +355,11 @@ const Registration = () => {
                   },
                 }}
               >
-                <img
+                <Box
+                  component="img"
                   src={Logo}
                   alt="HooHacks Ideathon logo"
-                  style={{
+                  sx={{
                     borderRadius: "5px",
                     width: "582px",
                     objectFit: "cover",
@@ -552,7 +535,7 @@ const Registration = () => {
                     size="large"
                     onChange={(e) => {
                       setGender(e.target.value);
-                      setGenderCheck(e.target.value !== null);
+                      setGenderCheck(e.target.value !== "");
                     }}
                   >
                     <MenuItem value="male">Male</MenuItem>
@@ -562,7 +545,7 @@ const Registration = () => {
                       Prefer not to say
                     </MenuItem>
                   </Select>
-                  {gender === null ? (
+                  {gender === "" ? (
                     <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
                       Please select an option
                     </FormHelperText>
