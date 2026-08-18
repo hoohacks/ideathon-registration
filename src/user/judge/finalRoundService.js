@@ -8,36 +8,54 @@ import {
 import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
 
-const SCORE_FIELDS = ["impact", "innovation", "pitch_quality", "problem"];
+// Each rubric criterion and the maximum a judge can award for it. These must
+// stay in step with the selects in ScoreSubmission -- a criterion missing here
+// is collected from judges and then silently thrown away.
+export const SCORE_FIELDS = {
+  problem: 10,
+  innovation: 10,
+  impact: 10,
+  viability: 5,
+  pitch_quality: 5,
+};
 
-export function calculateAverageScore(scores = {}) {
-  console.log(scores);
-  const entries = Object.values(scores);
-  if (!entries.length) return null;
+export const SCORE_MAX_TOTAL = Object.values(SCORE_FIELDS).reduce((a, b) => a + b, 0);
 
-  let totalAggregate = 0;
-  let judgedCount = 0;
+// Score one judge's card out of SCORE_MAX_TOTAL. Criteria are summed rather
+// than averaged so a 10 point criterion counts twice as much as a 5 point one,
+// which is what the differing ranges are for. Fields the judge did not fill in
+// are left out of both the total and the denominator, so an older card that
+// predates a criterion is not penalised for it.
+export function scoreCard(entry) {
+  let earned = 0;
+  let possible = 0;
 
-  for (const entry of entries) {
-    let judgeTotal = 0;
-    let fieldsCounted = 0;
-
-    for (const field of SCORE_FIELDS) {
-      const value = Number(entry?.[field]);
-      if (!Number.isNaN(value)) {
-        judgeTotal += value;
-        fieldsCounted += 1;
-      }
-    }
-
-    if (fieldsCounted > 0) {
-      totalAggregate += judgeTotal / fieldsCounted;
-      judgedCount += 1;
-    }
+  for (const [field, max] of Object.entries(SCORE_FIELDS)) {
+    const raw = entry?.[field];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) continue;
+    earned += value;
+    possible += max;
   }
 
-  if (!judgedCount) return null;
-  return totalAggregate / judgedCount;
+  if (possible === 0) return null;
+  return (earned / possible) * SCORE_MAX_TOTAL;
+}
+
+export function calculateAverageScore(scores = {}) {
+  const entries = Object.values(scores ?? {});
+  if (!entries.length) return null;
+
+  const cards = entries.map(scoreCard).filter((value) => value !== null);
+  if (!cards.length) return null;
+
+  return cards.reduce((a, b) => a + b, 0) / cards.length;
+}
+
+export function countFundableVotes(scores = {}) {
+  const entries = Object.values(scores ?? {});
+  return entries.filter((entry) => entry?.fundable === true).length;
 }
 
 export async function activateFinalRound({ limit = 4 } = {}) {
@@ -53,6 +71,7 @@ export async function activateFinalRound({ limit = 4 } = {}) {
   const teamsData = teamsSnap.val();
   const teamEntries = Object.entries(teamsData).map(([teamId, team]) => {
     const averageScore = calculateAverageScore(team?.scores);
+    // a judge who already saw this team in round one should not judge it again
     const excludedJudges = team?.scores
       ? Object.keys(team.scores).reduce((acc, judgeId) => {
         acc[judgeId] = true;
@@ -77,15 +96,13 @@ export async function activateFinalRound({ limit = 4 } = {}) {
     throw new Error("No teams have scores yet. Final round cannot be activated.");
   }
 
-  const timeslots = ["Slot 1", "Slot 2", "Slot 3", "Slot 4"];
-
-  const teamsPayload = eligibleTeams.reduce((acc, team) => {
+  const teamsPayload = eligibleTeams.reduce((acc, team, index) => {
     acc[team.teamId] = {
       name: team.name,
       averageScore: team.averageScore,
       excludedJudges: team.excludedJudges,
-      timeslot: timeslots.shift() || "TBD",
-      room: `Rice 011`,
+      timeslot: `Slot ${index + 1}`,
+      room: "Rice 011",
     };
     return acc;
   }, {});

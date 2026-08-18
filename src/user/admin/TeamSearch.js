@@ -1,14 +1,16 @@
-import { onValue, ref, get, set } from "firebase/database";
+import { onValue, ref, get } from "firebase/database";
 import { database } from "../../firebase";
-import { calculateAverageScore } from "../judge/finalRoundService";
+import {
+  calculateAverageScore,
+  countFundableVotes,
+  scoreCard,
+  SCORE_FIELDS,
+  SCORE_MAX_TOTAL,
+} from "../judge/finalRoundService";
 
-import React, { useEffect, useState } from "react";
-
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useMemo, useState } from "react";
 
 import ProgressBar from "react-bootstrap/ProgressBar";
-import Button from "react-bootstrap/Button";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Form from "react-bootstrap/Form";
 import Layout from "../Layout";
@@ -16,94 +18,140 @@ import Layout from "../Layout";
 function SubmissionProgressBar({ percent }) {
   return (
     <div style={{ marginBottom: "40px", marginInline: "10%" }}>
-      <ProgressBar
-        now={percent}
-        label={percent + "%"}
-        variant="danger"
-      ></ProgressBar>
+      <ProgressBar now={percent} label={percent + "%"} variant="danger"></ProgressBar>
+    </div>
+  );
+}
+
+function ScoreBreakdown({ title, scores }) {
+  const judgeIds = Object.keys(scores ?? {});
+  if (!judgeIds.length) return null;
+
+  const average = calculateAverageScore(scores);
+  const fundable = countFundableVotes(scores);
+
+  return (
+    <div style={{ marginTop: "20px" }}>
+      <h3 style={{ fontSize: "20px" }}>{title}</h3>
+      <p>
+        <strong>Aggregate:</strong>{" "}
+        {average === null ? "not scored" : `${average.toFixed(1)} / ${SCORE_MAX_TOTAL}`}{" "}
+        ({judgeIds.length} judge{judgeIds.length === 1 ? "" : "s"}, {fundable} voted fundable)
+      </p>
+      {judgeIds.map((judgeId) => {
+        const scoreObj = scores[judgeId];
+        const card = scoreCard(scoreObj);
+        return (
+          <div key={judgeId} style={{ marginBottom: "10px" }}>
+            <p style={{ marginBottom: "4px" }}>
+              <strong>Judge {judgeId}</strong>
+              {card === null ? "" : ` — ${card.toFixed(1)} / ${SCORE_MAX_TOTAL}`}
+            </p>
+            <ul style={{ marginBottom: "4px" }}>
+              {Object.entries(SCORE_FIELDS).map(([criterion, max]) => (
+                <li key={criterion}>
+                  {criterion.replace(/_/g, " ")}: {scoreObj?.[criterion] ?? "—"} / {max}
+                </li>
+              ))}
+              <li>fundable: {scoreObj?.fundable ? "yes" : "no"}</li>
+            </ul>
+            {scoreObj?.notes ? (
+              <p>
+                <strong>Comments:</strong> {scoreObj.notes}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function TeamSearch() {
   const [Query, setQuery] = useState("");
-  const [dietaryRestriction, setDietaryRestriction] = useState([]);
-  const [selectedDietaryRestriction, setSelectedDietaryRestriction] =
-    useState("");
+  const [sortBy, setSortBy] = useState("name");
 
   const [Data, setData] = useState({});
   const [submittedCount, setSubmittedCount] = useState(0);
 
-  //progress bar
   const [showProgressBar, setShowProgressBar] = useState(false);
-  const percentSubmitted = (
-    (submittedCount / Object.keys(Data).length) *
-    100
-  ).toFixed(2);
-
-  // <button onclick="https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay">Metrics</button>
+  const teamCount = Object.keys(Data).length;
+  const percentSubmitted = teamCount
+    ? ((submittedCount / teamCount) * 100).toFixed(2)
+    : "0.00";
 
   function toggleProgressBar(e) {
     setShowProgressBar(e.target.checked);
   }
 
   useEffect(() => {
-    onValue(ref(database, "/teams/"), async (snapshot) => {
+    const unsubscribe = onValue(ref(database, "/teams/"), async (snapshot) => {
       const data = snapshot.val();
+      if (!data) {
+        setData({});
+        setSubmittedCount(0);
+        return;
+      }
 
-      // Get team members' names
+      let submitted = 0;
+      const resolved = {};
 
-      let s = 0;
       for (const key in data) {
-        if (data[key].submitted) {
-          s += 1;
+        const team = { ...data[key] };
+        if (team.submitted) submitted += 1;
+
+        if (Array.isArray(team.members)) {
+          team.memberNames = await Promise.all(
+            team.members.map(async (uid) => {
+              const userSnapshot = await get(ref(database, `competitors/${uid}`));
+              if (userSnapshot.exists()) {
+                const userInfo = userSnapshot.val();
+                return `${userInfo.firstName} ${userInfo.lastName}`;
+              }
+              return "Unknown User";
+            })
+          );
+        } else {
+          team.memberNames = [];
         }
 
-        if (!data[key].members)
-          continue;
-        data[key].members = await Promise.all(
-          data[key].members.map(async (uid) => {
-            const userRef = ref(database, `competitors/${uid}`);
-            const userSnapshot = await get(userRef);
-            if (userSnapshot.exists()) {
-              const userInfo = userSnapshot.val();
-              return `${userInfo.firstName} ${userInfo.lastName}`;
-            }
-            return "Unknown User";
-          })
-        );
+        resolved[key] = team;
       }
-      setSubmittedCount(s);
 
-      // Set the newData object as the state
-      setData(data);
+      setSubmittedCount(submitted);
+      setData(resolved);
     });
+
+    return () => unsubscribe();
   }, []);
 
-  const filteredResults = Object.keys(Data).filter((key) => {
-    const teamData = Data[key];
-    const {
-      name,
-      members: memberIds,
-      submission,
-      submitted
-    } = teamData;
+  const visibleTeams = useMemo(() => {
+    const needle = Query.toLowerCase();
+    const keys = Object.keys(Data).filter((key) => {
+      const team = Data[key];
+      return (
+        (team?.name ?? "").toLowerCase().includes(needle) ||
+        (team?.submission?.ideaName ?? "").toLowerCase().includes(needle)
+      );
+    });
 
-    const matchesQuery =
-      name.toLowerCase().includes(Query.toLowerCase()) ||
-      submission?.ideaName?.toLowerCase().includes(Query.toLowerCase());
+    const scoreOf = (key) => calculateAverageScore(Data[key]?.scores) ?? -1;
 
-    return matchesQuery;
-  });
+    return keys.sort((a, b) => {
+      if (sortBy === "score") return scoreOf(b) - scoreOf(a);
+      if (sortBy === "finalScore") {
+        const f = (key) => calculateAverageScore(Data[key]?.scores_final_round) ?? -1;
+        return f(b) - f(a);
+      }
+      return (Data[a]?.name ?? "").localeCompare(Data[b]?.name ?? "");
+    });
+  }, [Data, Query, sortBy]);
 
   return (
     <Layout>
-      <h1 style={{ fontSize: "48px", textAlign: "center" }}>
-        Admin Team Dashboard
-      </h1>
+      <h1 style={{ fontSize: "48px", textAlign: "center" }}>Admin Team Dashboard</h1>
       <p style={{ fontSize: "24px", textAlign: "center" }}>
-        Total: {Object.keys(Data).length} | Submitted:{" "}
-        {submittedCount} | Percentage: {percentSubmitted}%
+        Total: {teamCount} | Submitted: {submittedCount} | Percentage: {percentSubmitted}%
         <Form.Check
           inline
           style={{ fontSize: "15px", marginLeft: "30px" }}
@@ -113,74 +161,56 @@ function TeamSearch() {
           onChange={(e) => toggleProgressBar(e)}
         />
       </p>
-      {showProgressBar && (
-        <SubmissionProgressBar
-          percent={percentSubmitted}
-        ></SubmissionProgressBar>
-      )}
-      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Name and Emails</h2>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "20px",
-        }}
-      >
-        {/* Search input */}
+      {showProgressBar && <SubmissionProgressBar percent={percentSubmitted} />}
+      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Teams and Scores</h2>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
         <input
           type="text"
-          placeholder="Search by name or email"
+          placeholder="Search by team or idea name"
           value={Query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
+          style={{ width: "300px", height: "40px", fontSize: "16px" }}
         />
         <select
-          value={selectedDietaryRestriction}
-          onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          style={{ width: "300px", height: "40px", fontSize: "16px" }}
         >
-          <option value="true">Checked In</option>
-          <option value="false">Not Checked In</option>
-          <option value="">No Filter</option>
-          <option value="">No Filter</option>
+          <option value="name">Sort by name</option>
+          <option value="score">Sort by first round score</option>
+          <option value="finalScore">Sort by final round score</option>
         </select>
       </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          // gridTemplateColumns: "repeat(5, minmax(250px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {filteredResults.map((key, index) => {
-          const teamData = Data[key]; // Access the data associated with the key(hash)
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        {visibleTeams.map((key) => {
+          const teamData = Data[key];
 
           return (
-            <div style={{ border: "1px solid #ccc", borderRadius: "15px", padding: "30px" }} key={key}>
-              <p
-                className="label"
-                style={{ fontSize: "24px", fontWeight: "bold" }}
-              >
-                {teamData.name}{teamData.submitted ? " ✅" : " ❌"}
+            <div
+              style={{ border: "1px solid #ccc", borderRadius: "15px", padding: "30px" }}
+              key={key}
+            >
+              <p className="label" style={{ fontSize: "24px", fontWeight: "bold" }}>
+                {teamData.name}
+                {teamData.submitted ? " ✅" : " ❌"}
               </p>
 
               <p>ID: {key}</p>
 
-              <strong>Members: {teamData.members ? teamData.members.length : 0}</strong>
+              <strong>Members: {teamData.memberNames?.length ?? 0}</strong>
               <ul>
-                {teamData.members && teamData.members.map((memberName, idx) => (
+                {teamData.memberNames?.map((memberName, idx) => (
                   <li key={idx}>{memberName}</li>
                 ))}
               </ul>
+
+              {teamData.schedule ? (
+                <p>
+                  <strong>Pitch:</strong> {teamData.schedule.time} in{" "}
+                  {teamData.schedule.room} (batch {teamData.schedule.batch}) ·{" "}
+                  {teamData.schedule.judges?.length ?? 0} judges
+                </p>
+              ) : null}
 
               {teamData.submitted && teamData.submission && (
                 <>
@@ -188,48 +218,28 @@ function TeamSearch() {
                     <strong>Idea Name:</strong> {teamData.submission.ideaName}
                   </p>
                   <p>
-                    <strong>Problem Statement:</strong>{" "}
-                    {teamData.submission.problemStatement}
+                    <strong>Problem Statement:</strong> {teamData.submission.problemStatement}
                   </p>
                   <p>
-                    <strong>Target Industry:</strong>{" "}
-                    {teamData.submission.targetIndustry}
+                    <strong>Target Industry:</strong> {teamData.submission.targetIndustry}
                   </p>
-                  <a href={teamData.submission.pitchDeckURL} target="_blank" rel="noopener noreferrer">Pitch Deck</a>
+                  {teamData.submission.pitchDeckURL ? (
+                    <a
+                      href={teamData.submission.pitchDeckURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Pitch Deck
+                    </a>
+                  ) : null}
                 </>
               )}
 
-              {teamData.scores && (
-                <div style={{ marginTop: "20px" }}>
-                  <h3>Scores:</h3>
-                  <p>Aggregate Score: {calculateAverageScore(teamData.scores)}</p>
-                  {Object.entries(teamData.scores).map(
-                    ([judgeId, scoreObj]) => (
-                      <div key={judgeId} style={{ marginBottom: "10px" }}>
-                        <p>
-                          <strong>Judge ID:</strong> {judgeId}
-                        </p>
-                        <p>
-                          <strong>Score:</strong>
-                          <ul>
-                            {Object.entries(scoreObj).map(
-                              ([criterion, score]) => (
-                                ["impact", "innovation", "pitch_quality", "problem"].includes(criterion) && (
-                                  <li key={criterion}>
-                                    {criterion}: {score}
-                                  </li>
-                                ))
-                            )}
-                          </ul>
-                        </p>
-                        <p>
-                          <strong>Comments:</strong> {scoreObj.notes}
-                        </p>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
+              <ScoreBreakdown title="First Round Scores" scores={teamData.scores} />
+              <ScoreBreakdown
+                title="Final Round Scores"
+                scores={teamData.scores_final_round}
+              />
             </div>
           );
         })}
