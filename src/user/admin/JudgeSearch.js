@@ -1,10 +1,7 @@
-import { onValue, ref, get, set } from "firebase/database";
+import { onValue, ref, update } from "firebase/database";
 import { database } from "../../firebase";
 
-import React, { useEffect, useState } from "react";
-
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useMemo, useState } from "react";
 
 import ProgressBar from "react-bootstrap/ProgressBar";
 import Button from "react-bootstrap/Button";
@@ -15,132 +12,98 @@ import Layout from "../Layout";
 function CheckedInProgressBar({ percent }) {
   return (
     <div style={{ marginBottom: "40px", marginInline: "10%" }}>
-      <ProgressBar
-        now={percent}
-        label={percent + "%"}
-        variant="danger"
-      ></ProgressBar>
+      <ProgressBar now={percent} label={percent + "%"} variant="danger"></ProgressBar>
     </div>
+  );
+}
+
+function Badge({ children, color }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        marginRight: "8px",
+        padding: "2px 10px",
+        borderRadius: "999px",
+        fontSize: "13px",
+        backgroundColor: color,
+        color: "white",
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
 function JudgeSearch() {
   const [Query, setQuery] = useState("");
-  const [dietaryRestriction, setDietaryRestriction] = useState([]);
-  const [selectedDietaryRestriction, setSelectedDietaryRestriction] =
-    useState("");
-  // varun stuff
+  const [checkedInFilter, setCheckedInFilter] = useState("");
+  const [roundOneFilter, setRoundOneFilter] = useState("");
 
   const handleMetricsClick = () => {
     window.location.href =
       "https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay";
   };
 
-  const [Data, setData] = useState({});
-  const [checkedInCount, setCheckedInCount] = useState(0);
-
-  //progress bar
+  const [judges, setJudges] = useState([]);
   const [showProgressBar, setShowProgressBar] = useState(false);
-  const percentCheckedIn = (
-    (checkedInCount / Object.keys(Data).length) *
-    100
-  ).toFixed(2);
 
-  // <button onclick="https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay">Metrics</button>
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, "/judges/"), (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        setJudges([]);
+        return;
+      }
+      setJudges(Object.entries(data).map(([id, details]) => ({ id, ...details })));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const checkedInCount = judges.filter((judge) => judge.checkedIn).length;
+  // the scheduler only assigns judges carrying this flag, so the count is worth
+  // showing before anyone hits Generate Schedule
+  const roundOneCount = judges.filter((judge) => judge.isRound1Judge === true).length;
+  const percentCheckedIn = judges.length
+    ? ((checkedInCount / judges.length) * 100).toFixed(2)
+    : "0.00";
 
   function toggleProgressBar(e) {
     setShowProgressBar(e.target.checked);
   }
 
-  useEffect(() => {
-    onValue(ref(database, "/judges/"), (snapshot) => {
-      const data = snapshot.val();
-      // Remove data where the isHooHacksJudge=true
+  const handleCheckIn = (judge) => {
+    // a targeted update rather than read-modify-write, so this cannot clobber a
+    // check-in happening at the scanner at the same moment
+    update(ref(database, `/judges/${judge.id}`), { checkedIn: !judge.checkedIn });
+  };
 
-      if (data) {
-        const newData = {};
-        let newCheckedInCount = 0;
-
-        for (const key in data) {
-          if (data.hasOwnProperty(key)) {
-            const entry = data[key];
-            const {
-              firstName,
-              lastName,
-              email,
-              wantsToJudge,
-              wantsToMentor,
-              isHooHacksMember,
-              checkedIn,
-              teamAssignments,
-              withCompany,
-              company,
-              timeslots
-            } = entry;
-            const fullName = `${firstName} ${lastName}`;
-
-            if (isHooHacksMember)
-              continue;
-
-            if (key != null) {
-              if (!newData[key]) {
-                newData[key] = [];
-                newData[key].push({
-                  fullName,
-                  email,
-                  wantsToJudge,
-                  wantsToMentor,
-                  checkedIn,
-                  teamAssignments,
-                  withCompany,
-                  company,
-                  timeslots,
-                  id: key
-                });
-
-                if (checkedIn) {
-                  newCheckedInCount++;
-                }
-              }
-            }
-          }
-        }
-
-        // Set the newData object as the state
-        setData(newData);
-        setCheckedInCount(newCheckedInCount);
-      }
-    });
-  }, []);
-
-  const handleCheckIn = (key) => {
-    // Get a reference to the participant's check-in status in Firebase
-    const participantRef = ref(database, "/judges/" + key);
-
-    // Use the set function to update the check-in status
-    get(participantRef).then((snapshot) => {
-      const personData = snapshot.val() || false;
-      if (personData == false) {
-        return;
-      }
-
-      personData.checkedIn = !personData.checkedIn;
-
-      set(participantRef, personData);
+  const handleToggleRoundOne = (judge) => {
+    update(ref(database, `/judges/${judge.id}`), {
+      isRound1Judge: judge.isRound1Judge !== true,
     });
   };
 
-  const filteredResults = Object.keys(Data).filter((key) => {
-    const personData = Data[key];
-    const fullName = personData[0].fullName.toString();
-    const email = personData[0].email; // Get email from the person's data
+  const filteredJudges = useMemo(() => {
+    const needle = Query.toLowerCase();
+    return judges.filter((judge) => {
+      const fullName = `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim();
+      const matchesQuery =
+        fullName.toLowerCase().includes(needle) ||
+        (judge.email ?? "").toLowerCase().includes(needle);
 
-    const matchesQuery =
-      fullName.toLowerCase().includes(Query.toLowerCase()) ||
-      (email && email.toLowerCase().includes(Query.toLowerCase()));
+      const matchesCheckedIn =
+        checkedInFilter === "" ||
+        String(Boolean(judge.checkedIn)) === checkedInFilter;
 
-    return matchesQuery;
-  });
+      const matchesRoundOne =
+        roundOneFilter === "" ||
+        String(judge.isRound1Judge === true) === roundOneFilter;
+
+      return matchesQuery && matchesCheckedIn && matchesRoundOne;
+    });
+  }, [judges, Query, checkedInFilter, roundOneFilter]);
 
   return (
     <Layout>
@@ -160,12 +123,10 @@ function JudgeSearch() {
         Metrics
       </button>
 
-      <h1 style={{ fontSize: "48px", textAlign: "center" }}>
-        Admin Judge Dashboard
-      </h1>
+      <h1 style={{ fontSize: "48px", textAlign: "center" }}>Admin Judge Dashboard</h1>
       <p style={{ fontSize: "24px", textAlign: "center" }}>
-        Total Signed-Up: {Object.keys(Data).length} | Checked In:{" "}
-        {checkedInCount} | Percentage: {percentCheckedIn}%
+        Total Signed-Up: {judges.length} | Checked In: {checkedInCount} | Percentage:{" "}
+        {percentCheckedIn}%
         <Form.Check
           inline
           style={{ fontSize: "15px", marginLeft: "30px" }}
@@ -175,124 +136,122 @@ function JudgeSearch() {
           onChange={(e) => toggleProgressBar(e)}
         />
       </p>
-      {showProgressBar && (
-        <CheckedInProgressBar
-          percent={percentCheckedIn}
-        ></CheckedInProgressBar>
-      )}
-      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Name and Emails</h2>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "20px",
-        }}
-      >
-        {/* Search input */}
+      <p style={{ fontSize: "18px", textAlign: "center" }}>
+        {roundOneCount} judge{roundOneCount === 1 ? "" : "s"} marked for the first
+        round. Only these are given team assignments when a schedule is generated.
+      </p>
+      {showProgressBar && <CheckedInProgressBar percent={percentCheckedIn} />}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px", gap: "10px" }}>
         <input
           type="text"
           placeholder="Search by name or email"
           value={Query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
+          style={{ width: "260px", height: "40px", fontSize: "16px" }}
         />
         <select
-          value={selectedDietaryRestriction}
-          onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
+          value={checkedInFilter}
+          onChange={(e) => setCheckedInFilter(e.target.value)}
+          style={{ width: "200px", height: "40px", fontSize: "16px" }}
         >
-          <option value="true">Checked In</option>
-          <option value="false">Not Checked In</option>
-          <option value="">No Filter</option>
-          <option value="">No Filter</option>
+          <option value="">All judges</option>
+          <option value="true">Checked in</option>
+          <option value="false">Not checked in</option>
+        </select>
+        <select
+          value={roundOneFilter}
+          onChange={(e) => setRoundOneFilter(e.target.value)}
+          style={{ width: "220px", height: "40px", fontSize: "16px" }}
+        >
+          <option value="">Any round</option>
+          <option value="true">First round judges</option>
+          <option value="false">Not first round</option>
         </select>
       </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          // gridTemplateColumns: "repeat(5, minmax(250px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {filteredResults.map((key, index) => {
-          const personData = Data[key]; // Access the data associated with the key(hash)
-
-          const fullName = personData[0].fullName.toString();
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        {filteredJudges.map((judge) => {
+          const fullName =
+            `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim() || "Unnamed Judge";
           const roles = [
-            personData[0].wantsToJudge && "Judging",
-            personData[0].wantsToMentor && "Mentoring"
-          ].filter(Boolean).join(" & ");
+            judge.wantsToJudge && "Judging",
+            judge.wantsToMentor && "Mentoring",
+          ]
+            .filter(Boolean)
+            .join(" & ");
 
-          const isCheckedIn = personData[0].checkedIn;
-          const checkedInString = String(personData[0].checkedIn);
+          const isCheckedIn = Boolean(judge.checkedIn);
+          const isRoundOne = judge.isRound1Judge === true;
+          const assignments = Array.isArray(judge.teamAssignments)
+            ? judge.teamAssignments.filter((a) => a && typeof a === "object")
+            : [];
 
-          const {
-            teamAssignments,
-            withCompany,
-            company,
-            timeslots,
-            id
-          } = personData[0];
+          return (
+            <div
+              style={{
+                border: isCheckedIn ? "1px solid #34a0a4" : "1px solid #ccc",
+                borderRadius: "15px",
+                padding: "30px",
+              }}
+              key={judge.id}
+            >
+              <p className="label" style={{ fontSize: "24px", fontWeight: "bold" }}>
+                {fullName}
+              </p>
 
-          if (
-            (checkedInString &&
-              checkedInString.includes(selectedDietaryRestriction))
-          ) {
-            return (
-              <div style={{ border: isCheckedIn ? "1px solid #34a0a4" : "1px solid #ccc", borderRadius: "15px", padding: "30px" }} key={key}>
-                <p
-                  className="label"
-                  style={{ fontSize: "24px", fontWeight: "bold" }}
-                >
-                  {fullName}
-                </p>
-
-                <p>{personData[0].email} ({id})</p>
-                <p>{roles}</p>
-                {withCompany ? (
-                  <p>
-                    <span>{company}</span>
-                  </p>
-                ) : null}
-                {teamAssignments ? (
-                  <p>
-                    <span>Judging Assignments: {teamAssignments.map(assignment => assignment.teamName).join(", ")}</span>
-                  </p>
-                ) : null}
-                {timeslots ? (
-                  <p>
-                    <span>Mentorship Timeslots: {timeslots.join(", ")}</span>
-                  </p>
-                ) : null
-                }
-                <div>
-                  <Button
-                    onClick={() => handleCheckIn(key)}
-                    style={{
-                      borderRadius: "12px",
-                      backgroundColor: isCheckedIn
-                        ? "#34a0a4"
-                        : "#2a6f97",
-                      color: "white",
-                    }}
-                  >
-                    {isCheckedIn ? "Checked In" : "Check In"}
-                  </Button>
-                </div>
+              <div style={{ marginBottom: "10px" }}>
+                {isRoundOne && <Badge color="#2563eb">First round judge</Badge>}
+                {judge.isHooHacksMember && <Badge color="#7c3aed">HooHacks member</Badge>}
+                {isCheckedIn && <Badge color="#34a0a4">Checked in</Badge>}
               </div>
-            );
-          } else {
-            return null; // Do not render if the dietary restriction does not match
-          }
+
+              <p>
+                {judge.email} ({judge.id})
+              </p>
+              <p>{roles}</p>
+              {judge.withCompany ? (
+                <p>
+                  <span>{judge.company}</span>
+                </p>
+              ) : null}
+              {assignments.length ? (
+                <p>
+                  <span>
+                    Judging Assignments:{" "}
+                    {assignments
+                      .map((a) => `${a.teamName} (${a.time}, ${a.room})`)
+                      .join(", ")}
+                  </span>
+                </p>
+              ) : null}
+              {Array.isArray(judge.timeslots) && judge.timeslots.length ? (
+                <p>
+                  <span>Mentorship Timeslots: {judge.timeslots.join(", ")}</span>
+                </p>
+              ) : null}
+              <div style={{ display: "flex", gap: "10px" }}>
+                <Button
+                  onClick={() => handleCheckIn(judge)}
+                  style={{
+                    borderRadius: "12px",
+                    backgroundColor: isCheckedIn ? "#34a0a4" : "#2a6f97",
+                    color: "white",
+                  }}
+                >
+                  {isCheckedIn ? "Checked In" : "Check In"}
+                </Button>
+                <Button
+                  onClick={() => handleToggleRoundOne(judge)}
+                  style={{
+                    borderRadius: "12px",
+                    backgroundColor: isRoundOne ? "#2563eb" : "#64748b",
+                    color: "white",
+                  }}
+                >
+                  {isRoundOne ? "First Round Judge" : "Mark First Round"}
+                </Button>
+              </div>
+            </div>
+          );
         })}
       </div>
     </Layout>
