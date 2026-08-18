@@ -1,13 +1,11 @@
-import React, { isValidElement, useState } from "react";
+import React, { useState } from "react";
 
 // firebase
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, storage, auth } from "./firebase";
-import { ref, push, child, update } from "firebase/database";
-import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { ref as storageRef } from "firebase/storage"; // avoid naming issues
+import { ref, update } from "firebase/database";
 
 // react pop up
 import { Popup } from "reactjs-popup";
@@ -39,11 +37,12 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // import logo
 import Logo from "./images/logo.png";
-import { maxWidth } from "@mui/system";
 import { FormText } from "react-bootstrap";
 
 // email format
-const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+// \w{2,3} rejected every TLD longer than three characters, so nobody with a
+// .tech / .info / .online address could register
+const mailformat = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
 
 const JudgeRegistration = () => {
   // theme
@@ -341,7 +340,6 @@ const JudgeRegistration = () => {
           >
             <Card
               sx={{
-                boxShadow: 4,
                 display: "flex",
                 flexFlow: "column nowrap",
                 margin: "24px",
@@ -369,6 +367,7 @@ const JudgeRegistration = () => {
               >
                 <img
                   src={Logo}
+                  alt="HooHacks Ideathon logo"
                   style={{
                     borderRadius: "5px",
                     width: "582px",
