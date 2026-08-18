@@ -1,36 +1,50 @@
 import Layout from "./Layout";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../App";
 import { Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { ref, onValue } from "firebase/database";
+import { database } from "../firebase";
+
+// Fallback only. Set config/eventStart in the database to an ISO timestamp so
+// the countdown can be moved without shipping a build.
+const DEFAULT_EVENT_START = "2026-10-18T10:00:00";
+
+function differenceToTime(target) {
+    if (!target || Number.isNaN(target.getTime())) return null;
+
+    const difference = target - new Date();
+    if (difference <= 0) return null;
+
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((difference / (1000 * 60)) % 60);
+    const seconds = Math.floor((difference / 1000) % 60);
+
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+}
 
 function Home() {
     const { userData } = useContext(AuthContext);
-
-    const target = new Date("2025-10-19T10:00:00"); // Set your target date and time here
-    const differenceToTime = (target) => {
-        const now = new Date();
-        const difference = Math.floor(target - now);
-
-        if (difference <= 0) {
-            return null;
-        }
-        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((difference / (1000 * 60)) % 60);
-        const seconds = Math.floor((difference / 1000) % 60);
-
-        return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-    }
-
-    const [time, setTime] = useState(differenceToTime(target));
+    const [eventStart, setEventStart] = useState(() => new Date(DEFAULT_EVENT_START));
+    const [time, setTime] = useState(() => differenceToTime(new Date(DEFAULT_EVENT_START)));
 
     useEffect(() => {
-        setInterval(() => {
-            setTime(differenceToTime(target));
-        }, 1000);
+        const unsubscribe = onValue(ref(database, "config/eventStart"), (snapshot) => {
+            if (!snapshot.exists()) return;
+            const parsed = new Date(snapshot.val());
+            if (!Number.isNaN(parsed.getTime())) setEventStart(parsed);
+        });
+        return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        setTime(differenceToTime(eventStart));
+        const interval = setInterval(() => {
+            setTime(differenceToTime(eventStart));
+        }, 1000);
+        // without this the timer kept running after the page unmounted
+        return () => clearInterval(interval);
+    }, [eventStart]);
 
     return (
         <Layout>

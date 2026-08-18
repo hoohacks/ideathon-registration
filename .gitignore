@@ -23,3 +23,6 @@ yarn-debug.log*
 yarn-error.log*
 
 scripts/jwt.key
+
+# local firebase config; firebase.js carries the real values
+.env

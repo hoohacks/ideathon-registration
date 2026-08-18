@@ -1,5 +1,5 @@
 import Layout from "../Layout";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../App";
 import { ref, get, set, onValue } from "firebase/database";
 import { database, storage } from "../../firebase";
@@ -11,29 +11,17 @@ import {
     Modal,
     Button,
     Typography,
-    InputLabel,
     TextField,
-    Select,
-    MenuItem,
-    LinearProgress,
-    Checkbox,
-    FormControlLabel,
-    FormGroup,
     FormControl,
-    Grid,
-    RadioGroup,
-    Radio,
     FormHelperText,
 } from "@mui/material";
 
-function Profile() {
+function Team() {
     const navigate = useNavigate();
     const { userData, userCredential, refreshUserData } = useContext(AuthContext);
     const [teamData, setTeamData] = useState(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadPitchDeck, setUploadPitchDeck] = useState(null);
     const [pitchDeckName, setPitchDeckName] = useState("");
-    const [isPitchDeckPicked, setIsPitchDeckPicked] = useState(false);
     const [ideaName, setIdeaName] = useState(userData ? userData.ideaName : "");
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
@@ -61,12 +49,10 @@ function Profile() {
                 const progress =
                     (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 console.log("Upload is " + progress + "% done");
-                setUploadProgress(progress);
                 setUploadPitchDeck(uploadResumeToDB);
             });
 
         setPitchDeckName(event.target.files[0].name);
-        setIsPitchDeckPicked(true);
     }
 
     const handleSubmitProject = async () => {
@@ -339,4 +325,4 @@ function Profile() {
     );
 }
 
-export default Profile;
+export default Team;

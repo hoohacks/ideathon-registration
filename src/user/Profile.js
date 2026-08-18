@@ -1,5 +1,5 @@
 import Layout from "./Layout";
-import { useContext, useRef, useState } from "react";
+import { useContext, useState } from "react";
 import { AuthContext } from "../App";
 import { Button, Typography } from "@mui/material";
 import { auth } from "../firebase";

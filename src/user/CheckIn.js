@@ -1,7 +1,6 @@
 import Layout from "./Layout";
 import { useAuth } from "../App";
 import { QRCodeCanvas } from "qrcode.react";
-import { Navigate } from "react-router-dom";
 
 function CheckIn() {
   

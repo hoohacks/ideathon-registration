@@ -15,7 +15,7 @@ function NewJoinTeam() {
   useEffect(() => {
     if (userData && userData.teamId)
       navigate('/user/team');
-  }, [userData]);
+  }, [userData, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

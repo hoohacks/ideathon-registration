@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useZxing } from "react-zxing";
 // firebase
 import { database } from "../../firebase";
-import { ref, get, update, set } from "firebase/database";
+import { ref, get, update } from "firebase/database";
 
 function AdminScan() {
     // pause scanner and popup
