@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 
 // firebase
-import firebase from "firebase/compat/app";
-import "firebase/compat/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, storage, auth } from "./firebase";
 import { ref, update } from "firebase/database";
@@ -101,13 +99,13 @@ const Registration = () => {
   // resume upload
   const [resumeName, setResumeName] = useState();
   const [uploadResume, setUploadResume] = useState();
-  const [isResumePicked, setIsResumePicked] = useState(false);
   const [progress, setProgress] = useState(0);
 
   // successful registration upload
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorString, setErrorString] = useState("");
 
   const changeResumeHandle = (event) => {
@@ -122,13 +120,20 @@ const Registration = () => {
       event.target.files[0]
     );
 
-    uploadResumeToDB.on("state_changed", (snapshot) => {
-      setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-      setUploadResume(uploadResumeToDB);
-    });
+    uploadResumeToDB.on(
+      "state_changed",
+      (snapshot) => {
+        setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      },
+      (error) => {
+        console.error("Resume upload failed:", error);
+      }
+    );
 
+    // set synchronously: waiting for the first progress event meant a quick
+    // submit saw no upload task at all
+    setUploadResume(uploadResumeToDB);
     setResumeName(event.target.files[0].name);
-    setIsResumePicked(true);
   };
 
   function firstProblem() {
@@ -156,6 +161,8 @@ const Registration = () => {
   }
 
   async function handleSubmit() {
+    if (submitting) return;
+
     const problem = firstProblem();
     if (problem) {
       setErrorString(problem);
@@ -163,83 +170,75 @@ const Registration = () => {
       return;
     }
 
-    const dietRestriction = dietaryRestriction;
-
-    // Sign in user with email and password
-    let user = null;
+    setSubmitting(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      user = userCredential.user;
-    } catch (error) {
-      setErrorString(
-        "Error signing up. An account with that email may already exist."
-      );
-      setShowErrorPopup(true);
-      return;
-    }
+      // Wait for the resume upload to finish rather than checking whether a
+      // progress counter happened to reach 100 by now. Submitting quickly used
+      // to fall through to the no-resume branch and silently store "none".
+      let resumeUrl = "none";
+      if (uploadResume) {
+        try {
+          await uploadResume;
+          resumeUrl = await getDownloadURL(uploadResume.snapshot.ref);
+        } catch (error) {
+          console.error("Resume upload failed:", error);
+          setErrorString(
+            "Your resume could not be uploaded. Please pick the file again, or reload the page to register without one."
+          );
+          setShowErrorPopup(true);
+          return;
+        }
+      }
 
-    // checks if resume has been uploaded yet or not
-    if (progress === 100 && isResumePicked) {
-      // download url
-      const url = await getDownloadURL(uploadResume.snapshot.ref);
+      let user = null;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        user = userCredential.user;
+      } catch (error) {
+        setErrorString(
+          "Error signing up. An account with that email may already exist."
+        );
+        setShowErrorPopup(true);
+        return;
+      }
 
-      let applicant = {
+      const dietRestriction = dietaryRestriction;
+
+      const applicant = {
         firstName: firstName,
         lastName: lastName,
         email: email,
         schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
         uvaSchool: selectSchool,
-        resume: url,
+        resume: resumeUrl,
         skills: skills,
         gender: gender || null,
         learn: learn,
         major: major,
-        registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
+        registeredAt: new Date().toString(),
         checkedIn: false,
         foodCheckIn: false,
-        dietaryRestriction:
-          dietRestriction.length === 0 ? "none" : dietRestriction,
+        dietaryRestriction: dietRestriction.length === 0 ? "none" : dietRestriction,
       };
 
-      const updates = {};
-      updates["/competitors/" + user.uid] = applicant;
-      return update(ref(database), updates)
-        .then(() => setSuccessRegistration(true))
-        .catch((error) => {
-          console.warn(error);
-        });
-    } else {
-      // for when no resume is selected
-
-      let applicant = {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
-        uvaSchool: selectSchool,
-        resume: "none",
-        skills: skills,
-        gender: gender || null,
-        learn: learn,
-        major: major,
-        registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
-        checkedIn: false,
-        foodCheckIn: false,
-        dietaryRestriction:
-          dietRestriction.length === 0 ? "none" : dietRestriction,
-      };
-
-      const updates = {};
-      updates["/competitors/" + user.uid] = applicant;
-      return update(ref(database), updates)
-        .then(() => setSuccessRegistration(true))
-        .catch((error) => {
-          console.warn(error);
-        });
+      try {
+        await update(ref(database), { ["/competitors/" + user.uid]: applicant });
+        setSuccessRegistration(true);
+      } catch (error) {
+        // the account exists at this point, so failing quietly here left people
+        // able to sign in with no profile and no idea why
+        console.error("Could not save registration:", error);
+        setErrorString(
+          "Your account was created but your registration could not be saved. Please contact HooHacks before trying again."
+        );
+        setShowErrorPopup(true);
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -794,8 +793,9 @@ const Registration = () => {
                   }}
                   type="submit"
                   onClick={() => handleSubmit()}
+                  disabled={submitting}
                 >
-                  Submit Registration
+                  {submitting ? "Submitting..." : "Submit Registration"}
                 </Button>
 
                 <Link href="https://ideathon.hoohacks.io">

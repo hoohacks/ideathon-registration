@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 
 // firebase
-import firebase from "firebase/compat/app";
-import "firebase/compat/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, auth } from "./firebase";
 import { ref, update } from "firebase/database";
@@ -149,9 +147,12 @@ const JudgeRegistration = () => {
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errorString, setErrorString] = useState("");
 
   async function handleSubmit() {
+    if (submitting) return;
+
     const checkSlots = () => {
       if (wantsToMentor) {
         let count = 0;
@@ -229,19 +230,27 @@ const JudgeRegistration = () => {
       skills: selected_skills,
       wantsToJudge: wantsToJudge,
       questionsAndConcerns: questionsAndConcerns,
-      registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
+      registeredAt: new Date().toString(),
       checkedIn: false,
       foodCheckIn: false,
       isJudge: true,
     };
 
-    const updates = {};
-    updates["/judges/" + user.uid] = judge;
-    return update(ref(database), updates)
-      .then(() => setSuccessRegistration(true))
-      .catch((error) => {
-        console.warn(error);
-      });
+    try {
+      setSubmitting(true);
+      await update(ref(database), { ["/judges/" + user.uid]: judge });
+      setSuccessRegistration(true);
+    } catch (error) {
+      // the account exists by now, so failing quietly here left judges able to
+      // sign in with no profile and no idea why
+      console.error("Could not save judge registration:", error);
+      setErrorString(
+        "Your account was created but your registration could not be saved. Please contact HooHacks before trying again."
+      );
+      setShowErrorPopup(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function Copyright() {

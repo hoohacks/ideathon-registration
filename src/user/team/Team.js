@@ -23,6 +23,9 @@ function Team() {
     const [teamData, setTeamData] = useState(null);
     const [uploadPitchDeck, setUploadPitchDeck] = useState(null);
     const [pitchDeckName, setPitchDeckName] = useState("");
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const [uploadError, setUploadError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
     const [ideaName, setIdeaName] = useState(userData ? userData.ideaName : "");
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
@@ -47,50 +50,69 @@ function Team() {
         uploadResumeToDB.on(
             "state_changed",
             (snapshot) => {
-                const progress =
-                    (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                console.log("Upload is " + progress + "% done");
-                setUploadPitchDeck(uploadResumeToDB);
-            });
+                setUploadProgress(
+                    (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+                );
+            },
+            (error) => {
+                console.error("Pitch deck upload failed:", error);
+                setUploadError("The pitch deck failed to upload. Please try again.");
+                setUploadProgress(null);
+            },
+            () => setUploadProgress(100)
+        );
 
+        // set synchronously: this used to happen only inside the progress
+        // callback, so submitting straight after picking a file saw no upload
+        // task and saved the submission with no pitch deck URL at all
+        setUploadPitchDeck(uploadResumeToDB);
+        setUploadError("");
         setPitchDeckName(event.target.files[0].name);
     }
 
     const handleSubmitProject = async () => {
-        if (!pitchDeckName || !problemStatement.trim() || !targetIndustry.trim()) {
-            alert("Please fill in all fields and upload a pitch deck before submitting.");
+        if (submitting) return;
+        if (!ideaName.trim() || !problemStatement.trim() || !targetIndustry.trim()) {
+            setUploadError("Please fill in the idea name, problem statement and target industry.");
             return;
         }
 
-        if (uploadPitchDeck) {
-            // Wait for upload to complete
-            await uploadPitchDeck;
-            const downloadURL = await getDownloadURL(uploadPitchDeck.snapshot.ref);
-            console.log("File available at", downloadURL);
+        const existingURL = teamData?.submission?.pitchDeckURL ?? null;
+        if (!uploadPitchDeck && !existingURL) {
+            setUploadError("Please upload a pitch deck before submitting.");
+            return;
+        }
 
-            // Save project submission data to Firebase
+        setSubmitting(true);
+        setUploadError("");
+        try {
+            let pitchDeckURL = existingURL;
+            let deckName = teamData?.submission?.pitchDeckName ?? pitchDeckName;
+
+            if (uploadPitchDeck) {
+                // await the task itself rather than trusting a progress counter
+                await uploadPitchDeck;
+                pitchDeckURL = await getDownloadURL(uploadPitchDeck.snapshot.ref);
+                deckName = pitchDeckName;
+            }
+
             await set(ref(database, `teams/${teamId}/submission`), {
                 ideaName,
                 problemStatement,
                 targetIndustry,
-                pitchDeckName,
-                pitchDeckURL: downloadURL
+                pitchDeckName: deckName,
+                pitchDeckURL,
             });
+            // only after the details land, so a team is never marked submitted
+            // with nothing to show
             await set(ref(database, `teams/${teamId}/submitted`), true);
 
             setShowModal(true);
-        } else {
-            // Pitch deck not changed, just update other fields
-            await set(ref(database, `teams/${teamId}/submission`), {
-                ideaName,
-                problemStatement,
-                targetIndustry,
-                pitchDeckName: teamData?.submission?.pitchDeckName ?? pitchDeckName,
-                pitchDeckURL: teamData?.submission?.pitchDeckURL ?? null
-            });
-            await set(ref(database, `teams/${teamId}/submitted`), true);
-
-            setShowModal(true);
+        } catch (error) {
+            console.error("Could not save the submission:", error);
+            setUploadError("Your submission could not be saved. Please try again.");
+        } finally {
+            setSubmitting(false);
         }
     }
 
@@ -276,8 +298,24 @@ function Team() {
                                         </FormControl>
                                     </Box>
 
-                                    <Button variant="contained" color="primary" onClick={handleSubmitProject}>
-                                        Save Project Submission
+                                    {uploadProgress !== null && uploadProgress < 100 ? (
+                                        <Typography variant="body2">
+                                            Uploading pitch deck… {Math.round(uploadProgress)}%
+                                        </Typography>
+                                    ) : null}
+                                    {uploadError ? (
+                                        <Typography variant="body2" color="error">
+                                            {uploadError}
+                                        </Typography>
+                                    ) : null}
+
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={handleSubmitProject}
+                                        disabled={submitting}
+                                    >
+                                        {submitting ? "Saving…" : "Save Project Submission"}
                                     </Button>
                                 </>
                             }
