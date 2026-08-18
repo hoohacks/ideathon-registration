@@ -48,6 +48,21 @@ means either moving scores to a top-level `/scores/{teamId}` node or replacing
 `$teamId/.read` with per-field read rules and splitting the single subscription
 in `src/user/team/Team.js` into one per field. Neither is done here.
 
+## Migrating existing teams
+
+Deploying the rules above requires a one-time data migration. Teams created
+before the keyed-set change still store `members` as an array, and the rules
+cannot see a member inside one, so those teams become unreadable to everyone
+except their creator. Run this once, from the repo root, with an account listed
+in `/admins`:
+
+```
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... node scripts/migrate-team-members.mjs
+```
+
+It reports what it would change and writes nothing. Add `--apply` to commit the
+change.
+
 ## Configuration
 
 Two optional database nodes change behaviour without a deploy:

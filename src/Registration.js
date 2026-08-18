@@ -106,6 +106,7 @@ const Registration = () => {
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [skipResume, setSkipResume] = useState(false);
   const [errorString, setErrorString] = useState("");
 
   const changeResumeHandle = (event) => {
@@ -133,6 +134,7 @@ const Registration = () => {
     // set synchronously: waiting for the first progress event meant a quick
     // submit saw no upload task at all
     setUploadResume(uploadResumeToDB);
+    setSkipResume(false);
     setResumeName(event.target.files[0].name);
   };
 
@@ -176,14 +178,18 @@ const Registration = () => {
       // progress counter happened to reach 100 by now. Submitting quickly used
       // to fall through to the no-resume branch and silently store "none".
       let resumeUrl = "none";
-      if (uploadResume) {
+      if (uploadResume && !skipResume) {
         try {
           await uploadResume;
           resumeUrl = await getDownloadURL(uploadResume.snapshot.ref);
         } catch (error) {
+          // the resume is optional, so a failed upload must not block signing
+          // up -- but it must not vanish without a word either. Say so once,
+          // then let a second press go through without it.
           console.error("Resume upload failed:", error);
+          setSkipResume(true);
           setErrorString(
-            "Your resume could not be uploaded. Please pick the file again, or reload the page to register without one."
+            "Your resume could not be uploaded. Press Submit Registration again to sign up without it, or choose a different file first."
           );
           setShowErrorPopup(true);
           return;
