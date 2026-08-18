@@ -2,26 +2,36 @@ import { ref, get, set, query, orderByChild, equalTo, serverTimestamp } from "fi
 import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
 
-// find teamid from name
+function requireUser() {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error("Must be signed in");
+  return user;
+}
+
+// Legacy fallback only. Team names are not unique, so two teams sharing a name
+// would send one team's scores to the other. Always prefer the team id carried
+// on the assignment.
 export async function findTeamIdByName(teamName) {
   const q = query(ref(database, "teams"), orderByChild("name"), equalTo(teamName));
   const snap = await get(q);
   if (!snap.exists()) return null;
 
-  // return the first match's key
-  const obj = snap.val();
-  return Object.keys(obj)[0];
+  const matches = Object.keys(snap.val());
+  if (matches.length > 1) {
+    console.warn(`Multiple teams are named "${teamName}"; falling back to the first match.`);
+  }
+  return matches[0];
 }
 
 // write a score for this judge under the team
 async function writeScoreToPath({ teamId, teamName, score, pathSegment }) {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  if (!user) throw new Error("Must be signed in to submit a score");
+  const user = requireUser();
+  if (!teamId) throw new Error(`No team id for "${teamName}"`);
 
   const payload = {
     ...score,
     judgeUid: user.uid,
+    teamId,
     teamName,
     submittedAt: serverTimestamp(),
   };
@@ -37,35 +47,25 @@ export async function writeFinalRoundScore(args) {
   await writeScoreToPath({ ...args, pathSegment: "scores_final_round" });
 }
 
-export async function getMyScoredTeamsByName(teamNames) {
-  return getScoredTeamsByNameForPath(teamNames, "scores");
-}
+async function getScoredTeamIdsForPath(teamIds, pathSegment) {
+  const user = requireUser();
+  const ids = [...new Set((teamIds ?? []).filter(Boolean))];
+  if (!ids.length) return new Set();
 
-export async function getMyFinalRoundScoredTeamsByName(teamNames) {
-  return getScoredTeamsByNameForPath(teamNames, "scores_final_round");
-}
-
-async function getScoredTeamsByNameForPath(teamNames = [], pathSegment) {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  if (!user) throw new Error("Must be signed in");
-  if (!teamNames.length) return {};
-
-  // check to see if team has already been scored
-  const pairs = await Promise.all(
-    teamNames.map(async (name) => {
-      if (!name) return [name, false];
-      const id = await findTeamIdByName(name);
-      if (!id) return [name, false];
+  const results = await Promise.all(
+    ids.map(async (id) => {
       const snap = await get(ref(database, `teams/${id}/${pathSegment}/${user.uid}`));
-      return [name, snap.exists()];
+      return [id, snap.exists()];
     })
   );
 
-  const map = {};
-  for (const [name, hasScore] of pairs) {
-    if (name && hasScore) map[name] = true;
-  }
-  console.log(map);
-  return map;
+  return new Set(results.filter(([, scored]) => scored).map(([id]) => id));
+}
+
+export function getMyScoredTeamIds(teamIds) {
+  return getScoredTeamIdsForPath(teamIds, "scores");
+}
+
+export function getMyFinalRoundScoredTeamIds(teamIds) {
+  return getScoredTeamIdsForPath(teamIds, "scores_final_round");
 }

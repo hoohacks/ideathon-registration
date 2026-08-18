@@ -14,5 +14,6 @@ export async function getPersonalSchedule() {
 
   const raw = snap.val().teamAssignments ?? [];
   const arr = Array.isArray(raw) ? raw : Object.values(raw);
-  return arr.filter(Boolean);
+  // older schedules wrote a [""] placeholder when a judge had no teams
+  return arr.filter((assignment) => assignment && typeof assignment === "object");
 }

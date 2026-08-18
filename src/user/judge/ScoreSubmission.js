@@ -1,5 +1,5 @@
 import "./ScheduleCard.css";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 const rubric = {
   problem: {
@@ -44,6 +44,7 @@ function ScoreSubmission({
   teamName = "Team Name",
   room = "Room 101",
   time = "10:00 AM",
+  submitting = false,
   onClose = () => {},
   onSubmit = () => {},
 }) {
@@ -57,18 +58,20 @@ function ScoreSubmission({
     notes: "",
   });
   const dialogRef = useRef(null);
-  const oneToTen = useMemo(() => Array.from({ length: 10 }, (_, i) => `${i + 1}`), []);
   const scoreOptions = (n) => Array.from({ length: n }, (_, i) => String(i + 1));
 
-  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inFlight = submitting || busy;
 
   function handleChange(e) {
     const { name, value } = e.target;
     setValues((v) => ({ ...v, [name]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    // the write is async, so without this guard a double click writes twice
+    if (inFlight) return;
     const score = {
       problem: Number(values.problem),
       innovation: Number(values.innovation),
@@ -81,8 +84,13 @@ function ScoreSubmission({
       room,
       time,
     };
-    onSubmit(score);
-    setSubmitted(true);
+    setBusy(true);
+    try {
+      await onSubmit(score);
+    } finally {
+      // if the parent failed it keeps the modal open, so re-enable the button
+      setBusy(false);
+    }
   }
 
   return (
@@ -103,6 +111,7 @@ function ScoreSubmission({
             onClick={onClose}
             aria-label="Close"
             type="button"
+            disabled={inFlight}
           >
             ×
           </button>
@@ -237,11 +246,20 @@ function ScoreSubmission({
             </label>
 
             <div className="score-modal__actions">
-              <button type="button" className="btn btn--ghost" onClick={onClose}>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={onClose}
+                disabled={inFlight}
+              >
                 Cancel
               </button>
-              <button type="submit" className="btn btn--primary">
-                Submit Score
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={inFlight}
+              >
+                {inFlight ? "Submitting..." : "Submit Score"}
               </button>
             </div>
           </form>

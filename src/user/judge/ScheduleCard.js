@@ -4,12 +4,15 @@ import "./ScheduleCard.css";
 /**
  * ScheduleCard
  * Props:
+ * - teamId: string (the database key -- team names are not unique, so scoring
+ *   must be keyed off this rather than the name)
  * - teamName: string
  * - room: string
  * - time: string
  * - onButtonClick: function
  */
 function ScheduleCard({
+  teamId = null,
   teamName = "Team Name",
   room = "Room 101",
   time = "10:00 AM",
@@ -38,8 +41,7 @@ function ScheduleCard({
         type="button"
         className={`schedule-card__button ${disabled ? "is-disabled" : ""}`}
         onClick={(e) => {
-          console.log('ScheduleCard clicked', { teamName, room, time, disabled });
-          if (!disabled) onButtonClick({ teamName, room, time, event: e });
+          if (!disabled) onButtonClick({ teamId, teamName, room, time, event: e });
         }}
         disabled={disabled}
         aria-disabled={disabled}

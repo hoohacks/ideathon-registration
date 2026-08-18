@@ -80,3 +80,15 @@
 	color: #b91c1c;
 	font-size: 0.9rem;
 }
+
+.assignments__warning {
+	margin: 8px 0 0;
+	color: #b45309;
+	font-size: 0.9rem;
+}
+
+.assignments__notice {
+	margin: 8px 0 0;
+	color: #15803d;
+	font-size: 0.9rem;
+}
