@@ -24,20 +24,20 @@ import {
   MenuItem,
   LinearProgress,
   Button,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
   FormControl,
   Grid,
   Link,
-  RadioGroup,
-  Radio,
   FormHelperText,
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // import logo
 import Logo from "./images/logo.png";
+
+function joinList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+}
 
 // email format
 // \w{2,3} rejected every TLD longer than three characters, so nobody with a
@@ -68,30 +68,22 @@ const Registration = () => {
 
   // text-fields
   const [firstName, setFirstName] = useState("");
-  const [firstNameCheck, setFirstNameCheck] = useState(false);
 
   const [lastName, setLastName] = useState("");
-  const [lastNameCheck, setLastNameCheck] = useState(false);
 
   const [email, setEmail] = useState("");
-  const [emailCheck, setEmailCheck] = useState(false);
 
   const [password, setPassword] = useState("");
-  const [passwordCheck, setPasswordCheck] = useState(false);
   const [isValidPassword, setIsValidPassword] = useState(true);
 
   const [skills, setSkills] = useState("");
-  const [skillsCheck, setSkillsCheck] = useState(false);
 
   const [major, setMajor] = useState("");
-  const [majorCheck, setMajorCheck] = useState(false);
 
   const [learn, setLearn] = useState("");
-  const [learnCheck, setLearnCheck] = useState(false);
 
   // gender
   const [gender, setGender] = useState("");
-  const [genderCheck, setGenderCheck] = useState(false);
 
   // email check
   const [isValidEmail, setIsValidEmail] = useState(true);
@@ -101,8 +93,7 @@ const Registration = () => {
 
   // year
   const [selectYear, setSelectYear] = useState(2026);
-  const [otherSelectYear, setOtherSelectYear] = useState("");
-  const [otherSelectYearCheck, setOtherSelectYearCheck] = useState("");
+  const otherSelectYear = "";
 
   // school
   const [selectSchool, setSelectedSchool] = useState("college");
@@ -157,7 +148,7 @@ const Registration = () => {
       .map(([label]) => label);
 
     if (missing.length) {
-      return `Please fill in your ${missing.join(", ")} before submitting.`;
+      return `Please fill in your ${joinList(missing)} before submitting.`;
     }
     if (!isValidEmail) return "Please enter a valid email address.";
     if (!isValidPassword) return "Your password must be at least 6 characters.";
@@ -437,7 +428,6 @@ const Registration = () => {
                   autoComplete="first-name"
                   onChange={(e) => {
                     setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setFirstNameCheck(firstName !== "");
                   }}
                   helperText={
                     firstName === "" && (
@@ -460,7 +450,6 @@ const Registration = () => {
                   autoComplete="last-name"
                   onChange={(e) => {
                     setLastName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setLastNameCheck(lastName !== "");
                   }}
                   helperText={
                     lastName === "" && (
@@ -485,7 +474,6 @@ const Registration = () => {
                 error={!isValidEmail}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setEmailCheck(email !== "");
                   setIsValidEmail(mailformat.test(email));
                 }}
                 helperText={
@@ -510,7 +498,6 @@ const Registration = () => {
                 error={!isValidPassword}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setPasswordCheck(password !== "");
                   setIsValidPassword(password.length >= 6);
                 }}
                 helperText={
@@ -534,7 +521,6 @@ const Registration = () => {
                 autoComplete="major"
                 onChange={(e) => {
                   setMajor(e.target.value);
-                  setMajorCheck(e.target.value !== "");
                 }}
                 helperText={
                   major === "" && (
@@ -561,7 +547,6 @@ const Registration = () => {
                     size="large"
                     onChange={(e) => {
                       setGender(e.target.value);
-                      setGenderCheck(e.target.value !== "");
                     }}
                   >
                     <MenuItem value="male">Male</MenuItem>
@@ -715,7 +700,6 @@ const Registration = () => {
                   autoComplete="skills"
                   onChange={(e) => {
                     setSkills(e.target.value);
-                    setSkillsCheck(e.target.value !== "");
                   }}
                   helperText={
                     skills === "" && (
@@ -751,7 +735,6 @@ const Registration = () => {
                   autoComplete="learn"
                   onChange={(e) => {
                     setLearn(e.target.value);
-                    setLearnCheck(e.target.value !== "");
                   }}
                   helperText={
                     learn === "" && (

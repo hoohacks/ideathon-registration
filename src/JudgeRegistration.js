@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { database, storage, auth } from "./firebase";
+import { database, auth } from "./firebase";
 import { ref, update } from "firebase/database";
 
 // react pop up
@@ -16,28 +16,24 @@ import {
   Box,
   Card,
   Typography,
-  InputLabel,
   TextField,
-  Select,
-  MenuItem,
-  LinearProgress,
   Button,
   Checkbox,
   FormControlLabel,
-  FormLabel,
-  FormGroup,
-  FormControl,
   Grid,
   Link,
   RadioGroup,
   Radio,
-  FormHelperText,
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // import logo
 import Logo from "./images/logo.png";
-import { FormText } from "react-bootstrap";
+
+function joinList(items) {
+  if (items.length < 2) return items.join("");
+  return items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+}
 
 // email format
 // \w{2,3} rejected every TLD longer than three characters, so nobody with a
@@ -68,16 +64,12 @@ const JudgeRegistration = () => {
 
   // text-fields
   const [firstName, setFirstName] = useState("");
-  const [firstNameCheck, setFirstNameCheck] = useState(false);
 
   const [lastName, setLastName] = useState("");
-  const [lastNameCheck, setLastNameCheck] = useState(false);
 
   const [email, setEmail] = useState("");
-  const [emailCheck, setEmailCheck] = useState(false);
 
   const [password, setPassword] = useState("");
-  const [passwordCheck, setPasswordCheck] = useState(false);
   const [isValidPassword, setIsValidPassword] = useState(true);
 
   const [withCompany, setWithCompany] = useState(false);
@@ -187,7 +179,7 @@ const JudgeRegistration = () => {
       .map(([label]) => label);
 
     if (missing.length) {
-      setErrorString(`Please fill in your ${missing.join(", ")} before submitting.`);
+      setErrorString(`Please fill in your ${joinList(missing)} before submitting.`);
       setShowErrorPopup(true);
       return;
     }
@@ -438,7 +430,6 @@ const JudgeRegistration = () => {
                   autoComplete="first-name"
                   onChange={(e) => {
                     setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setFirstNameCheck(firstName !== "");
                   }}
                   helperText={
                     firstName === "" && (
@@ -461,7 +452,6 @@ const JudgeRegistration = () => {
                   autoComplete="last-name"
                   onChange={(e) => {
                     setLastName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setLastNameCheck(lastName !== "");
                   }}
                   helperText={
                     lastName === "" && (
@@ -486,7 +476,6 @@ const JudgeRegistration = () => {
                 error={!isValidEmail}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setEmailCheck(email !== "");
                   setIsValidEmail(mailformat.test(email));
                 }}
                 helperText={
@@ -511,7 +500,6 @@ const JudgeRegistration = () => {
                 error={!isValidPassword}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setPasswordCheck(password !== "");
                   setIsValidPassword(password.length >= 6);
                 }}
                 helperText={
