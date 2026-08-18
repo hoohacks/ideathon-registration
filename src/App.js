@@ -1,5 +1,5 @@
 import { Navigate, Routes, Route } from "react-router-dom"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import Registration from "./Registration"
 import Search from "./user/admin/Search.js"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
@@ -25,6 +25,8 @@ import TeamDashboard from "./user/admin/TeamSearch.js"
 
 const AuthContext = createContext(null);
 
+const ROLES = ["competitor", "judge", "admin"];
+
 function useAuth() {
   return useContext(AuthContext);
 }
@@ -45,8 +47,6 @@ function ProtectedRoute({ children, requiredRoles }) {
   if (!userCredential) {
     return <Navigate to="/login" replace />;
   }
-  console.log("User types:", userTypes);
-  console.log("Required roles:", requiredRoles);
 
   if (requiredRoles && !requiredRoles.some(role => userTypes.includes(role))) {
     return <Navigate to="/user/home" replace />;
@@ -64,57 +64,72 @@ function AuthProvider({ children }) {
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed:", user);
-      setUserCredential(user ? { user } : null);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // keep the same object identity when the signed-in uid has not changed so
+      // downstream effects do not re-run for every token refresh
+      setUserCredential((prev) =>
+        prev?.user?.uid === user?.uid ? prev : (user ? { user } : null)
+      );
       setLoadingAuth(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const refreshUserData = async () => {
-    if (!userCredential)
-      return;
-
-    const idToken = await userCredential.user.getIdToken();
-    setToken(idToken);
-
-    // Check if user exists in /competitors or /judges
-    const userTypes = ["competitor", "judge", "admin"];
-    let userFound = false;
-
-    for (const userType of userTypes) {
-      try {
-        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-          setUserData(snapshot.val());
-          setUserTypes(userTypes => [...userTypes, userType]);
-          userFound = true;
-        }
-      } catch (error) {
-        console.log(`Checked ${userType} data`);
-      }
-    }
-
-    if (!userFound) {
+  const refreshUserData = useCallback(async () => {
+    if (!userCredential) {
+      // signed out: clear every trace of the previous user so roles cannot leak
+      // into the next session on this tab
+      setToken(null);
       setUserData(null);
+      setUserTypes([]);
+      setLoadingUserData(false);
+      return;
     }
 
-    setLoadingUserData(false);
-  };
+    setLoadingUserData(true);
+
+    try {
+      const idToken = await userCredential.user.getIdToken();
+      setToken(idToken);
+
+      const foundRoles = [];
+      let profile = null;
+
+      for (const role of ROLES) {
+        try {
+          const userRef = ref(database, `/${role}s/${userCredential.user.uid}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            foundRoles.push(role);
+            profile = { ...(profile ?? {}), ...snapshot.val() };
+          }
+        } catch (error) {
+          console.warn(`Could not read ${role} data:`, error);
+        }
+      }
+
+      // replace rather than append, otherwise roles accumulate across logins
+      setUserData(profile);
+      setUserTypes(foundRoles);
+    } finally {
+      setLoadingUserData(false);
+    }
+  }, [userCredential]);
 
   useEffect(() => {
+    // wait for firebase to report the initial auth state, otherwise a signed-in
+    // user is briefly treated as signed out and bounced to /login
+    if (loadingAuth) return;
     refreshUserData();
-  }, [userCredential]);
+  }, [loadingAuth, refreshUserData]);
 
   const handleLogin = async (email, password, remember = false) => {
     try {
       if (remember)
         await auth.setPersistence(browserLocalPersistence);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      setUserCredential(userCredential);
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      setUserCredential({ user: credential.user });
       return true;
     } catch (error) {
       console.error("Login failed:", error);
@@ -142,7 +157,7 @@ function App() {
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge"]}><Assignments /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
           <Route path="team">
             <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><Team /></ProtectedRoute>} />

@@ -38,7 +38,7 @@ function Profile() {
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
-    const [finalRound, setFinalRound] = useState(null);
+    const [finalRound, setFinalRound] = useState({ active: false });
 
 
     // Get team ID from userData if available
@@ -98,8 +98,8 @@ function Profile() {
                 ideaName,
                 problemStatement,
                 targetIndustry,
-                pitchDeckName: teamData.submission.pitchDeckName,
-                pitchDeckURL: teamData.submission.pitchDeckURL
+                pitchDeckName: teamData?.submission?.pitchDeckName ?? pitchDeckName,
+                pitchDeckURL: teamData?.submission?.pitchDeckURL ?? null
             });
             await set(ref(database, `teams/${teamId}/submitted`), true);
 
@@ -142,18 +142,17 @@ function Profile() {
 
     useEffect(() => {
         const finalRoundRef = ref(database, "finalRound");
-        onValue(finalRoundRef, async (snapshot) => {
-            if (snapshot.exists()) {
-                const finalRoundData = snapshot.val();
-                setFinalRound(finalRoundData);
-            }
+        const unsubscribe = onValue(finalRoundRef, (snapshot) => {
+            setFinalRound(snapshot.exists() ? snapshot.val() : { active: false });
         });
+        return () => unsubscribe();
     }, []);
 
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
+        if (!teamId) return;
         const teamRef = ref(database, "teams/" + teamId);
-        onValue(teamRef, async (snapshot) => {
+        const unsubscribe = onValue(teamRef, async (snapshot) => {
             if (!snapshot.exists())
                 return;
 
@@ -176,6 +175,7 @@ function Profile() {
             setPitchDeckName(teamData.submission?.pitchDeckName || "");
             setTeamData(teamData);
         });
+        return () => unsubscribe();
     }, [teamId]);
 
     if (!teamId) {
@@ -233,7 +233,7 @@ function Profile() {
                                             Room: {teamData.schedule.room}
                                         </Typography>
                                         <hr />
-                                        {finalRound.active && (teamId in finalRound.teams) ? (
+                                        {finalRound?.active && finalRound?.teams?.[teamId] ? (
                                             <>
                                                 <Typography variant="h6" style={{ fontWeight: 'bold' }}>
                                                     Final Round Details

@@ -4,15 +4,17 @@ import { AuthContext } from "../App";
 import { Button, Typography } from "@mui/material";
 import { auth } from "../firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { ref, update } from "firebase/database";
 import { database } from "../firebase";
 
 function Profile() {
     const { userData, userTypes, userCredential } = useContext(AuthContext);
+    const navigate = useNavigate();
     const [sentReset, setSentReset] = useState(false);
-    const [dietaryRestriction, setDietaryRestriction] = useState(userData.dietaryRestriction ? userData.dietaryRestriction : "none");
+    const [resetError, setResetError] = useState("");
+    const [dietaryRestriction, setDietaryRestriction] = useState(userData?.dietaryRestriction ?? "none");
 
     const setDietaryRestrictions = async (restriction) => {
         if (!userData) return "N/A";
@@ -28,19 +30,25 @@ function Profile() {
 
 
     const handlePasswordReset = async () => {
-        // Implement password reset functionality here
+        const email = userData?.email ?? userCredential?.user?.email;
+        if (!email) {
+            setResetError("No email on file for this account.");
+            return;
+        }
         try {
-            await sendPasswordResetEmail(auth, userData.email);
+            await sendPasswordResetEmail(auth, email);
             setSentReset(true);
+            setResetError("");
         } catch (error) {
             console.error("Error sending password reset email:", error);
+            setResetError("Could not send the reset email. Please try again.");
         }
     };
 
     const handleLogout = async () => {
         try {
             await auth.signOut();
-            return <Navigate to="/login" replace />;
+            navigate("/login", { replace: true });
         } catch (error) {
             console.error("Error during logout:", error);
         }
@@ -101,9 +109,16 @@ function Profile() {
                                     Password reset email sent! Please check your inbox and spam folder.
                                 </Typography>
                             ) : (
-                                <Button variant="contained" color="primary" onClick={handlePasswordReset}>
-                                    Send Password Reset Email
-                                </Button>
+                                <>
+                                    <Button variant="contained" color="primary" onClick={handlePasswordReset}>
+                                        Send Password Reset Email
+                                    </Button>
+                                    {resetError ? (
+                                        <Typography variant="body2" color="error" style={{ marginTop: "10px" }}>
+                                            {resetError}
+                                        </Typography>
+                                    ) : null}
+                                </>
                             )
                         }
                         <hr />
