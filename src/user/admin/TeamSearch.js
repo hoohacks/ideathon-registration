@@ -14,6 +14,7 @@ import ProgressBar from "react-bootstrap/ProgressBar";
 import "bootstrap/dist/css/bootstrap.min.css";
 import Form from "react-bootstrap/Form";
 import Layout from "../Layout";
+import { memberIds } from "../team/teamMembers";
 
 function SubmissionProgressBar({ percent }) {
   return (
@@ -100,9 +101,10 @@ function TeamSearch() {
         const team = { ...data[key] };
         if (team.submitted) submitted += 1;
 
-        if (Array.isArray(team.members)) {
+        const members = memberIds(team.members);
+        if (members.length) {
           team.memberNames = await Promise.all(
-            team.members.map(async (uid) => {
+            members.map(async (uid) => {
               const userSnapshot = await get(ref(database, `competitors/${uid}`));
               if (userSnapshot.exists()) {
                 const userInfo = userSnapshot.val();

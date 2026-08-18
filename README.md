@@ -1,4 +1,78 @@
-# Getting Started with Create React App
+# Ideathon Registration
+
+Registration, check-in, team submission and judging for the HooHacks Ideathon.
+
+## Database rules
+
+`database.rules.json` holds the Realtime Database rules. Paste it into the
+Firebase console (Realtime Database -> Rules) or deploy it with
+`firebase deploy --only database`. The console strips the `//` comments.
+
+Two things about Realtime Database rules drive the whole shape of that file:
+
+1. **Rules cascade downward and cannot be revoked.** Granting `.read` at
+   `/teams` grants it for every team's `scores` too, no matter what the deeper
+   rules say. So there is no blanket `"auth != null"` on `/teams` or
+   `/competitors`; access is granted per record instead.
+2. **`hasChild(auth.uid)` matches a child *key*, not a value.** Team membership
+   is therefore stored as a keyed set:
+
+   ```
+   teams/{teamId}/members/{uid} = true
+   ```
+
+   If members were an array, Firebase would store it under the keys `0`, `1`,
+   `2`, and every `members.hasChild(auth.uid)` check would silently be false.
+   `src/user/team/teamMembers.js` reads both shapes so teams created before
+   this change still work.
+
+### Who can do what
+
+| Actor | Can |
+| --- | --- |
+| anyone signed in | read their own `admins`/`judges`/`competitors` record, `config`, `finalRound`, and any team's `name` |
+| competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members; read their own team; write their own team's `submission` and `submitted` |
+| judge | read their own record and assignments; write `teams/*/scores/{ownUid}` and `scores_final_round/{ownUid}`, and read back only their own |
+| admin | everything, via the root rule |
+
+Notably a judge cannot set their own `isRound1Judge` or `checkedIn`, and a
+competitor cannot check themselves in or touch their team's `schedule` or
+`scores`.
+
+### Known trade-off
+
+A team member can read their own team node, and scores live under it, so a
+determined competitor could read their own team's judge scores and notes
+through the console. They cannot read any other team's. Closing this properly
+means either moving scores to a top-level `/scores/{teamId}` node or replacing
+`$teamId/.read` with per-field read rules and splitting the single subscription
+in `src/user/team/Team.js` into one per field. Neither is done here.
+
+## Configuration
+
+Two optional database nodes change behaviour without a deploy:
+
+| Path | Effect |
+| --- | --- |
+| `config/judgingRooms` | list of room names for the first round; falls back to the 12 in `getJudgeSchedule.js`. A batch cannot have more teams than there are rooms |
+| `config/eventStart` | ISO timestamp the home page counts down to |
+
+## Judging
+
+1. Mark first-round judges on **Judge Search**. Only judges flagged
+   `isRound1Judge` are given assignments.
+2. Press **Generate Schedule** on the Judging page. Teams that submitted are
+   split into three batches; each team in a batch gets its own room, and every
+   judge visits exactly one team per batch. Generation validates room and judge
+   supply first and writes nothing if it cannot produce a complete schedule.
+3. Judges score from their assignment cards. Scores are keyed by team id.
+4. **Activate Final Round** takes the top four teams by average score and
+   excludes the judges who already saw them in round one.
+
+Scoring is out of 40: problem, innovation and impact are worth 10 each,
+viability and pitch quality 5 each. `fundable` is recorded as a tally, not
+scored.
+
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 

@@ -4,6 +4,7 @@ import { AuthContext } from "../../App";
 import { ref, get, set, onValue } from "firebase/database";
 import { database, storage } from "../../firebase";
 import { Link, useNavigate } from "react-router-dom";
+import { memberIds } from "./teamMembers";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage";
 import {
@@ -94,29 +95,11 @@ function Team() {
     }
 
     const handleLeaveTeam = async () => {
-        const teamRef = ref(database, "teams/" + teamId);
-        const snapshot = await get(teamRef);
-
-        if (!snapshot.exists()) {
-            alert(`Team with ID "${teamId}" does not exist.`);
-            return;
-        }
-
-        // Remove user from team's member list
-        const teamData = snapshot.val();
-        let members = [];
-
-        // Coerce existing members into an array if possible
-        if (Array.isArray(teamData.members)) {
-            members = teamData.members.filter(Boolean); // remove any null/undefined
-        }
-
-        // Remove current UID from the array
         const uid = userCredential.user.uid;
-        members = members.filter(memberUid => memberUid !== uid);
 
-        // Update the team in the database
-        await set(ref(database, "teams/" + teamId + "/members"), members);
+        // remove only this member, which is all the rules allow and all that
+        // is needed
+        await set(ref(database, `teams/${teamId}/members/${uid}`), null);
 
         // Remove teamId from user's profile
         await set(ref(database, `competitors/${uid}/teamId`), null);
@@ -143,7 +126,7 @@ function Team() {
                 return;
 
             // Map member UIDs to names
-            const members = snapshot.val().members || [];
+            const members = memberIds(snapshot.val().members);
             const memberNames = await Promise.all(members.map(async (uid) => {
                 const userRef = ref(database, `competitors/${uid}`);
                 const userSnapshot = await get(userRef);

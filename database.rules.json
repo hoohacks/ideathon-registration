@@ -1,0 +1,106 @@
+{
+  "rules": {
+    // Admins read and write everything. Every rule below grants some narrower
+    // slice to a specific actor. Remember that Realtime Database rules CASCADE:
+    // granting .read or .write at a path grants it for everything underneath,
+    // and a deeper rule can never take it back. That is why there is no
+    // blanket ".read": "auth != null" on /teams or /competitors.
+    ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+    ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+
+    "admins": {
+      // Anyone signed in may check whether they themselves are an admin, and
+      // nothing more. The app probes this on every login to build the role
+      // list; without it every non-admin login logs a permission error.
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid"
+      }
+    },
+
+    // Judging room list and event start date. Admin-writable via the root rule.
+    "config": {
+      ".read": "auth != null"
+    },
+
+    // Teams need their final-round slot and judges need the roster.
+    "finalRound": {
+      ".read": "auth != null"
+    },
+
+    "judges": {
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid",
+
+        // A judge writes their own record once, at registration. isRound1Judge,
+        // checkedIn and teamAssignments are set by admins through the root
+        // rule, so a judge cannot add themselves to the judging pool, check
+        // themselves in, or hand themselves extra teams.
+        ".write": "auth != null && $uid === auth.uid && !data.exists() && !newData.hasChild('isRound1Judge') && !newData.hasChild('teamAssignments') && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false"
+      }
+    },
+
+    "competitors": {
+      "$uid": {
+        // Yourself, or someone on your team. The teamId comparison is guarded
+        // on the reader having a team at all: without that guard two
+        // competitors who are both teamless compare null === null and every
+        // unteamed competitor becomes readable by every other one.
+        ".read": "auth != null && ($uid === auth.uid || (root.child('competitors').child(auth.uid).child('teamId').exists() && root.child('competitors').child($uid).child('teamId').val() === root.child('competitors').child(auth.uid).child('teamId').val()))",
+
+        // Own record only, and never your own check-in state.
+        ".write": "auth != null && $uid === auth.uid && ((!data.exists() && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false) || (data.exists() && newData.child('checkedIn').val() === data.child('checkedIn').val() && newData.child('foodCheckIn').val() === data.child('foodCheckIn').val()))"
+      }
+    },
+
+    "teams": {
+      ".indexOn": ["name"],
+
+      "$teamId": {
+        // Your own team only. Reading /teams as a whole stays admin-only, so
+        // one team can never enumerate another team's submission or scores.
+        ".read": "auth != null && (data.child('members').hasChild(auth.uid) || data.child('createdBy').val() === auth.uid)",
+
+        // Creating a team, and only with yourself as creator and first member.
+        // Edits to an existing team go through the per-field rules below, so a
+        // member cannot overwrite their team's schedule or their own scores.
+        ".write": "auth != null && !data.exists() && root.child('competitors').child(auth.uid).exists() && newData.child('createdBy').val() === auth.uid && newData.child('members').hasChild(auth.uid)",
+
+        // Readable by anyone signed in so a competitor can confirm a team id
+        // before joining it, which they must do before they can read the team.
+        "name": {
+          ".read": "auth != null"
+        },
+
+        "members": {
+          "$memberUid": {
+            // Add or remove yourself, nobody else. Storing members as a keyed
+            // set rather than an array is what makes this expressible at all.
+            ".write": "auth != null && $memberUid === auth.uid && root.child('competitors').child(auth.uid).exists()"
+          }
+        },
+
+        "submission": {
+          ".write": "auth != null && root.child('teams').child($teamId).child('members').hasChild(auth.uid)"
+        },
+
+        "submitted": {
+          ".write": "auth != null && root.child('teams').child($teamId).child('members').hasChild(auth.uid)"
+        },
+
+        "scores": {
+          "$judgeId": {
+            ".read": "auth != null && auth.uid === $judgeId",
+            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()"
+          }
+        },
+
+        "scores_final_round": {
+          "$judgeId": {
+            ".read": "auth != null && auth.uid === $judgeId",
+            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()"
+          }
+        }
+      }
+    }
+  }
+}

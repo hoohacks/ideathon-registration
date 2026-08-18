@@ -37,29 +37,18 @@ function NewJoinTeam() {
 
 
     try {
-      const teamRef = ref(database, "teams/" + teamId);
-      const snapshot = await get(teamRef);
+      // only the name is read: someone joining is not a member yet, so the
+      // rules do not let them read the whole team node
+      const nameSnapshot = await get(ref(database, `teams/${teamId}/name`));
 
-      if (!snapshot.exists()) {
+      if (!nameSnapshot.exists()) {
         alert(`Team with ID "${teamId}" does not exist.`);
         return;
       }
 
-      const teamData = snapshot.val();
-      let members = [];
-
-      // Coerce existing members into an array if possible
-      if (Array.isArray(teamData.members)) {
-        members = teamData.members.filter(Boolean); // remove any null/undefined
-      }
-
-      // Append current UID if not already in the array
-      if (!members.includes(userCredential.uid)) {
-        members.push(userCredential.uid);
-      }
-
-      // Overwrite members attribute in Firebase
-      await set(ref(database, `teams/${teamId}/members`), members);
+      // add just this member rather than rewriting the whole list, so joining
+      // cannot drop or reorder anyone else
+      await set(ref(database, `teams/${teamId}/members/${userCredential.uid}`), true);
 
       // Attach teamId to user's profile
       await set(ref(database, `competitors/${userCredential.uid}/teamId`), teamId);

@@ -40,11 +40,12 @@ function CreateTeam() {
       const teamsRef = ref(database, "teams/");
       const teamRef = push(teamsRef);
 
-      // Create a new team object
+      // members is a keyed set, not an array, so the database rules can
+      // check members.hasChild(auth.uid)
       const teamData = {
         name: teamName,
         createdBy: userCredential.uid,
-        members: [userCredential.uid]
+        members: { [userCredential.uid]: true }
       };
 
       // Write the new team to Firebase
