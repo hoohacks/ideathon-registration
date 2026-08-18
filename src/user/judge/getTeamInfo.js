@@ -12,8 +12,14 @@ function requireUser() {
 // would send one team's scores to the other. Always prefer the team id carried
 // on the assignment.
 export async function findTeamIdByName(teamName) {
-  const q = query(ref(database, "teams"), orderByChild("name"), equalTo(teamName));
-  const snap = await get(q);
+  let snap;
+  try {
+    const q = query(ref(database, "teams"), orderByChild("name"), equalTo(teamName));
+    snap = await get(q);
+  } catch (error) {
+    console.warn("Team name lookup is not permitted for this account:", error);
+    return null;
+  }
   if (!snap.exists()) return null;
 
   const matches = Object.keys(snap.val());

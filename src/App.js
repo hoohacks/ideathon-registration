@@ -150,7 +150,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
-        <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login" element={<Login />} />
@@ -165,6 +164,7 @@ function App() {
             <Route path="create" element={<ProtectedRoute requiredRoles={["competitor"]}><CreateTeam /></ProtectedRoute>} />
           </Route>
           <Route path="admin">
+            <Route path="metrics" element={<ProtectedRoute requiredRoles={["admin"]}><RegisteredAtDisplay /></ProtectedRoute>} />
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
             <Route path="judges" element={<ProtectedRoute requiredRoles={["admin"]}><JudgeDashboard /></ProtectedRoute>} />

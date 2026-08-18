@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../App";
 import { FaUser, FaGavel } from "react-icons/fa";
-import { IoHome, IoQrCodeOutline, IoScan, IoSearch } from "react-icons/io5";
+import { IoHome, IoQrCodeOutline, IoScan, IoSearch, IoStatsChart } from "react-icons/io5";
 import { RiTeamFill } from "react-icons/ri";
 
 function Nav() {
@@ -23,6 +23,7 @@ function Nav() {
         { to: "/user/admin/search", label: "Admin Search", authTypes: ["admin"], icon: <IoSearch /> },
         { to: "/user/admin/judges", label: "Judge Search", authTypes: ["admin"], icon: <IoSearch /> },
         { to: "/user/admin/teams", label: "Team Search", authTypes: ["admin"], icon: <IoSearch /> },
+        { to: "/user/admin/metrics", label: "Metrics", authTypes: ["admin"], icon: <IoStatsChart /> },
     ];
 
     const userTypes = useContext(AuthContext)?.userTypes ?? [];

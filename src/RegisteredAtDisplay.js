@@ -1,101 +1,70 @@
 // RegisteredAtDisplay.js
 
 import { onValue, ref } from "firebase/database";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { database } from "./firebase";
-import { Line, Bar } from "react-chartjs-2";
-import Chart from "chart.js/auto";
+import { Line } from "react-chartjs-2";
+import "chart.js/auto";
+import Layout from "./user/Layout";
+
+function dayKey(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return null;
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}/${day}`;
+}
 
 function RegisteredAtDisplay() {
-  const [RegisteredAt, setRegisteredAt] = useState([]);
+  const [registeredAt, setRegisteredAt] = useState([]);
 
   useEffect(() => {
-    onValue(ref(database, "/competitors/"), (snapshot) => {
+    const unsubscribe = onValue(ref(database, "/competitors/"), (snapshot) => {
       const data = snapshot.val();
-
-      if (data) {
-        const registeredAtArray = [];
-
-        for (const key in data) {
-          if (data.hasOwnProperty(key)) {
-            const entry = data[key];
-
-            // Assume each entry in your database has a "registeredAt" field.
-            if (entry.registeredAt) {
-              registeredAtArray.push(entry.registeredAt);
-            }
-          }
-        }
-
-        setRegisteredAt(registeredAtArray);
-      } else {
-        console.log("No data found");
+      if (!data) {
+        setRegisteredAt([]);
+        return;
       }
+      setRegisteredAt(
+        Object.values(data)
+          .map((entry) => entry?.registeredAt)
+          .filter(Boolean)
+      );
     });
+
+    return () => unsubscribe();
   }, []);
 
-  const convertDateToInt = (dateString) => {
-    const date = new Date(dateString);
-    // Month in JavaScript is 0-indexed (0 is January, 1 is February, etc.)
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+  // One pass over the data instead of makeX/makeY recomputing on every render,
+  // and counting from the first record rather than the second.
+  const { labels, perDay, cumulative } = useMemo(() => {
+    const counts = new Map();
 
-    return `${month.toString().padStart(2, "0")}${day
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
-  function makeX() {
-    const uniqueDates = new Set();
-
-    RegisteredAt.forEach((date) => {
-      const formattedDate = convertDateToInt(date);
-      console.log(formattedDate);
-      uniqueDates.add(formattedDate.slice(0, 2) + "/" + formattedDate.slice(2)); // Insert "/"
-    });
-
-    const sortedDates = Array.from(uniqueDates).sort((a, b) => {
-      const [aMonth, aDay] = a.split("/").map(Number);
-      const [bMonth, bDay] = b.split("/").map(Number);
-
-      // Compare by month, then day
-      if (aMonth === bMonth) return aDay - bDay;
-      return aMonth - bMonth;
-    });
-
-
-    return sortedDates;
-  }
-
-  function makeY() {
-    const yMap = new Map();
-
-    for (let i = 1; i < RegisteredAt.length; i++) {
-      const date = convertDateToInt(RegisteredAt[i]);
-      yMap.set(date, (yMap.get(date) || 0) + 1);
+    for (const value of registeredAt) {
+      const key = dayKey(value);
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
 
-    const yArr = makeX().map((date) => {
-      const formattedDate = date.replace("/", "");
-      return yMap.get(formattedDate) || 0;
+    const sorted = [...counts.keys()].sort((a, b) => {
+      const [aMonth, aDay] = a.split("/").map(Number);
+      const [bMonth, bDay] = b.split("/").map(Number);
+      return aMonth === bMonth ? aDay - bDay : aMonth - bMonth;
     });
 
-    return yArr;
-  }
+    let total = 0;
+    const daily = sorted.map((key) => counts.get(key));
+    const running = daily.map((count) => (total += count));
 
-  const totalParticipants = RegisteredAt.length;
+    return { labels: sorted, perDay: daily, cumulative: running };
+  }, [registeredAt]);
 
-  console.log("here");
-
-  const totalParticipantsData = {
-    labels: makeX(),
+  const line = (label, data) => ({
+    labels,
     datasets: [
       {
-        label: "Total Participants Registered",
-        data: makeY().reduce((acc, currentCount) => {
-          acc.push((acc.length > 0 ? acc[acc.length - 1] : 0) + currentCount);
-          return acc;
-        }, []),
+        label,
+        data,
         fill: false,
         borderWidth: 4,
         borderColor: "#6495ed",
@@ -103,35 +72,22 @@ function RegisteredAtDisplay() {
         responsive: true,
       },
     ],
-  };
+  });
 
   return (
-    <>
+    <Layout>
+      <h1 style={{ textAlign: "center" }}>Registration Metrics</h1>
+      <p style={{ textAlign: "center" }}>
+        {registeredAt.length} competitor{registeredAt.length === 1 ? "" : "s"} registered
+        across {labels.length} day{labels.length === 1 ? "" : "s"}
+      </p>
       <div>
-        <Line
-          data={{
-            // x-axis label values
-            labels: makeX(),
-            datasets: [
-              {
-                label: "# of Participants Registered",
-                // y-axis data plotting values
-                data: makeY(),
-                fill: false,
-                borderWidth: 4,
-                borderColor: "#6495ed",
-                backgroundColor: "rgb(255, 99, 132)",
-                responsive: true,
-              },
-            ],
-          }}
-        />
+        <Line data={line("# of Participants Registered", perDay)} />
       </div>
-
       <div>
-        <Line data={totalParticipantsData} />
+        <Line data={line("Total Participants Registered", cumulative)} />
       </div>
-    </>
+    </Layout>
   );
 }
 

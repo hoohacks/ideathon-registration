@@ -22,11 +22,6 @@ function Search() {
   const [checkedInFilter, setCheckedInFilter] = useState("");
   const [dietaryFilter, setDietaryFilter] = useState("");
 
-  const handleMetricsClick = () => {
-    window.location.href =
-      "https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay";
-  };
-
   const [competitors, setCompetitors] = useState([]);
   const [showProgressBar, setShowProgressBar] = useState(false);
 
@@ -90,22 +85,6 @@ function Search() {
 
   return (
     <Layout>
-      <button
-        onClick={handleMetricsClick}
-        style={{
-          position: "fixed",
-          border: "1px solid white",
-          top: "20px",
-          left: "20px",
-          borderRadius: "12px",
-          backgroundColor: "#34a0a4",
-          color: "white",
-          zIndex: 1000,
-        }}
-      >
-        Metrics
-      </button>
-
       <h1 style={{ fontSize: "48px", textAlign: "center" }}>Admin Dashboard</h1>
       <p style={{ fontSize: "24px", textAlign: "center" }}>
         Total Signed-Up: {competitors.length} | Checked In: {checkedInCount} |

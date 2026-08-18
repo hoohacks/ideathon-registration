@@ -18,6 +18,8 @@ import "reactjs-popup/dist/index.css";
 
 export default function ForgotPasswordPage() {
     const [sentReset, setSentReset] = useState(false);
+    const [error, setError] = useState("");
+    const [sending, setSending] = useState(false);
 
     const theme = createTheme({
         palette: {
@@ -53,11 +55,23 @@ export default function ForgotPasswordPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (sending) return;
+        setSending(true);
+        setError("");
         try {
             await sendPasswordResetEmail(auth, formData.email);
             setSentReset(true);
-        } catch (error) {
-            console.error("Error sending password reset email:", error);
+        } catch (err) {
+            // this used to only reach the console, so a failed reset looked
+            // exactly like a successful one from the outside
+            console.error("Error sending password reset email:", err);
+            setError(
+                err.code === "auth/invalid-email"
+                    ? "That does not look like a valid email address."
+                    : "Could not send the reset email. Please check the address and try again."
+            );
+        } finally {
+            setSending(false);
         }
     };
 
@@ -127,9 +141,15 @@ export default function ForgotPasswordPage() {
                             fullWidth
                             variant="contained"
                             sx={{ mt: 3, mb: 2 }}
+                            disabled={sending}
                         >
-                            Send Reset Link
+                            {sending ? "Sending..." : "Send Reset Link"}
                         </Button>
+                        {error ? (
+                            <Typography color="error" variant="body2" sx={{ mb: 2 }}>
+                                {error}
+                            </Typography>
+                        ) : null}
                     </Box>
                 </Box>
             </Container>
