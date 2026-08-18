@@ -117,6 +117,7 @@ const Registration = () => {
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorString, setErrorString] = useState("");
 
   const changeResumeHandle = (event) => {
     if (!event.target.files[0]) return;
@@ -139,9 +140,34 @@ const Registration = () => {
     setIsResumePicked(true);
   };
 
+  function firstProblem() {
+    // the form marks these required and renders red helper text for them, but
+    // nothing ever stopped a submission with them empty
+    const missing = [
+      ["first name", firstName],
+      ["last name", lastName],
+      ["email", email],
+      ["password", password],
+      ["major/intended major", major],
+      ["gender", gender],
+      ["skills", skills],
+      ["what you want to learn", learn],
+    ]
+      .filter(([, value]) => !String(value ?? "").trim())
+      .map(([label]) => label);
+
+    if (missing.length) {
+      return `Please fill in your ${missing.join(", ")} before submitting.`;
+    }
+    if (!isValidEmail) return "Please enter a valid email address.";
+    if (!isValidPassword) return "Your password must be at least 6 characters.";
+    return null;
+  }
+
   async function handleSubmit() {
-    // form validation
-    if (!isValidEmail || !isValidPassword) {
+    const problem = firstProblem();
+    if (problem) {
+      setErrorString(problem);
       setShowErrorPopup(true);
       return;
     }
@@ -158,7 +184,10 @@ const Registration = () => {
       );
       user = userCredential.user;
     } catch (error) {
-      alert("Error signing up. User already exists or email is invalid.");
+      setErrorString(
+        "Error signing up. An account with that email may already exist."
+      );
+      setShowErrorPopup(true);
       return;
     }
 
@@ -287,10 +316,7 @@ const Registration = () => {
               gap: "8px",
             }}
           >
-            <Typography>
-              Please enter a valid email and ensure your password is at least 6
-              characters.
-            </Typography>
+            <Typography>{errorString}</Typography>
             <Button
               sx={{
                 backgroundColor: "#f82249",

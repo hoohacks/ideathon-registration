@@ -157,7 +157,7 @@ const JudgeRegistration = () => {
   const [successRegistration, setSuccessRegistration] = useState(false);
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
-  const [errorString, setErrorString] = useState(false);
+  const [errorString, setErrorString] = useState("");
 
   async function handleSubmit() {
     const checkSlots = () => {
@@ -175,7 +175,23 @@ const JudgeRegistration = () => {
       }
       return true;
     };
-    // form validation
+    // the form marks these required but nothing enforced it before
+    const missing = [
+      ["first name", firstName],
+      ["last name", lastName],
+      ["email", email],
+      ["password", password],
+      ...(withCompany ? [["company", company]] : []),
+    ]
+      .filter(([, value]) => !String(value ?? "").trim())
+      .map(([label]) => label);
+
+    if (missing.length) {
+      setErrorString(`Please fill in your ${missing.join(", ")} before submitting.`);
+      setShowErrorPopup(true);
+      return;
+    }
+
     if (!isValidEmail || !isValidPassword) {
       setErrorString(
         "Please enter a valid email and ensure your password is at least 6 characters."
