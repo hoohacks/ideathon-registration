@@ -381,9 +381,9 @@ const JudgeRegistration = () => {
                   students with business experience build their technical
                   business ideas together. Mentors help our students form their
                   ideas and craft a pitch throughout the day in minimum 2-hour
-                  shifts. Judges will evaluate and score the teams’ pitches from
+                  shifts. Judges will evaluate and score the teams’ pitches from{" "}
                   {EVENT.judgingHours}. We would appreciate it if you could be a
-                  mentor and/or judge! The event itself is {EVENT.dateLabel}
+                  mentor and/or judge! The event itself is {EVENT.dateLabel}{" "}
                   from {EVENT.hours} at {EVENT.venue}, but you do not have to
                   stay for the entire event! Fill out this form if you would
                   like to help out. Thank you!
