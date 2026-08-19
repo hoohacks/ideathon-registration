@@ -1,49 +1,93 @@
-import "./ScheduleCard.css";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import {
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  MenuItem,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { IoInformationCircleOutline } from "react-icons/io5";
 
 const rubric = {
   problem: {
     label: "Problem",
     range: 10,
-    desc: `• Does the submission identify and describe an addressable need, want, problem, and/or opportunity in society?
-• Does the submission identify a target customer base?`,
+    desc: "Does the submission identify and describe an addressable need, want, problem or opportunity in society? Does it identify a target customer base?",
   },
   innovation: {
     label: "Innovation",
     range: 10,
-    desc: `• Does the submission present a novel, original, and compelling solution, whether product or service, for addressing some need, want, problem, and/or opportunity in the world?
-• Does the submission describe the alternative solutions while making a compelling case on how their idea is an improvement over these alternatives?`,
+    desc: "Does the submission present a novel, original and compelling solution? Does it describe the alternatives while making a compelling case for how their idea improves on them?",
   },
   impact: {
     label: "Impact",
     range: 10,
-    desc: `• Does the submission discuss the impact it will make? How large of an impact?
-• How strongly did the submission discuss how stakeholders and potential users/customers/beneficiaries could potentially benefit from this idea`,
+    desc: "Does the submission discuss the impact it will make, and how large? How strongly did it cover how stakeholders and potential users could benefit?",
   },
   viability: {
     label: "Viability",
     range: 5,
-    desc: `• Is the submission feasible? How hard would it be to implement?
-• How strongly did the submission understand, address, and incorporate risks, cost, timeframe, or measures of success?`,
+    desc: "Is the submission feasible, and how hard would it be to implement? How well did it address risks, cost, timeframe or measures of success?",
   },
   pitch_quality: {
-    label: "Pitch Quality",
+    label: "Pitch quality",
     range: 5,
-    desc: `• How well did they present? Were they confident? Did they have a professional presentation?
-• Did they have appropriate evidence and information to support their idea?`,
-  },
-  fundable: {
-    label: "Fundable",
-    yesNo: true,
-    desc: `Is this an idea that would greatly benefit from funding given by HooHacks?`,
+    desc: "How well did they present? Were they confident and professional? Did they have appropriate evidence to support their idea?",
   },
 };
 
+const MAX_TOTAL = Object.values(rubric).reduce((sum, f) => sum + f.range, 0);
+
+function Criterion({ field, spec, value, onChange }) {
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+        <Typography variant="body1">{spec.label}</Typography>
+        <Tooltip title={spec.desc} enterTouchDelay={0}>
+          <Box
+            component="span"
+            sx={{ display: "flex", color: "text.secondary", cursor: "help", fontSize: "1rem" }}
+          >
+            <IoInformationCircleOutline />
+          </Box>
+        </Tooltip>
+      </Stack>
+
+      <TextField
+        select
+        name={field}
+        value={value}
+        onChange={onChange}
+        sx={{ width: 104 }}
+        // the maximum sits under the field, so a 5-point criterion cannot be
+        // mistaken for a 10-point one at a glance
+        helperText={`of ${spec.range}`}
+        FormHelperTextProps={{ sx: { textAlign: "right", mr: 0 } }}
+      >
+        {Array.from({ length: spec.range }, (_, i) => String(i + 1)).map((n) => (
+          <MenuItem key={n} value={n}>
+            {n}
+          </MenuItem>
+        ))}
+      </TextField>
+    </Stack>
+  );
+}
 
 function ScoreSubmission({
-  teamName = "Team Name",
-  room = "Room 101",
-  time = "10:00 AM",
+  teamName = "Team",
+  room = "TBD",
+  time = "TBD",
   submitting = false,
   onClose = () => {},
   onSubmit = () => {},
@@ -52,16 +96,19 @@ function ScoreSubmission({
     problem: "5",
     innovation: "5",
     impact: "5",
-    viability: "5",
-    pitch_quality: "5",
+    viability: "3",
+    pitch_quality: "3",
     fundable: "yes",
     notes: "",
   });
-  const dialogRef = useRef(null);
-  const scoreOptions = (n) => Array.from({ length: n }, (_, i) => String(i + 1));
 
   const [busy, setBusy] = useState(false);
   const inFlight = submitting || busy;
+
+  const runningTotal = Object.keys(rubric).reduce(
+    (sum, field) => sum + Number(values[field] || 0),
+    0
+  );
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -72,6 +119,7 @@ function ScoreSubmission({
     e.preventDefault();
     // the write is async, so without this guard a double click writes twice
     if (inFlight) return;
+
     const score = {
       problem: Number(values.problem),
       innovation: Number(values.innovation),
@@ -84,189 +132,87 @@ function ScoreSubmission({
       room,
       time,
     };
+
     setBusy(true);
     try {
       await onSubmit(score);
     } finally {
-      // if the parent failed it keeps the modal open, so re-enable the button
+      // if the parent failed it keeps the dialog open, so re-enable the button
       setBusy(false);
     }
   }
 
   return (
-    <div
-      className="score-modal-overlay"
-      aria-hidden="false"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="score-modal-title"
-    >
-      <div className="score-modal__dialog" ref={dialogRef}>
-        <header className="score-modal__header">
-          <h2 id="score-modal-title" className="score-modal__title">
-            Score Submission
-          </h2>
-          <button
-            className="score-modal__close"
-            onClick={onClose}
-            aria-label="Close"
-            type="button"
-            disabled={inFlight}
-          >
-            ×
-          </button>
-        </header>
+    <Dialog open onClose={inFlight ? undefined : onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Typography variant="h3" component="div">
+          {teamName}
+        </Typography>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <Chip label={time} size="small" variant="outlined" />
+          <Chip label={room} size="small" variant="outlined" />
+        </Stack>
+      </DialogTitle>
 
-        <div className="score-modal__body">
-          <div className="score-modal-team-info">
-            <span className="score-chip">{teamName}</span>
-            <span className="score-chip">{room}</span>
-            <span className="score-chip">{time}</span>
-          </div>
-
-          <form className="score-modal__form" onSubmit={handleSubmit}>
-            <label className="score-field">
-              <span>{rubric.problem.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.problem.desc}</div>
-              </details>              
-              <select
-                name="problem"
-                value={values.problem}
+      <Box component="form" onSubmit={handleSubmit}>
+        <DialogContent dividers sx={{ py: 2 }}>
+          <Stack spacing={1.75}>
+            {Object.entries(rubric).map(([field, spec]) => (
+              <Criterion
+                key={field}
+                field={field}
+                spec={spec}
+                value={values[field]}
                 onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.problem.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.innovation.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.innovation.desc}</div>
-              </details>
-              <select
-                name="innovation"
-                value={values.innovation}
-                onChange={handleChange}
-                required
-              >
-                {scoreOptions(rubric.innovation.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.impact.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.impact.desc}</div>
-              </details>              
-              <select
-                name="impact"
-                value={values.impact}
-                onChange={handleChange}
-                required
-              >
-                {scoreOptions(rubric.impact.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.viability.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.viability.desc}</div>
-              </details>
-              <select
-                name="viability"
-                value={values.viability}
-                onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.viability.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.pitch_quality.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.pitch_quality.desc}</div>
-              </details>
-              <select
-                name="pitch_quality"
-                value={values.pitch_quality}
-                onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.pitch_quality.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.fundable.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.fundable.desc}</div>
-              </details>
-              <div role="radiogroup" aria-label="Fundable" style={{ display: "flex", gap: 12 }}>
-                <label>
-                  <input
-                    type="radio"
-                    name="fundable"
-                    value="yes"
-                    checked={values.fundable === "yes"}
-                    onChange={handleChange}
-                  />{" "}
-                  Yes
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="fundable"
-                    value="no"
-                    checked={values.fundable === "no"}
-                    onChange={handleChange}
-                  />{" "}
-                  No
-                </label>
-              </div>
-            </label>
-            <label className="score-field score-field--textarea">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                value={values.notes}
-                onChange={handleChange}
-                placeholder="Optional notes for judges…"
-                rows={4}
               />
-            </label>
+            ))}
 
-            <div className="score-modal__actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={onClose}
-                disabled={inFlight}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn--primary"
-                disabled={inFlight}
-              >
-                {inFlight ? "Submitting..." : "Submit Score"}
-              </button>
-            </div>
-          </form>
-        </div>
+            <Divider />
 
-      </div>
-    </div>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="body1">Worth funding?</Typography>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={values.fundable}
+                onChange={(_, next) => next && setValues((v) => ({ ...v, fundable: next }))}
+              >
+                <ToggleButton value="yes" sx={{ px: 2 }}>
+                  Yes
+                </ToggleButton>
+                <ToggleButton value="no" sx={{ px: 2 }}>
+                  No
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
+
+            <TextField
+              name="notes"
+              label="Notes (optional)"
+              value={values.notes}
+              onChange={handleChange}
+              multiline
+              minRows={2}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+          <Typography variant="body2">
+            Total {runningTotal} / {MAX_TOTAL}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={onClose} disabled={inFlight} variant="outlined">
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={inFlight}>
+              {inFlight ? "Submitting…" : "Submit score"}
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Box>
+    </Dialog>
   );
 }
 

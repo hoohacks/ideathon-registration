@@ -1,54 +1,56 @@
 import React from "react";
-import "./ScheduleCard.css";
+import { Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 
 /**
- * ScheduleCard
+ * One judging assignment.
+ *
  * Props:
- * - teamId: string (the database key -- team names are not unique, so scoring
- *   must be keyed off this rather than the name)
- * - teamName: string
- * - room: string
- * - time: string
- * - onButtonClick: function
+ * - teamId: the database key. Team names are not unique, so scoring keys off
+ *   this rather than the name.
  */
 function ScheduleCard({
   teamId = null,
-  teamName = "Team Name",
-  room = "Room 101",
-  time = "10:00 AM",
+  teamName = "Team",
+  room = "TBD",
+  time = "TBD",
   onButtonClick = () => {},
   disabled = false,
 }) {
   return (
-    <div
-      className="schedule-card"
-      role="article"
-      aria-label={`Schedule for ${teamName}`}
-    >
-      <div className="schedule-card__content">
-        <div className="schedule-card__title">{teamName}</div>
-        <div className="schedule-card__meta">
-          <div className="schedule-card__field">
-            <span className="label">Room:</span> {room}
-          </div>
-          <div className="schedule-card__field">
-            <span className="label">Time:</span> {time}
-          </div>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        className={`schedule-card__button ${disabled ? "is-disabled" : ""}`}
-        onClick={(e) => {
-          if (!disabled) onButtonClick({ teamId, teamName, room, time, event: e });
+    <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <CardContent
+        sx={{
+          p: 2,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          "&:last-child": { pb: 2 },
         }}
-        disabled={disabled}
-        aria-disabled={disabled}
       >
-        {disabled ? "Scored" : "Score this Team"}
-      </button>
-    </div>
+        <Stack spacing={0.75}>
+          <Typography variant="h5" sx={{ lineHeight: 1.3 }}>
+            {teamName}
+          </Typography>
+          <Stack direction="row" spacing={0.75}>
+            <Chip label={time} size="small" variant="outlined" />
+            <Chip label={room} size="small" variant="outlined" />
+          </Stack>
+        </Stack>
+
+        <Button
+          fullWidth
+          variant={disabled ? "outlined" : "contained"}
+          disabled={disabled}
+          onClick={(e) => {
+            if (!disabled) onButtonClick({ teamId, teamName, room, time, event: e });
+          }}
+          sx={{ mt: "auto" }}
+        >
+          {disabled ? "Scored" : "Score team"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

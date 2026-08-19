@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  Divider,
+  Grid,
+  Snackbar,
+  Stack,
+  Typography,
+} from "@mui/material";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
-import GenerateSchedule from "./GenerateSchedule";
 import { getJudgeSchedule } from "./getJudgeSchedule";
 import { getPersonalSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
-import "./Assigments.css";
 import {
   findTeamIdByName,
   writeTeamScore,
@@ -20,10 +29,23 @@ import {
   subscribeToFinalRoundState,
 } from "./finalRoundService";
 
+function Section({ title, caption, children }) {
+  return (
+    <Box>
+      <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1.5 }}>
+        <Typography variant="h2">{title}</Typography>
+        {caption && <Typography variant="body2">{caption}</Typography>}
+      </Stack>
+      {children}
+    </Box>
+  );
+}
+
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
 
   function openFor(card) {
     setSelected(card);
@@ -42,9 +64,7 @@ function Assignments() {
   // scored teams are tracked by database id, never by name -- team names are
   // not unique and would collide
   const [scoredTeamIds, setScoredTeamIds] = useState(() => new Set());
-  const [finalRoundScoredTeamIds, setFinalRoundScoredTeamIds] = useState(
-    () => new Set()
-  );
+  const [finalRoundScoredTeamIds, setFinalRoundScoredTeamIds] = useState(() => new Set());
   const [finalRoundState, setFinalRoundState] = useState({ active: false });
   const [finalRoundLoading, setFinalRoundLoading] = useState(true);
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
@@ -119,7 +139,7 @@ function Assignments() {
 
   async function handleDeactivateFinalRound() {
     const confirmed = window.confirm(
-      "Deactivate final round judging? This will hide final-round assignments until reactivated."
+      "Deactivate final round judging? This hides final-round assignments until reactivated."
     );
     if (!confirmed) return;
 
@@ -144,20 +164,18 @@ function Assignments() {
       if (!teamName) throw new Error("No team selected");
 
       const isFinalRound = selected?.round === "final";
-      const alreadyScored = isFinalRound
-        ? finalRoundScoredTeamIds
-        : scoredTeamIds;
+      const alreadyScored = isFinalRound ? finalRoundScoredTeamIds : scoredTeamIds;
 
       // schedules written before assignments carried an id fall back to a name
       // lookup, which is why duplicate team names are worth avoiding
       const teamId = selected?.teamId ?? (await findTeamIdByName(teamName));
       if (!teamId) {
-        alert(`Could not find "${teamName}" in the database.`);
+        setToast({ severity: "error", message: `Could not find "${teamName}" in the database.` });
         return;
       }
 
       if (alreadyScored.has(teamId)) {
-        alert(`You already submitted a score for ${teamName}`);
+        setToast({ severity: "warning", message: `You already scored ${teamName}.` });
         return;
       }
 
@@ -169,11 +187,11 @@ function Assignments() {
         setScoredTeamIds((prev) => new Set(prev).add(teamId));
       }
 
-      alert(`Submitted scores for ${teamName}`);
+      setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
       closeModal();
     } catch (e) {
       console.error(e);
-      alert(`Failed to submit score: ${e.message}`);
+      setToast({ severity: "error", message: `Could not submit: ${e.message}` });
     } finally {
       setSubmitting(false);
     }
@@ -202,9 +220,7 @@ function Assignments() {
 
   const finalAssignmentsForJudge = useMemo(() => {
     if (!finalRoundTeams.length || !currentUserId) return [];
-    return finalRoundTeams.filter(
-      (team) => !team.excludedJudges?.[currentUserId]
-    );
+    return finalRoundTeams.filter((team) => !team.excludedJudges?.[currentUserId]);
   }, [finalRoundTeams, currentUserId]);
 
   const finalRoundTeamIdsForJudge = useMemo(
@@ -234,141 +250,182 @@ function Assignments() {
   }, [finalRoundState?.active, finalRoundTeamIdsForJudge]);
 
   const stats = generateResult?.ok ? generateResult.stats : null;
+  const remaining = personalAssignments.filter((a) => !scoredTeamIds.has(a.id)).length;
 
   return (
-    <Layout>
-      <div className="judging-page">
-        <h1>Judge Assignments</h1>
+    <Layout maxWidth="lg">
+      <Stack spacing={3}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          spacing={1}
+        >
+          <Typography variant="h1">Judging</Typography>
+          {canViewAssignments && personalAssignments.length > 0 && (
+            <Typography variant="body2">
+              {remaining === 0
+                ? "All teams scored"
+                : `${remaining} of ${personalAssignments.length} left to score`}
+            </Typography>
+          )}
+        </Stack>
+
         {canManageSchedule && (
-          <>
-            <div className="assignments__admin-controls">
-              <GenerateSchedule
-                onButtonClick={handleGenerateClick}
-                busy={generating}
-                generated={Boolean(generateResult?.ok)}
-              />
+          <Card sx={{ p: 2 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "stretch", sm: "center" }}
+            >
+              <Typography variant="h5" sx={{ flex: 1 }}>
+                Run of show
+              </Typography>
+              <Button variant="contained" onClick={handleGenerateClick} disabled={generating}>
+                {generating
+                  ? "Generating…"
+                  : generateResult?.ok
+                  ? "Regenerate schedule"
+                  : "Generate schedule"}
+              </Button>
               {finalRoundState?.active ? (
-                <>
-                  <button
-                    type="button"
-                    className="assignments__toggle-button assignments__toggle-button--disabled"
-                    disabled
-                  >
-                    Final Round Active
-                  </button>
-                  <button
-                    type="button"
-                    className="assignments__toggle-button assignments__toggle-button--danger"
-                    onClick={handleDeactivateFinalRound}
-                    disabled={togglingFinalRound || finalRoundLoading}
-                  >
-                    Deactivate Final Round
-                  </button>
-                </>
+                <Button
+                  variant="outlined"
+                  onClick={handleDeactivateFinalRound}
+                  disabled={togglingFinalRound || finalRoundLoading}
+                >
+                  Deactivate final round
+                </Button>
               ) : (
-                <button
-                  type="button"
-                  className="assignments__toggle-button"
+                <Button
+                  variant="outlined"
                   onClick={handleActivateFinalRound}
                   disabled={togglingFinalRound || finalRoundLoading}
                 >
-                  Activate Final Round
-                </button>
+                  Activate final round
+                </Button>
               )}
-            </div>
-            {generateResult && !generateResult.ok && (
-              <p className="assignments__error">{generateResult.error}</p>
+            </Stack>
+
+            {(generateResult || finalRoundError || finalRoundState?.active) && (
+              <Stack spacing={1} sx={{ mt: 2 }}>
+                {finalRoundState?.active && (
+                  <Alert severity="info">Final round is active.</Alert>
+                )}
+                {generateResult && !generateResult.ok && (
+                  <Alert severity="error">{generateResult.error}</Alert>
+                )}
+                {generateResult?.warnings?.map((warning) => (
+                  <Alert severity="warning" key={warning}>
+                    {warning}
+                  </Alert>
+                ))}
+                {stats && (
+                  <Alert severity="success">
+                    Scheduled {stats.teams} teams across {stats.judges} judges in batches of{" "}
+                    {stats.batchSizes.join(" / ")}, using {stats.roomsUsed} rooms. Each team
+                    sees{" "}
+                    {stats.minJudgesPerTeam === stats.maxJudgesPerTeam
+                      ? stats.minJudgesPerTeam
+                      : `${stats.minJudgesPerTeam}–${stats.maxJudgesPerTeam}`}{" "}
+                    judges.
+                  </Alert>
+                )}
+                {finalRoundError && <Alert severity="error">{finalRoundError}</Alert>}
+              </Stack>
             )}
-            {generateResult?.warnings?.map((warning) => (
-              <p className="assignments__warning" key={warning}>
-                {warning}
-              </p>
-            ))}
-            {stats && (
-              <p className="assignments__notice">
-                Scheduled {stats.teams} teams across {stats.judges} judges in
-                batches of {stats.batchSizes.join(" / ")}, using{" "}
-                {stats.roomsUsed} rooms. Each team sees{" "}
-                {stats.minJudgesPerTeam === stats.maxJudgesPerTeam
-                  ? stats.minJudgesPerTeam
-                  : `${stats.minJudgesPerTeam}-${stats.maxJudgesPerTeam}`}{" "}
-                judges.
-              </p>
-            )}
-            {finalRoundError && (
-              <p className="assignments__error">{finalRoundError}</p>
-            )}
-          </>
+          </Card>
         )}
+
         {canViewAssignments && (
           <>
-            <div className="assignments__section">
-              <h2 className="assignments__subheader">First Round</h2>
-              <div className="assignments__row">
-                {loadingAssignments ? (
-                  <div>Loading your assignments...</div>
-                ) : personalAssignments.length === 0 ? (
-                  <div>No assignments yet</div>
-                ) : (
-                  personalAssignments.map((assignment, idx) => (
-                    <ScheduleCard
-                      key={assignment.id ?? `${assignment.teamName}-${idx}`}
-                      teamId={assignment.id}
-                      teamName={assignment.teamName}
-                      room={assignment.room}
-                      time={assignment.time}
-                      onButtonClick={(card) => openFor({ ...card, round: "first" })}
-                      disabled={scoredTeamIds.has(assignment.id)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
+            <Section title="First round">
+              {loadingAssignments ? (
+                <Typography variant="body2">Loading your assignments…</Typography>
+              ) : personalAssignments.length === 0 ? (
+                <Card sx={{ p: 3 }}>
+                  <Typography variant="body2" align="center">
+                    No assignments yet. They appear once an admin generates the schedule.
+                  </Typography>
+                </Card>
+              ) : (
+                <Grid container spacing={2}>
+                  {personalAssignments.map((assignment, idx) => (
+                    <Grid item xs={12} sm={6} md={4} key={assignment.id ?? `${assignment.teamName}-${idx}`}>
+                      <ScheduleCard
+                        teamId={assignment.id}
+                        teamName={assignment.teamName}
+                        room={assignment.room}
+                        time={assignment.time}
+                        onButtonClick={(card) => openFor({ ...card, round: "first" })}
+                        disabled={scoredTeamIds.has(assignment.id)}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Section>
+
             {finalRoundState?.active && (
               <>
-                <hr className="assignments__divider" />
-                <div className="assignments__section">
-                  <h2 className="assignments__subheader">Final Round</h2>
-                  <div className="assignments__row">
-                    {finalAssignmentsForJudge.length === 0 ? (
-                      <div>No final round assignments for you.</div>
-                    ) : (
-                      finalAssignmentsForJudge.map((team) => (
-                        <ScheduleCard
-                          key={`final-${team.teamId}`}
-                          teamId={team.teamId}
-                          teamName={team.name}
-                          room={team.room}
-                          time={team.timeslot}
-                          disabled={finalRoundScoredTeamIds.has(team.teamId)}
-                          onButtonClick={(card) =>
-                            openFor({ ...card, round: "final" })
-                          }
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
+                <Divider />
+                <Section title="Final round">
+                  {finalAssignmentsForJudge.length === 0 ? (
+                    <Card sx={{ p: 3 }}>
+                      <Typography variant="body2" align="center">
+                        No final round assignments for you.
+                      </Typography>
+                    </Card>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {finalAssignmentsForJudge.map((team) => (
+                        <Grid item xs={12} sm={6} md={4} key={`final-${team.teamId}`}>
+                          <ScheduleCard
+                            teamId={team.teamId}
+                            teamName={team.name}
+                            room={team.room}
+                            time={team.timeslot}
+                            disabled={finalRoundScoredTeamIds.has(team.teamId)}
+                            onButtonClick={(card) => openFor({ ...card, round: "final" })}
+                          />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  )}
+                </Section>
               </>
             )}
           </>
         )}
+
         {!canViewAssignments && !canManageSchedule && (
-          <p className="assignments__empty">
-            You do not have assigned judging duties.
-          </p>
+          <Typography variant="body2">You do not have assigned judging duties.</Typography>
         )}
-        {modalOpen && selected && (
-          <ScoreSubmission
-            teamName={selected.teamName}
-            room={selected.room}
-            time={selected.time}
-            submitting={submitting}
-            onClose={closeModal}
-            onSubmit={handleSubmit}
-          />
-        )}
-      </div>
+      </Stack>
+
+      {modalOpen && selected && (
+        <ScoreSubmission
+          teamName={selected.teamName}
+          room={selected.room}
+          time={selected.time}
+          submitting={submitting}
+          onClose={closeModal}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      <Snackbar
+        open={Boolean(toast)}
+        autoHideDuration={4000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        {toast ? (
+          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
+            {toast.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Layout>
   );
 }
