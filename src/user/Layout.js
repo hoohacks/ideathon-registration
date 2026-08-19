@@ -1,33 +1,40 @@
-import { Box, Container, Typography } from "@mui/material";
-import Nav from "./Nav";
-import { EVENT } from "../eventInfo";
+import { Box, Container } from "@mui/material";
+import Nav from "../siteNav";
+import PageFooter from "../siteFooter";
 
 /**
- * Page frame. The old version pinned main to a fixed 800px, which left the
- * admin tables cramped on a laptop and the short forms adrift on a wide screen.
- * Pages now pick their own width via `maxWidth`.
+ * Page frame for the signed-in portal. The old version pinned main to a fixed
+ * 800px, which left the admin tables cramped on a laptop and the short forms
+ * adrift on a wide screen. Pages now pick their own width via `maxWidth`.
+ *
+ * `bleed` is for the one page that wants the whole viewport: the check-in
+ * scanner runs edge to edge and dark.
  */
-function Layout({ children, maxWidth = "md" }) {
+function Layout({ children, maxWidth = "md", bleed = false }) {
     return (
-        <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
+        <Box
+            sx={{
+                minHeight: "100vh",
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "background.default",
+            }}
+        >
             <Nav />
-            <Container
-                component="main"
-                maxWidth={maxWidth}
-                sx={{ flex: 1, width: "100%", py: { xs: 3, sm: 4 } }}
-            >
-                {children}
-            </Container>
-            <Box
-                component="footer"
-                sx={{ borderTop: 1, borderColor: "divider", py: 2.5, mt: 4 }}
-            >
-                <Container maxWidth={maxWidth}>
-                    <Typography variant="body2" align="center">
-                        © {EVENT.year} HooHacks · {EVENT.name}
-                    </Typography>
+            {bleed ? (
+                <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    {children}
+                </Box>
+            ) : (
+                <Container
+                    component="main"
+                    maxWidth={maxWidth}
+                    sx={{ flex: 1, width: "100%", py: { xs: 3, sm: 4 } }}
+                >
+                    {children}
                 </Container>
-            </Box>
+            )}
+            {!bleed && <PageFooter maxWidth={maxWidth} />}
         </Box>
     );
 }

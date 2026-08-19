@@ -14,12 +14,23 @@ service firebase.storage {
     // the person has an account, so this cannot require auth. That means an
     // anonymous write endpoint, which is why it is capped hard and pinned to
     // document types. See the README for the alternative.
-    match /ideathon-resume-2025/{year}/{fileName} {
+    //
+    // The event year is a path segment rather than part of the folder name.
+    // The old rule hardcoded /ideathon-resume-2025/, while the form uploads to
+    // the current EVENT.year -- so every upload this year would have been
+    // rejected, and the form would have quietly registered people without the
+    // resume they attached.
+    match /ideathon-resumes/{eventYear}/{gradYear}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.resource.size < 5 * 1024 * 1024
                    && (request.resource.contentType.matches('application/pdf')
                        || request.resource.contentType.matches('application/msword')
                        || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*'));
+    }
+
+    // Resumes uploaded under the old layout, kept readable for admins.
+    match /ideathon-resume-2025/{gradYear}/{fileName} {
+      allow read: if request.auth != null;
     }
 
     // Pitch decks are uploaded from the team page by a signed-in member.

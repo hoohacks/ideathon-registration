@@ -58,7 +58,7 @@ jest.mock("firebase/storage", () => ({
 jest.mock("react-zxing", () => ({ useZxing: () => ({ ref: { current: null } }) }));
 
 // chart.js draws to a canvas, which jsdom does not implement
-jest.mock("react-chartjs-2", () => ({ Line: () => null }));
+jest.mock("react-chartjs-2", () => ({ Line: () => null, Bar: () => null }));
 
 // ---- Helpers --------------------------------------------------------------
 
@@ -98,6 +98,7 @@ const Search = require("./user/admin/Search").default;
 const JudgeSearch = require("./user/admin/JudgeSearch").default;
 const TeamSearch = require("./user/admin/TeamSearch").default;
 const Metrics = require("./RegisteredAtDisplay").default;
+const Scan = require("./user/admin/Scan").default;
 const Login = require("./Login").default;
 const ForgotPassword = require("./ForgotPassword").default;
 
@@ -167,6 +168,19 @@ describe("pages render without crashing", () => {
   test("metrics", async () => {
     renderPage(Metrics, { userTypes: ["admin"] });
     expect(await screen.findByRole("heading", { name: "Registration Metrics" })).toBeInTheDocument();
+  });
+
+  test("check-in scanner", async () => {
+    renderPage(Scan, { userTypes: ["admin"] });
+    expect(await screen.findByRole("heading", { name: "Scan check-in" })).toBeInTheDocument();
+    // the two things it can record, and the camera it records them with
+    expect(screen.getByRole("button", { name: "Event" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Food" })).toBeInTheDocument();
+  });
+
+  test("metrics with no registrations invites rather than showing empty axes", async () => {
+    renderPage(Metrics, { userTypes: ["admin"] });
+    expect(await screen.findByText(/No registrations yet/)).toBeInTheDocument();
   });
 
   test("login", async () => {

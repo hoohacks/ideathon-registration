@@ -36,6 +36,30 @@ alternative is to hold the file in memory and upload it after
 `createUserWithEmailAndPassword` succeeds, which would let that rule require
 auth; that has not been done here.
 
+Uploads go to `ideathon-resumes/{eventYear}/{graduationYear}/{file}`. The event
+year is a path segment rather than part of the folder name, because a Storage
+wildcard has to be a whole segment: the rule used to hardcode
+`ideathon-resume-2025` while the form uploaded to the current `EVENT.year`, so
+every upload after the 2025 event would have been rejected and the form would
+have registered people without the resume they attached. **Republish
+`storage.rules` after upgrading**, or resume uploads will fail.
+
+### About autofill
+
+The two registration forms are controlled React forms, and Chrome writes a saved
+profile straight into the DOM. If it does that before React attaches its
+listeners -- the normal case for a saved password on page load -- no change event
+is dispatched, React state stays empty, and the form refuses to submit while
+pointing at fields that are visibly full.
+
+`src/formKit.js` fixes that by letting the DOM have the last word: it re-reads
+the fields on mount, whenever the `onAutofill` keyframe in `index.css` fires
+(the only signal a browser gives that it filled something), on the first focus
+inside the form, and immediately before submitting. That last one is the
+backstop; the earlier ones exist because a controlled input whose value React has
+not seen gets wiped on the next render. If you rename that keyframe, rename it in
+both places.
+
 ## Schema
 
 ```

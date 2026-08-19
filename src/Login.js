@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   Checkbox,
-  Container,
   FormControlLabel,
   Link,
   Stack,
@@ -16,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { EVENT } from "./eventInfo";
+import { PublicShell } from "./registrationUi";
 
 export default function LoginPage() {
   const { handleLogin } = useAuth();
@@ -53,19 +53,14 @@ export default function LoginPage() {
   };
 
   return (
-    <Container maxWidth="xs" sx={{ py: { xs: 6, sm: 10 } }}>
-      <Box sx={{ mb: 3, textAlign: "center" }}>
-        <Typography variant="h1">{EVENT.name}</Typography>
-        <Typography variant="body2" sx={{ mt: 0.5 }}>
-          {EVENT.dateLabel}
-        </Typography>
-      </Box>
-
+    <PublicShell maxWidth="xs" pad>
       <Card>
         <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-          <Typography variant="h3" gutterBottom>
+          {/* the bar carries the wordmark, so the page says what it is for */}
+          <Typography variant="h1" gutterBottom>
             Sign in
           </Typography>
+          <Typography variant="body2">{EVENT.dateLabel}</Typography>
 
           <Box component="form" onSubmit={handleSubmit}>
             <Stack spacing={2} sx={{ mt: 2 }}>
@@ -128,6 +123,6 @@ export default function LoginPage() {
           </Box>
         </CardContent>
       </Card>
-    </Container>
+    </PublicShell>
   );
 }

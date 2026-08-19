@@ -5,7 +5,6 @@ import {
     Button,
     Card,
     CardContent,
-    Container,
     Link,
     Stack,
     TextField,
@@ -13,7 +12,7 @@ import {
 } from "@mui/material";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "./firebase";
-import { EVENT } from "./eventInfo";
+import { PublicShell } from "./registrationUi";
 
 export default function ForgotPasswordPage() {
     const [sentReset, setSentReset] = useState(false);
@@ -44,14 +43,10 @@ export default function ForgotPasswordPage() {
     };
 
     return (
-        <Container maxWidth="xs" sx={{ py: { xs: 6, sm: 10 } }}>
-            <Box sx={{ mb: 3, textAlign: "center" }}>
-                <Typography variant="h1">{EVENT.name}</Typography>
-            </Box>
-
+        <PublicShell maxWidth="xs" pad>
             <Card>
                 <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-                    <Typography variant="h3">Reset password</Typography>
+                    <Typography variant="h1">Reset password</Typography>
 
                     {sentReset ? (
                         <Stack spacing={2} sx={{ mt: 2 }}>
@@ -93,6 +88,6 @@ export default function ForgotPasswordPage() {
                     )}
                 </CardContent>
             </Card>
-        </Container>
+        </PublicShell>
     );
 }

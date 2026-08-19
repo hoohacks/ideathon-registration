@@ -17,17 +17,31 @@ import {
 } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { IoChevronDown, IoMenu, IoClose } from "react-icons/io5";
-import { AuthContext } from "../App";
-import { auth } from "../firebase";
+import { AuthContext } from "./App";
+import { auth } from "./firebase";
+import { tokens } from "./theme";
 
 /**
- * Primary links stay as plain text. Admin pages collapse into one menu, and
- * the account sits on the far right behind an avatar.
+ * The one bar for the whole site. It used to live under user/ and serve only
+ * the signed-in pages, while the two registration forms carried a second bar of
+ * their own; they drifted, and someone arriving from the marketing site met a
+ * different header depending on which page they landed on.
  *
- * The previous version put all ten destinations in a single flat row, each
- * with an icon from a different icon set at the same weight as its label,
- * which read as noise rather than navigation.
+ * `variant="public"` is the signed-out form: wordmark and a way in, nothing
+ * else. Everything below is shared.
+ *
+ * Primary links stay as plain text. Admin pages collapse into one menu, and the
+ * account sits on the far right behind an avatar. The previous version put all
+ * ten destinations in a single flat row, each with an icon from a different icon
+ * set at the same weight as its label, which read as noise rather than
+ * navigation.
  */
+
+// The logo is two inks on transparency, crimson and white, so it needs the dark
+// bar under it -- on white, half the word disappears.
+export const LOGO_SRC = `${process.env.PUBLIC_URL ?? ""}/ideathon-logo.png`;
+const LOGO_RATIO = 768 / 227;
+
 const PRIMARY = [
     { to: "/user/home", label: "Home" },
     { to: "/user/judging", label: "Judging", roles: ["judge", "admin"] },
@@ -49,6 +63,28 @@ function initialsOf(userData) {
     return (first + last).toUpperCase() || "?";
 }
 
+export function Wordmark({ height = 30, to = "/user/home", href }) {
+    const image = (
+        <Box
+            component="img"
+            src={LOGO_SRC}
+            alt="Ideathon"
+            sx={{ display: "block", height, width: height * LOGO_RATIO }}
+        />
+    );
+    const sx = { display: "flex", alignItems: "center", lineHeight: 0, flexShrink: 0 };
+    return href ? (
+        <Box component="a" href={href} sx={sx}>
+            {image}
+        </Box>
+    ) : (
+        <Box component={Link} to={to} sx={sx}>
+            {image}
+        </Box>
+    );
+}
+
+/** The underline is pinned to the bottom of the bar, so it reads as a tab. */
 function TopLink({ to, label, active }) {
     return (
         <Box
@@ -63,17 +99,15 @@ function TopLink({ to, label, active }) {
                 fontSize: "0.9375rem",
                 fontWeight: active ? 600 : 500,
                 textDecoration: "none",
-                color: active ? "text.primary" : "text.secondary",
-                "&:hover": { color: "text.primary" },
-                // a 2px rule pinned to the bottom of the bar, rather than a
-                // grey pill that barely reads against white
+                color: active ? tokens.ON_NIGHT : tokens.ON_NIGHT_MUTED,
+                "&:hover": { color: tokens.ON_NIGHT },
                 "&::after": active
                     ? {
                           content: '""',
                           position: "absolute",
                           left: 12,
                           right: 12,
-                          bottom: -1,
+                          bottom: 0,
                           height: 2,
                           borderRadius: 1,
                           bgcolor: "primary.main",
@@ -86,7 +120,13 @@ function TopLink({ to, label, active }) {
     );
 }
 
-function Nav() {
+// PaperProps, not slotProps: MUI only taught Menu and Drawer about slotProps
+// in 5.15 and this project is on 5.10, so the whole object was being dropped --
+// which is why the menus had no outline and the drawer no width.
+const menuPaper = { variant: "outlined", sx: { minWidth: 200, mt: 0.5 } };
+
+function Nav({ variant = "app" }) {
+    const isPublic = variant === "public";
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const context = useContext(AuthContext);
@@ -126,34 +166,51 @@ function Nav() {
 
     const fullName = [userData?.firstName, userData?.lastName].filter(Boolean).join(" ");
 
+    const onAuthPage = pathname.startsWith("/login") || pathname.startsWith("/forgot-password");
+
+    if (isPublic) {
+        return (
+            <AppBar position="sticky">
+                <Container maxWidth="lg">
+                    <Toolbar disableGutters sx={{ minHeight: { xs: 56, sm: 60 }, gap: 2 }}>
+                        <Wordmark height={30} href="https://ideathon.hoohacks.io" />
+                        <Box sx={{ flexGrow: 1 }} />
+                        {/* offer the door the person is not already standing in */}
+                        <Button
+                            component={Link}
+                            to={onAuthPage ? "/ideathon-registration" : "/login"}
+                            sx={{
+                                color: tokens.ON_NIGHT_MUTED,
+                                "&:hover": { color: tokens.ON_NIGHT, bgcolor: "transparent" },
+                            }}
+                        >
+                            {onAuthPage ? "Register" : "Sign in"}
+                        </Button>
+                    </Toolbar>
+                </Container>
+            </AppBar>
+        );
+    }
+
     return (
         <AppBar position="sticky">
             <Container maxWidth="lg">
                 <Toolbar disableGutters sx={{ minHeight: { xs: 56, sm: 60 }, gap: 1 }}>
                     <IconButton
                         onClick={() => setDrawerOpen(true)}
-                        sx={{ display: { xs: "inline-flex", md: "none" }, ml: -1 }}
+                        sx={{
+                            display: { xs: "inline-flex", md: "none" },
+                            ml: -1,
+                            color: tokens.ON_NIGHT,
+                        }}
                         aria-label="Open menu"
                     >
                         <IoMenu />
                     </IconButton>
 
-                    <Typography
-                        component={Link}
-                        to="/user/home"
-                        sx={{
-                            fontSize: "1.0625rem",
-                            fontWeight: 700,
-                            letterSpacing: "-0.02em",
-                            color: "text.primary",
-                            textDecoration: "none",
-                            mr: { md: 2 },
-                        }}
-                    >
-                        Ideathon
-                    </Typography>
+                    <Wordmark height={30} />
 
-                    <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" }}>
+                    <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", ml: 2 }}>
                         {primary.map((link) => (
                             <TopLink key={link.to} {...link} active={isActive(link.to)} />
                         ))}
@@ -172,17 +229,17 @@ function Nav() {
                                 height: 60,
                                 borderRadius: 0,
                                 px: 1.5,
-                                color: adminActive ? "text.primary" : "text.secondary",
+                                color: adminActive ? tokens.ON_NIGHT : tokens.ON_NIGHT_MUTED,
                                 fontWeight: adminActive ? 600 : 500,
                                 fontSize: "0.9375rem",
-                                "&:hover": { bgcolor: "transparent", color: "text.primary" },
+                                "&:hover": { bgcolor: "transparent", color: tokens.ON_NIGHT },
                                 "&::after": adminActive
                                     ? {
                                           content: '""',
                                           position: "absolute",
                                           left: 12,
                                           right: 12,
-                                          bottom: -1,
+                                          bottom: 0,
                                           height: 2,
                                           borderRadius: 1,
                                           bgcolor: "primary.main",
@@ -205,7 +262,8 @@ function Nav() {
                                 height: 32,
                                 fontSize: "0.8125rem",
                                 fontWeight: 600,
-                                bgcolor: "secondary.main",
+                                bgcolor: "primary.main",
+                                color: "#fff",
                             }}
                         >
                             {initialsOf(userData)}
@@ -221,7 +279,7 @@ function Nav() {
                 onClose={() => setAdminAnchor(null)}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
-                slotProps={{ paper: { variant: "outlined", sx: { minWidth: 200, mt: 0.5 } } }}
+                PaperProps={menuPaper}
             >
                 {ADMIN.map((link) => (
                     <MenuItem
@@ -240,7 +298,7 @@ function Nav() {
                 onClose={() => setAccountAnchor(null)}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
-                slotProps={{ paper: { variant: "outlined", sx: { minWidth: 220, mt: 0.5 } } }}
+                PaperProps={{ ...menuPaper, sx: { ...menuPaper.sx, minWidth: 220 } }}
             >
                 <Box sx={{ px: 2, py: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>{fullName || "Signed in"}</Typography>
@@ -255,71 +313,86 @@ function Nav() {
                 <MenuItem onClick={logOut}>Log out</MenuItem>
             </Menu>
 
-            {/* Mobile */}
+            {/* Mobile. Night as well, so opening it is not a flash of white. */}
             <Drawer
                 anchor="left"
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
-                slotProps={{ paper: { sx: { width: 268 } } }}
+                PaperProps={{
+                    sx: { width: 268, bgcolor: tokens.NIGHT, color: tokens.ON_NIGHT },
+                }}
             >
-                <Stack direction="row" alignItems="center" sx={{ p: 2, pb: 1 }}>
-                    <Typography sx={{ flex: 1, fontWeight: 700, fontSize: "1.0625rem" }}>
-                        Ideathon
-                    </Typography>
-                    <IconButton onClick={() => setDrawerOpen(false)} aria-label="Close menu">
+                <Stack direction="row" alignItems="center" sx={{ p: 2, pb: 1.5 }}>
+                    <Box sx={{ flex: 1 }}>
+                        <Wordmark height={28} />
+                    </Box>
+                    <IconButton
+                        onClick={() => setDrawerOpen(false)}
+                        aria-label="Close menu"
+                        sx={{ color: tokens.ON_NIGHT }}
+                    >
                         <IoClose />
                     </IconButton>
                 </Stack>
 
                 <Box sx={{ px: 1, pb: 1 }}>
                     {primary.map((link) => (
-                        <ListItemButton
+                        <DrawerLink
                             key={link.to}
-                            selected={isActive(link.to)}
+                            label={link.label}
+                            active={isActive(link.to)}
                             onClick={() => go(link.to)}
-                            sx={{ borderRadius: 1.5 }}
-                        >
-                            {link.label}
-                        </ListItemButton>
+                        />
                     ))}
                 </Box>
 
                 {isAdmin && (
                     <>
-                        <Divider />
+                        <Divider sx={{ borderColor: tokens.NIGHT_LINE }} />
                         <Typography
-                            variant="body2"
-                            sx={{ px: 2, pt: 1.5, pb: 0.5, textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.06em" }}
+                            variant="overline"
+                            sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, color: tokens.ON_NIGHT_MUTED }}
                         >
                             Admin
                         </Typography>
                         <Box sx={{ px: 1, pb: 1 }}>
                             {ADMIN.map((link) => (
-                                <ListItemButton
+                                <DrawerLink
                                     key={link.to}
-                                    selected={pathname.startsWith(link.to)}
+                                    label={link.label}
+                                    active={pathname.startsWith(link.to)}
                                     onClick={() => go(link.to)}
-                                    sx={{ borderRadius: 1.5 }}
-                                >
-                                    {link.label}
-                                </ListItemButton>
+                                />
                             ))}
                         </Box>
                     </>
                 )}
 
                 <Box sx={{ flexGrow: 1 }} />
-                <Divider />
+                <Divider sx={{ borderColor: tokens.NIGHT_LINE }} />
                 <Box sx={{ px: 1, py: 1 }}>
-                    <ListItemButton onClick={() => go("/user/profile")} sx={{ borderRadius: 1.5 }}>
-                        Profile
-                    </ListItemButton>
-                    <ListItemButton onClick={logOut} sx={{ borderRadius: 1.5 }}>
-                        Log out
-                    </ListItemButton>
+                    <DrawerLink label="Profile" onClick={() => go("/user/profile")} />
+                    <DrawerLink label="Log out" onClick={logOut} />
                 </Box>
             </Drawer>
         </AppBar>
+    );
+}
+
+function DrawerLink({ label, active = false, onClick }) {
+    return (
+        <ListItemButton
+            onClick={onClick}
+            sx={{
+                borderRadius: 1.5,
+                color: active ? tokens.ON_NIGHT : tokens.ON_NIGHT_MUTED,
+                fontWeight: active ? 600 : 500,
+                bgcolor: active ? tokens.NIGHT_RAISED : "transparent",
+                "&:hover": { bgcolor: tokens.NIGHT_RAISED, color: tokens.ON_NIGHT },
+            }}
+        >
+            {label}
+        </ListItemButton>
     );
 }
 
