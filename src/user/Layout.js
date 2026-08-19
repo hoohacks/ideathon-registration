@@ -1,18 +1,34 @@
+import { Box, Container, Typography } from "@mui/material";
 import Nav from "./Nav";
+import { EVENT } from "../eventInfo";
 
-function Layout({ children }) {
+/**
+ * Page frame. The old version pinned main to a fixed 800px, which left the
+ * admin tables cramped on a laptop and the short forms adrift on a wide screen.
+ * Pages now pick their own width via `maxWidth`.
+ */
+function Layout({ children, maxWidth = "md" }) {
     return (
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <header>
-                <Nav />
-            </header>
-            <main style={{ flex: 1, padding: "20px", width: "800px", maxWidth: "100%", margin: "0 auto" }}>
+        <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
+            <Nav />
+            <Container
+                component="main"
+                maxWidth={maxWidth}
+                sx={{ flex: 1, width: "100%", py: { xs: 3, sm: 4 } }}
+            >
                 {children}
-            </main>
-            <footer className="text-center p-3 mt-4">
-                <p>&copy; 2025 HooHacks</p>
-            </footer>
-        </div>
+            </Container>
+            <Box
+                component="footer"
+                sx={{ borderTop: 1, borderColor: "divider", py: 2.5, mt: 4 }}
+            >
+                <Container maxWidth={maxWidth}>
+                    <Typography variant="body2" align="center">
+                        © {EVENT.year} HooHacks · {EVENT.name}
+                    </Typography>
+                </Container>
+            </Box>
+        </Box>
     );
 }
 
