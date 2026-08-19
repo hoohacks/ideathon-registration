@@ -3,19 +3,29 @@ import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../App";
 import { ref, get, set, onValue } from "firebase/database";
 import { database, storage } from "../../firebase";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { memberIds } from "./teamMembers";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage";
 import {
+    Alert,
     Box,
-    Modal,
     Button,
-    Typography,
+    Card,
+    CardContent,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Divider,
+    LinearProgress,
+    Link as MuiLink,
+    Stack,
     TextField,
-    FormControl,
-    FormHelperText,
+    Typography,
 } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 
 function Team() {
     const navigate = useNavigate();
@@ -31,7 +41,6 @@ function Team() {
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
     const [finalRound, setFinalRound] = useState({ active: false });
-
 
     // Get team ID from userData if available
     const teamId = userData ? userData.teamId : null;
@@ -171,176 +180,195 @@ function Team() {
 
     if (!teamId) {
         return (
-            <Layout>
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-                    <div>
-                        You are not currently part of a team. Please <Link to="/user/team/join">join</Link> or <Link to="/user/team/create">create</Link> a team to view team information.
-                    </div>
-                </div>
+            <Layout maxWidth="sm">
+                <Typography variant="h1" gutterBottom>Team</Typography>
+                <Card>
+                    <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
+                        <Typography variant="body1" gutterBottom>
+                            You are not on a team yet.
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                            <Button variant="contained" component={RouterLink} to="/user/team/create">
+                                Create a team
+                            </Button>
+                            <Button variant="outlined" component={RouterLink} to="/user/team/join">
+                                Join with an ID
+                            </Button>
+                        </Stack>
+                    </CardContent>
+                </Card>
             </Layout>
         );
     }
 
+    const schedule = teamData?.schedule;
+    const finalSlot = finalRound?.active ? finalRound?.teams?.[teamId] : null;
+
     return (
         <>
-            <Modal
-                open={showModal}
-                onClose={() => setShowModal(false)}
-                aria-labelledby="modal-modal-title"
-                aria-describedby="modal-modal-description"
-                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-                <Box sx={{ bgcolor: 'background.paper', border: '1px solid black', outline: 'none', boxShadow: 24, p: 4, width: 400 }}>
-                    <Typography id="modal-modal-title" variant="h6" component="h2">
-                        A round of applause! 🎉
+            <Dialog open={showModal} onClose={() => setShowModal(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Submission received</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1">
+                        Your project is in. You can come back and update it any time before the
+                        schedule is published.
                     </Typography>
-                    <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-                        you have successfully submitted your project! You can always come back to this page to update your submission before the deadline.
-                    </Typography>
-                </Box>
-            </Modal>
-            <Layout>
-                <Typography variant="h4" gutterBottom style={{ fontWeight: 'bold', textAlign: 'center' }}>
-                    Team Information
-                </Typography>
-                {
-                    teamData ? (
-                        <div style={{ textAlign: 'center' }}>
-                            <Typography variant="h5" style={{ fontWeight: 'bold' }}>
-                                {teamData.name}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button variant="contained" onClick={() => setShowModal(false)}>
+                        Done
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Layout maxWidth="sm">
+                {!teamData ? (
+                    <Typography variant="body2">Loading team…</Typography>
+                ) : (
+                    <Stack spacing={2}>
+                        <Box>
+                            <Typography variant="h1">{teamData.name}</Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                Team ID {teamId} — share this so teammates can join
                             </Typography>
-                            <Typography variant="h6" style={{ fontStyle: 'italic' }}>
-                                Team ID: {teamId}
-                            </Typography>
-                            <hr />
-                            {
-                                teamData.schedule ? (
-                                    <>
-                                        <Typography variant="h6" style={{ fontWeight: 'bold' }}>
-                                            Pitch Presentation Details
+                        </Box>
+
+                        {(schedule || finalSlot) && (
+                            <Card>
+                                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                                    <Typography variant="h5" gutterBottom>Your pitch</Typography>
+                                    {schedule && (
+                                        <Stack direction="row" spacing={0.75} sx={{ mb: finalSlot ? 1.5 : 0 }}>
+                                            <Chip label={schedule.time} size="small" color="primary" />
+                                            <Chip label={schedule.room} size="small" variant="outlined" />
+                                        </Stack>
+                                    )}
+                                    {finalSlot && (
+                                        <>
+                                            <Typography variant="body2" sx={{ mb: 0.75 }}>Final round</Typography>
+                                            <Stack direction="row" spacing={0.75}>
+                                                <Chip label={finalSlot.timeslot} size="small" color="primary" />
+                                                <Chip label={finalSlot.room} size="small" variant="outlined" />
+                                            </Stack>
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {schedule ? (
+                            teamData.submission && (
+                                <Card>
+                                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                                        <Typography variant="h5" gutterBottom>
+                                            {teamData.submission.ideaName}
                                         </Typography>
-                                        <Typography variant="body1">
-                                            Time: {teamData.schedule.time} <br />
-                                            Room: {teamData.schedule.room}
+                                        <Typography variant="body2">
+                                            {teamData.submission.problemStatement}
                                         </Typography>
-                                        <hr />
-                                        {finalRound?.active && finalRound?.teams?.[teamId] ? (
-                                            <>
-                                                <Typography variant="h6" style={{ fontWeight: 'bold' }}>
-                                                    Final Round Details
-                                                </Typography>
-                                                <Typography variant="body1">
-                                                    Time: {finalRound.teams[teamId].timeslot} <br />
-                                                    Room: {finalRound.teams[teamId].room}
-                                                </Typography>
-                                            </>
-                                        ) : null}
-                                    </>
-                                ) : <>
-                                    <Typography variant="h5" style={{ fontWeight: 'bold' }}>
-                                        Project Submission
+                                        {teamData.submission.pitchDeckURL && (
+                                            <MuiLink
+                                                href={teamData.submission.pitchDeckURL}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                variant="body2"
+                                                sx={{ display: "inline-block", mt: 1 }}
+                                            >
+                                                Pitch deck
+                                            </MuiLink>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        ) : (
+                            <Card>
+                                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                                    <Typography variant="h5">Project submission</Typography>
+                                    <Typography variant="body2" sx={{ mb: 2 }}>
+                                        Judges read this before you pitch.
                                     </Typography>
-                                    { /* Idea Name */}
-                                    <FormControl fullWidth margin="normal">
-                                        {/* <InputLabel htmlFor="problem-statement">Problem Statement</InputLabel> */}
+
+                                    <Stack spacing={2}>
                                         <TextField
-                                            id="idea-name"
-                                            label="Idea Name"
+                                            label="Idea name"
                                             value={ideaName}
                                             onChange={(e) => setIdeaName(e.target.value)}
+                                            fullWidth
                                         />
-                                    </FormControl>
-                                    { /* Problem Statement - Give a quick description as to what problem your project aims to solve and why it is important */}
-                                    <FormControl fullWidth margin="normal">
-                                        {/* <InputLabel htmlFor="problem-statement">Problem Statement</InputLabel> */}
                                         <TextField
-                                            id="problem-statement"
-                                            multiline
-                                            label="Problem Statement"
-                                            minRows={3}
+                                            label="Problem statement"
                                             value={problemStatement}
                                             onChange={(e) => setProblemStatement(e.target.value)}
-                                            helperText="Give a quick description as to what problem your project aims to solve and why it is important."
+                                            helperText="What problem does this solve, and why does it matter?"
+                                            multiline
+                                            minRows={3}
+                                            fullWidth
                                         />
-                                    </FormControl>
-                                    { /* Which industry or industries does your idea primarily target? (e.g., Technology, Finance, Healthcare, Energy, Fitness, etc.) */}
-                                    <Box>
-                                        <FormControl fullWidth margin="normal">
-                                            <TextField
-                                                id="target-industry"
-                                                multiline
-                                                label="Target Industry"
-                                                minRows={2}
-                                                value={targetIndustry}
-                                                onChange={(e) => setTargetIndustry(e.target.value)}
-                                                helperText="e.g., Technology, Finance, Healthcare, Energy, Fitness, etc."
-                                            />
-                                        </FormControl>
-                                    </Box>
+                                        <TextField
+                                            label="Target industry"
+                                            value={targetIndustry}
+                                            onChange={(e) => setTargetIndustry(e.target.value)}
+                                            helperText="e.g. technology, finance, healthcare, energy, fitness"
+                                            fullWidth
+                                        />
 
-                                    { /* Upload your pitch slide deck (in .ppt/.pptx format) */}
-                                    <Box mb={2}>
-                                        <FormControl fullWidth margin="normal">
-                                            <Button
-                                                variant="outlined"
-                                                component="label"
-                                            >
-                                                {pitchDeckName || "Upload Pitch Deck (.ppt/.pptx)"}
+                                        <Box>
+                                            <Button variant="outlined" component="label" fullWidth>
+                                                {pitchDeckName || "Upload pitch deck (.ppt, .pptx, .pdf)"}
                                                 <input
                                                     type="file"
-                                                    size="large"
-                                                    hidden={true}
-                                                    accept=".ppt,.pptx"
+                                                    hidden
+                                                    accept=".ppt,.pptx,.pdf"
                                                     onChange={(e) => uploadFileToFirebase(e)}
                                                 />
                                             </Button>
-                                            <FormHelperText>Upload your pitch slide deck (in .ppt/.pptx format).</FormHelperText>
-                                        </FormControl>
-                                    </Box>
+                                            {uploadProgress !== null && uploadProgress < 100 && (
+                                                <LinearProgress
+                                                    variant="determinate"
+                                                    value={uploadProgress}
+                                                    sx={{ mt: 1, height: 4, borderRadius: 2 }}
+                                                />
+                                            )}
+                                        </Box>
 
-                                    {uploadProgress !== null && uploadProgress < 100 ? (
-                                        <Typography variant="body2">
-                                            Uploading pitch deck… {Math.round(uploadProgress)}%
-                                        </Typography>
-                                    ) : null}
-                                    {uploadError ? (
-                                        <Typography variant="body2" color="error">
-                                            {uploadError}
-                                        </Typography>
-                                    ) : null}
+                                        {uploadError && <Alert severity="error">{uploadError}</Alert>}
 
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        onClick={handleSubmitProject}
-                                        disabled={submitting}
-                                    >
-                                        {submitting ? "Saving…" : "Save Project Submission"}
-                                    </Button>
-                                </>
-                            }
-                            <hr />
-                            <Typography variant="h6" style={{ fontWeight: 'bold' }}>
-                                Team Members
-                            </Typography>
-                            <ul style={{ listStyleType: 'none', padding: 0 }}>
-                                {teamData && teamData.memberNames && teamData.memberNames.map((name, index) => (
-                                    <li key={index}>
-                                        <Typography variant="body1">{name}</Typography>
-                                    </li>
-                                ))}
-                            </ul>
-                            <hr />
-                            <Button onClick={handleLeaveTeam} variant="outlined" color="secondary">
-                                Leave Team
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleSubmitProject}
+                                            disabled={submitting}
+                                        >
+                                            {submitting ? "Saving…" : "Save submission"}
+                                        </Button>
+                                    </Stack>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        <Card>
+                            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                                <Typography variant="h5" gutterBottom>Members</Typography>
+                                <Stack spacing={0.5}>
+                                    {teamData.memberNames?.length ? (
+                                        teamData.memberNames.map((name, index) => (
+                                            <Typography key={index} variant="body1">{name}</Typography>
+                                        ))
+                                    ) : (
+                                        <Typography variant="body2">No members yet.</Typography>
+                                    )}
+                                </Stack>
+                            </CardContent>
+                        </Card>
+
+                        <Divider />
+
+                        <Box>
+                            <Button variant="outlined" onClick={handleLeaveTeam}>
+                                Leave team
                             </Button>
-                        </div>
-                    ) : (
-                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-                            Loading team information...
-                        </div>
-                    )
-                }
+                        </Box>
+                    </Stack>
+                )}
             </Layout>
         </>
     );

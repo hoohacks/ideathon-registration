@@ -72,7 +72,12 @@ const theme = createTheme({
       defaultProps: { elevation: 0, variant: "outlined" },
       styleOverrides: { root: { borderColor: LINE } },
     },
-    MuiTextField: { defaultProps: { size: "small" } },
+    MuiTextField: {
+      // Labels sit above the field rather than floating into it. Besides
+      // reading more cleanly, it sidesteps Chrome autofilling a value before
+      // React sees a change event, which left the label sitting on top of it.
+      defaultProps: { size: "small", InputLabelProps: { shrink: true } },
+    },
     MuiSelect: { defaultProps: { size: "small" } },
     MuiFormControl: { defaultProps: { size: "small" } },
     MuiOutlinedInput: {

@@ -27,10 +27,10 @@ import {
   Link,
   FormHelperText,
 } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // import logo
 import Logo from "./images/logo.png";
+import { EVENT, GRADUATION_YEARS } from "./eventInfo";
 
 function joinList(items) {
   if (items.length < 2) return items.join("");
@@ -43,27 +43,6 @@ function joinList(items) {
 const mailformat = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
 
 const Registration = () => {
-  // theme
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
-
   // text-fields
   const [firstName, setFirstName] = useState("");
 
@@ -90,7 +69,7 @@ const Registration = () => {
   const [dietaryRestriction, setDietaryRestriction] = useState("");
 
   // year
-  const [selectYear, setSelectYear] = useState(2026);
+  const [selectYear, setSelectYear] = useState(GRADUATION_YEARS[0]);
   const otherSelectYear = "";
 
   // school
@@ -104,6 +83,9 @@ const Registration = () => {
   // successful registration upload
   const [successRegistration, setSuccessRegistration] = useState(false);
 
+  // validation messages stay hidden until the first submit attempt, so an
+  // untouched form does not open covered in red
+  const [showErrors, setShowErrors] = useState(false);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [skipResume, setSkipResume] = useState(false);
@@ -114,7 +96,7 @@ const Registration = () => {
 
     const storageReference = storageRef(
       storage,
-      `/ideathon-resume-2025/${selectYear}/${event.target.files[0].name}`
+      `/ideathon-resume-${EVENT.year}/${selectYear}/${event.target.files[0].name}`
     );
     const uploadResumeToDB = uploadBytesResumable(
       storageReference,
@@ -167,6 +149,7 @@ const Registration = () => {
 
     const problem = firstProblem();
     if (problem) {
+      setShowErrors(true);
       setErrorString(problem);
       setShowErrorPopup(true);
       return;
@@ -267,7 +250,6 @@ const Registration = () => {
 
   return (
     <>
-      <ThemeProvider theme={theme}>
         <Popup open={successRegistration} modal>
           <Box
             sx={{
@@ -279,7 +261,7 @@ const Registration = () => {
               gap: "8px",
             }}
           >
-            <Typography>Successfully signed up for Ideathon 25!</Typography>
+            <Typography>{`You are signed up for ${EVENT.name} ${EVENT.year}.`}</Typography>
             <Link href="https://ideathon.hoohacks.io">
               <Button
                 sx={{
@@ -355,47 +337,38 @@ const Registration = () => {
                 display: "flex",
                 flexFlow: "column nowrap",
                 margin: "24px",
-                width: "582px",
+                width: "100%",
+                maxWidth: "620px",
                 alignItems: "center",
                 backgroundColor: "#fff",
                 padding: "22px 22px",
                 gap: "16px",
                 border: "none",
                 boxShadow: "none",
-                [theme.breakpoints.down("md")]: {
-                  margin: "0",
-                },
               }}
             >
               {/* IDEATHON LOGO */}
               <Link
                 href="https://ideathon.hoohacks.io"
-                sx={{
-                  maxWidth: "582px",
-                  [theme.breakpoints.down("md")]: {
-                    maxWidth: "402px",
-                  },
-                }}
+                sx={{ display: "block", width: "100%", lineHeight: 0 }}
               >
                 <Box
                   component="img"
                   src={Logo}
                   alt="HooHacks Ideathon logo"
                   sx={{
-                    borderRadius: "5px",
-                    width: "582px",
-                    objectFit: "cover",
-                    [theme.breakpoints.down("md")]: {
-                      width: "402px",
-                    },
+                    borderRadius: 1,
+                    display: "block",
+                    width: "100%",
+                    height: "auto",
                   }}
                 />
               </Link>
 
               <Typography sx={{ textAlign: "center" }}>
-                The fifth annual Ideathon,{" "}
+                The {EVENT.edition} {EVENT.name},{" "}
                 <span style={{ fontWeight: "bold" }}>
-                  Sunday, October 19, 2025
+                  {EVENT.dateLabel}
                 </span>
                 , is a networking, team-building, and pitching event designed to
                 help students with technical experience and students with
@@ -434,13 +407,8 @@ const Registration = () => {
                   onChange={(e) => {
                     setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
                   }}
-                  helperText={
-                    firstName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your first name
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && firstName === ""}
+                  helperText={showErrors && firstName === "" ? "Enter your first name" : undefined}
                 />
                 <TextField
                   fullWidth={true}
@@ -456,13 +424,8 @@ const Registration = () => {
                   onChange={(e) => {
                     setLastName(e.target.value.replace(/[^a-z]/gi, ""));
                   }}
-                  helperText={
-                    lastName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your last name
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && lastName === ""}
+                  helperText={showErrors && lastName === "" ? "Enter your last name" : undefined}
                 />
               </Box>
               <TextField
@@ -476,17 +439,17 @@ const Registration = () => {
                 value={email}
                 type="email"
                 autoComplete="email"
-                error={!isValidEmail}
+                error={(showErrors && email === "") || !isValidEmail}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setIsValidEmail(mailformat.test(email));
+                  setIsValidEmail(mailformat.test(e.target.value));
                 }}
                 helperText={
-                  email === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your email
-                    </Typography>
-                  )
+                  showErrors && email === ""
+                    ? "Enter your email"
+                    : !isValidEmail
+                    ? "That does not look like a valid email address"
+                    : undefined
                 }
               />
               <TextField
@@ -500,17 +463,17 @@ const Registration = () => {
                 value={password}
                 type="password"
                 autoComplete="current-password"
-                error={!isValidPassword}
+                error={(showErrors && password === "") || !isValidPassword}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setIsValidPassword(password.length >= 6);
+                  setIsValidPassword(e.target.value.length >= 6);
                 }}
                 helperText={
-                  password === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your password (6 characters minimum)
-                    </Typography>
-                  )
+                  showErrors && password === ""
+                    ? "Enter your password"
+                    : !isValidPassword
+                    ? "At least 6 characters"
+                    : undefined
                 }
               />
               <TextField
@@ -527,13 +490,8 @@ const Registration = () => {
                 onChange={(e) => {
                   setMajor(e.target.value);
                 }}
-                helperText={
-                  major === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your major
-                    </Typography>
-                  )
-                }
+                error={showErrors && major === ""}
+                  helperText={showErrors && major === "" ? "Enter your major" : undefined}
               />
               <Box
                 sx={{
@@ -561,7 +519,7 @@ const Registration = () => {
                       Prefer not to say
                     </MenuItem>
                   </Select>
-                  {gender === "" ? (
+                  {showErrors && gender === "" ? (
                     <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
                       Please select an option
                     </FormHelperText>
@@ -586,11 +544,11 @@ const Registration = () => {
                     size="large"
                     onChange={(e) => setSelectYear(e.target.value)}
                   >
-                    <MenuItem value={2025}>2025</MenuItem>
-                    <MenuItem value={2026}>2026</MenuItem>
-                    <MenuItem value={2027}>2027</MenuItem>
-                    <MenuItem value={2028}>2028</MenuItem>
-                    <MenuItem value={2029}>2029</MenuItem>
+                    {GRADUATION_YEARS.map((year) => (
+                      <MenuItem key={year} value={year}>
+                        {year}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Box>
@@ -706,13 +664,8 @@ const Registration = () => {
                   onChange={(e) => {
                     setSkills(e.target.value);
                   }}
-                  helperText={
-                    skills === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your skills or N/A
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && skills === ""}
+                  helperText={showErrors && skills === "" ? "Enter your skills or N/A" : undefined}
                 />
               </Box>
               <Box
@@ -741,13 +694,8 @@ const Registration = () => {
                   onChange={(e) => {
                     setLearn(e.target.value);
                   }}
-                  helperText={
-                    learn === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter something you would like to learn or N/A
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && learn === ""}
+                  helperText={showErrors && learn === "" ? "Enter something you would like to learn or N/A" : undefined}
                 />
               </Box>
               <Box
@@ -843,7 +791,6 @@ const Registration = () => {
           </Box>
           <Copyright />
         </Grid>
-      </ThemeProvider>
     </>
   );
 };

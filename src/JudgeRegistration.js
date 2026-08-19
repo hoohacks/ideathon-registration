@@ -23,10 +23,10 @@ import {
   RadioGroup,
   Radio,
 } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 // import logo
 import Logo from "./images/logo.png";
+import { EVENT } from "./eventInfo";
 
 function joinList(items) {
   if (items.length < 2) return items.join("");
@@ -39,27 +39,6 @@ function joinList(items) {
 const mailformat = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/;
 
 const JudgeRegistration = () => {
-  // theme
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
-
   // text-fields
   const [firstName, setFirstName] = useState("");
 
@@ -146,6 +125,9 @@ const JudgeRegistration = () => {
   // successful registration upload
   const [successRegistration, setSuccessRegistration] = useState(false);
 
+  // validation messages stay hidden until the first submit attempt, so an
+  // untouched form does not open covered in red
+  const [showErrors, setShowErrors] = useState(false);
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorString, setErrorString] = useState("");
@@ -180,6 +162,7 @@ const JudgeRegistration = () => {
       .map(([label]) => label);
 
     if (missing.length) {
+      setShowErrors(true);
       setErrorString(`Please fill in your ${joinList(missing)} before submitting.`);
       setShowErrorPopup(true);
       return;
@@ -272,7 +255,6 @@ const JudgeRegistration = () => {
 
   return (
     <>
-      <ThemeProvider theme={theme}>
         <Popup open={successRegistration} modal>
           <Box
             sx={{
@@ -284,7 +266,7 @@ const JudgeRegistration = () => {
               gap: "8px",
             }}
           >
-            <Typography>Successfully signed up for Ideathon 25!</Typography>
+            <Typography>{`You are signed up for ${EVENT.name} ${EVENT.year}.`}</Typography>
             <Link href="https://ideathon.hoohacks.io">
               <Button
                 sx={{
@@ -360,47 +342,38 @@ const JudgeRegistration = () => {
                 display: "flex",
                 flexFlow: "column nowrap",
                 margin: "24px",
-                width: "582px",
+                width: "100%",
+                maxWidth: "620px",
                 alignItems: "center",
                 backgroundColor: "#fff",
                 padding: "22px 22px",
                 gap: "16px",
                 border: "none",
                 boxShadow: "none",
-                [theme.breakpoints.down("md")]: {
-                  margin: "0",
-                },
               }}
             >
               {/* IDEATHON LOGO */}
               <Link
                 href="https://ideathon.hoohacks.io"
-                sx={{
-                  maxWidth: "582px",
-                  [theme.breakpoints.down("md")]: {
-                    maxWidth: "402px",
-                  },
-                }}
+                sx={{ display: "block", width: "100%", lineHeight: 0 }}
               >
                 <Box
                   component="img"
                   src={Logo}
                   alt="HooHacks Ideathon logo"
                   sx={{
-                    borderRadius: "5px",
-                    width: "582px",
-                    objectFit: "cover",
-                    [theme.breakpoints.down("md")]: {
-                      width: "402px",
-                    },
+                    borderRadius: 1,
+                    display: "block",
+                    width: "100%",
+                    height: "auto",
                   }}
                 />
               </Link>
 
               <Typography component="div" sx={{ textAlign: "center" }}>
-                The fifth annual Ideathon,{" "}
+                The {EVENT.edition} {EVENT.name},{" "}
                 <span style={{ fontWeight: "bold" }}>
-                  Sunday, October 19, 2025
+                  {EVENT.dateLabel}
                 </span>
                 <Typography>
                   Ideathon is a networking, team-building, and pitching event
@@ -409,9 +382,9 @@ const JudgeRegistration = () => {
                   business ideas together. Mentors help our students form their
                   ideas and craft a pitch throughout the day in minimum 2-hour
                   shifts. Judges will evaluate and score the teams’ pitches from
-                  5:00 PM - 7:00 PM. We would appreciate it if you could be a
-                  mentor and/or judge! The event itself is Sunday, October 19th
-                  from 10:00 AM - 7:00 PM at Rice Hall, but you do not have to
+                  {EVENT.judgingHours}. We would appreciate it if you could be a
+                  mentor and/or judge! The event itself is {EVENT.dateLabel}
+                  from {EVENT.hours} at {EVENT.venue}, but you do not have to
                   stay for the entire event! Fill out this form if you would
                   like to help out. Thank you!
                 </Typography>
@@ -440,13 +413,8 @@ const JudgeRegistration = () => {
                   onChange={(e) => {
                     setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
                   }}
-                  helperText={
-                    firstName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your first name
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && firstName === ""}
+                  helperText={showErrors && firstName === "" ? "Enter your first name" : undefined}
                 />
                 <TextField
                   fullWidth={true}
@@ -462,13 +430,8 @@ const JudgeRegistration = () => {
                   onChange={(e) => {
                     setLastName(e.target.value.replace(/[^a-z]/gi, ""));
                   }}
-                  helperText={
-                    lastName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your last name
-                      </Typography>
-                    )
-                  }
+                  error={showErrors && lastName === ""}
+                  helperText={showErrors && lastName === "" ? "Enter your last name" : undefined}
                 />
               </Box>
               <TextField
@@ -482,17 +445,17 @@ const JudgeRegistration = () => {
                 value={email}
                 type="email"
                 autoComplete="email"
-                error={!isValidEmail}
+                error={(showErrors && email === "") || !isValidEmail}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setIsValidEmail(mailformat.test(email));
+                  setIsValidEmail(mailformat.test(e.target.value));
                 }}
                 helperText={
-                  email === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your email
-                    </Typography>
-                  )
+                  showErrors && email === ""
+                    ? "Enter your email"
+                    : !isValidEmail
+                    ? "That does not look like a valid email address"
+                    : undefined
                 }
               />
               <TextField
@@ -506,17 +469,17 @@ const JudgeRegistration = () => {
                 value={password}
                 type="password"
                 autoComplete="current-password"
-                error={!isValidPassword}
+                error={(showErrors && password === "") || !isValidPassword}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setIsValidPassword(password.length >= 6);
+                  setIsValidPassword(e.target.value.length >= 6);
                 }}
                 helperText={
-                  password === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your password (6 characters minimum)
-                    </Typography>
-                  )
+                  showErrors && password === ""
+                    ? "Enter your password"
+                    : !isValidPassword
+                    ? "At least 6 characters"
+                    : undefined
                 }
               />
               <Box
@@ -772,7 +735,6 @@ const JudgeRegistration = () => {
           </Box>
           <Copyright />
         </Grid>
-      </ThemeProvider>
     </>
   );
 };
