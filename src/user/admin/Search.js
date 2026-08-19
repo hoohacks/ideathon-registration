@@ -3,46 +3,34 @@ import { database } from "../../firebase";
 
 import React, { useEffect, useMemo, useState } from "react";
 
-import ProgressBar from "react-bootstrap/ProgressBar";
-import Button from "react-bootstrap/Button";
-import "bootstrap/dist/css/bootstrap.min.css";
-import Form from "react-bootstrap/Form";
+import {
+  Button,
+  Chip,
+  Link,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import Layout from "../Layout";
-
-function CheckedInProgressBar({ percent }) {
-  return (
-    <div style={{ marginBottom: "40px", marginInline: "10%" }}>
-      <ProgressBar now={percent} label={percent + "%"} variant="danger"></ProgressBar>
-    </div>
-  );
-}
+import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
 
 function Search() {
-  const [Query, setQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [checkedInFilter, setCheckedInFilter] = useState("");
   const [dietaryFilter, setDietaryFilter] = useState("");
-
   const [competitors, setCompetitors] = useState([]);
-  const [showProgressBar, setShowProgressBar] = useState(false);
 
   const checkedInCount = competitors.filter((person) => person.checkedIn).length;
   const percentCheckedIn = competitors.length
-    ? ((checkedInCount / competitors.length) * 100).toFixed(2)
-    : "0.00";
-
-  function toggleProgressBar(e) {
-    setShowProgressBar(e.target.checked);
-  }
+    ? (checkedInCount / competitors.length) * 100
+    : 0;
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, "/competitors/"), (snapshot) => {
       const data = snapshot.val();
-      if (!data) {
-        setCompetitors([]);
-        return;
-      }
       setCompetitors(
-        Object.entries(data).map(([id, details]) => ({ id, ...details }))
+        data ? Object.entries(data).map(([id, details]) => ({ id, ...details })) : []
       );
     });
 
@@ -64,122 +52,135 @@ function Search() {
     return [...values].sort();
   }, [competitors]);
 
-  const filteredResults = useMemo(() => {
-    const needle = Query.toLowerCase();
-    return competitors.filter((person) => {
-      const fullName = `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim();
-      const matchesQuery =
-        fullName.toLowerCase().includes(needle) ||
-        (person.email ?? "").toLowerCase().includes(needle);
+  const results = useMemo(() => {
+    const needle = query.toLowerCase();
+    return competitors
+      .filter((person) => {
+        const fullName = `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim();
+        const matchesQuery =
+          fullName.toLowerCase().includes(needle) ||
+          (person.email ?? "").toLowerCase().includes(needle);
 
-      const matchesCheckedIn =
-        checkedInFilter === "" ||
-        String(Boolean(person.checkedIn)) === checkedInFilter;
+        const matchesCheckedIn =
+          checkedInFilter === "" ||
+          String(Boolean(person.checkedIn)) === checkedInFilter;
 
-      const matchesDietary =
-        dietaryFilter === "" || person.dietaryRestriction === dietaryFilter;
+        const matchesDietary =
+          dietaryFilter === "" || person.dietaryRestriction === dietaryFilter;
 
-      return matchesQuery && matchesCheckedIn && matchesDietary;
-    });
-  }, [competitors, Query, checkedInFilter, dietaryFilter]);
+        return matchesQuery && matchesCheckedIn && matchesDietary;
+      })
+      .sort((a, b) =>
+        `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
+          `${b.firstName ?? ""} ${b.lastName ?? ""}`
+        )
+      );
+  }, [competitors, query, checkedInFilter, dietaryFilter]);
 
   return (
-    <Layout>
-      <h1 style={{ fontSize: "48px", textAlign: "center" }}>Admin Dashboard</h1>
-      <p style={{ fontSize: "24px", textAlign: "center" }}>
-        Total Signed-Up: {competitors.length} | Checked In: {checkedInCount} |
-        Percentage: {percentCheckedIn}%
-        <Form.Check
-          inline
-          style={{ fontSize: "15px", marginLeft: "30px" }}
-          type="switch"
-          id="custom-switch"
-          label="Show Progress Bar"
-          onChange={(e) => toggleProgressBar(e)}
-        />
-      </p>
-      {showProgressBar && <CheckedInProgressBar percent={percentCheckedIn} />}
-      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Name and Emails</h2>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "20px",
-          gap: "10px",
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Search by name or email"
-          value={Query}
+    <Layout maxWidth="lg">
+      <PageHeader
+        title="Competitors"
+        progress={percentCheckedIn}
+        stats={[
+          { label: "registered", value: competitors.length },
+          { label: "checked in", value: checkedInCount },
+          { label: "of registrants", value: `${percentCheckedIn.toFixed(0)}%` },
+        ]}
+      />
+
+      <FilterBar>
+        <SearchField
+          placeholder="Search name or email"
+          value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{ width: "260px", height: "40px", fontSize: "16px" }}
         />
-        <select
+        <TextField
+          select
+          label="Check-in"
           value={checkedInFilter}
           onChange={(e) => setCheckedInFilter(e.target.value)}
-          style={{ width: "200px", height: "40px", fontSize: "16px" }}
+          sx={{ minWidth: 160 }}
         >
-          <option value="">All competitors</option>
-          <option value="true">Checked in</option>
-          <option value="false">Not checked in</option>
-        </select>
-        <select
+          <MenuItem value="">Everyone</MenuItem>
+          <MenuItem value="true">Checked in</MenuItem>
+          <MenuItem value="false">Not checked in</MenuItem>
+        </TextField>
+        <TextField
+          select
+          label="Dietary"
           value={dietaryFilter}
           onChange={(e) => setDietaryFilter(e.target.value)}
-          style={{ width: "220px", height: "40px", fontSize: "16px" }}
+          sx={{ minWidth: 170 }}
         >
-          <option value="">Any dietary restriction</option>
+          <MenuItem value="">Any</MenuItem>
           {dietaryOptions.map((option) => (
-            <option key={option} value={option}>
+            <MenuItem key={option} value={option} sx={{ textTransform: "capitalize" }}>
               {option}
-            </option>
+            </MenuItem>
           ))}
-        </select>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        {filteredResults.map((person) => {
+        </TextField>
+      </FilterBar>
+
+      <RowList empty="No competitors match those filters.">
+        {results.map((person) => {
           const fullName =
             `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() ||
-            "Unnamed Competitor";
+            "Unnamed competitor";
           const isCheckedIn = Boolean(person.checkedIn);
 
           return (
-            <div
-              key={person.id}
-              style={{
-                borderRadius: "15px",
-                border: isCheckedIn ? "1px solid #34a0a4" : "1px solid #ccc",
-                padding: "30px",
-              }}
-            >
-              <p className="label" style={{ fontSize: "24px", fontWeight: "bold" }}>
-                {fullName}
-              </p>
-
-              <p>{person.dietaryRestriction}</p>
-              <p>{person.email}</p>
-              {person.resume ? (
-                <p>
-                  <a href={person.resume} target="_blank" rel="noopener noreferrer">
-                    {fullName} resume
-                  </a>
-                </p>
-              ) : null}
-              <Button
-                onClick={() => handleCheckIn(person)}
-                style={{
-                  borderRadius: "12px",
-                  backgroundColor: isCheckedIn ? "#34a0a4" : "#2a6f97",
-                  color: "white",
-                }}
+            <Row key={person.id} accent={isCheckedIn}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                spacing={1}
               >
-                {isCheckedIn ? "Checked In" : "Check In"}
-              </Button>
-            </div>
+                <Stack sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                    {person.dietaryRestriction && person.dietaryRestriction !== "none" && (
+                      <Chip
+                        label={person.dietaryRestriction}
+                        size="small"
+                        variant="outlined"
+                        sx={{ textTransform: "capitalize" }}
+                      />
+                    )}
+                    {person.foodCheckIn && (
+                      <Chip label="got food" size="small" variant="outlined" />
+                    )}
+                  </Stack>
+                  <Stack direction="row" spacing={1.5} alignItems="baseline" flexWrap="wrap">
+                    <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                      {person.email}
+                    </Typography>
+                    {person.resume && person.resume !== "none" && (
+                      <Link
+                        href={person.resume}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="body2"
+                      >
+                        Resume
+                      </Link>
+                    )}
+                  </Stack>
+                </Stack>
+
+                <Button
+                  size="small"
+                  variant={isCheckedIn ? "contained" : "outlined"}
+                  onClick={() => handleCheckIn(person)}
+                  sx={{ minWidth: 116 }}
+                >
+                  {isCheckedIn ? "Checked in" : "Check in"}
+                </Button>
+              </Stack>
+            </Row>
           );
         })}
-      </div>
+      </RowList>
     </Layout>
   );
 }
