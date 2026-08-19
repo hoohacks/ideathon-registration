@@ -2,6 +2,40 @@
 
 Registration, check-in, team submission and judging for the HooHacks Ideathon.
 
+## First-time project setup
+
+The Firebase project is `ideathon-2026-d6950`; its config lives in
+`src/firebaseConfig.js` and is shared by the app and the scripts.
+
+Four things have to be done in the Firebase console before the app works:
+
+1. **Enable Email/Password auth** (Authentication -> Sign-in method).
+2. **Publish the database rules** from `database.rules.json`.
+3. **Publish the storage rules** from `storage.rules`. Without these, resume
+   and pitch deck uploads fail — and a pitch deck is required to be judged.
+4. **Create the first admin by hand.** This one is easy to miss: the rules give
+   root access only to uids present under `/admins`, and writing to `/admins`
+   itself requires being an admin already. Nothing in the app can break that
+   cycle. Register an account normally, copy its uid from the Authentication
+   tab, then add this in the Realtime Database console:
+
+   ```
+   admins
+     └── <that-uid>: true
+   ```
+
+   Until that exists, no one can generate a schedule or open any admin page.
+
+### About the anonymous resume upload
+
+The registration form starts uploading a resume the moment the file is picked,
+which is before the person has an account, so `storage.rules` has to allow an
+unauthenticated write on that one path. It is capped at 5 MB and restricted to
+document content types, but it is still an anonymous write endpoint. The
+alternative is to hold the file in memory and upload it after
+`createUserWithEmailAndPassword` succeeds, which would let that rule require
+auth; that has not been done here.
+
 ## Database rules
 
 `database.rules.json` holds the Realtime Database rules. Paste it into the
@@ -61,7 +95,7 @@ ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... node scripts/migrate-team-members
 ```
 
 It reports what it would change and writes nothing. Add `--apply` to commit the
-change.
+change. On a fresh project there is nothing to migrate and it exits saying so.
 
 ## Configuration
 

@@ -20,16 +20,7 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, update } from "firebase/database";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAFHTfN6KuOwzDsLdWtmZeFAVpVcI-Npfw",
-  authDomain: "ideathon-registration-form.firebaseapp.com",
-  databaseURL: "https://ideathon-registration-form-default-rtdb.firebaseio.com",
-  projectId: "ideathon-registration-form",
-  storageBucket: "ideathon-registration-form.appspot.com",
-  messagingSenderId: "1094596378197",
-  appId: "1:1094596378197:web:81887879503a76e09c5edc",
-};
+import { firebaseConfig } from "../src/firebaseConfig.js";
 
 const apply = process.argv.includes("--apply");
 const email = process.env.ADMIN_EMAIL;

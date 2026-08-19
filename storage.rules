@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Cloud Storage rules. Paste into the Firebase console (Storage -> Rules) or
+// deploy with `firebase deploy --only storage`.
+//
+// Note on download URLs: getDownloadURL() returns a URL carrying an access
+// token, and that token grants access regardless of these rules. So anyone
+// holding a resume or pitch deck link can open it whether or not `read` is
+// allowed below. Treat the links themselves as the secret.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Resumes are picked and uploaded on the public registration form, before
+    // the person has an account, so this cannot require auth. That means an
+    // anonymous write endpoint, which is why it is capped hard and pinned to
+    // document types. See the README for the alternative.
+    match /ideathon-resume-2025/{year}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.resource.size < 5 * 1024 * 1024
+                   && (request.resource.contentType.matches('application/pdf')
+                       || request.resource.contentType.matches('application/msword')
+                       || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*'));
+    }
+
+    // Pitch decks are uploaded from the team page by a signed-in member.
+    match /teams/{teamId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 25 * 1024 * 1024
+                   && (request.resource.contentType.matches('application/vnd.ms-powerpoint')
+                       || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*')
+                       || request.resource.contentType.matches('application/pdf'));
+    }
+
+    // Nothing else is writable.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
