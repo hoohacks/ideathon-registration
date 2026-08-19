@@ -7,8 +7,9 @@ import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 import Layout from "./user/Layout";
 
-function dayKey(dateString) {
-  const date = new Date(dateString);
+function dayKey(value) {
+  // epoch milliseconds now; older records hold a locale date string
+  const date = new Date(typeof value === "number" ? value : String(value));
   if (Number.isNaN(date.getTime())) return null;
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");

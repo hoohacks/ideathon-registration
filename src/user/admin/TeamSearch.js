@@ -144,7 +144,7 @@ function TeamSearch() {
     });
 
     const first = (key) => calculateAverageScore(teams[key]?.scores) ?? -1;
-    const final = (key) => calculateAverageScore(teams[key]?.scores_final_round) ?? -1;
+    const final = (key) => calculateAverageScore(teams[key]?.finalScores) ?? -1;
 
     return keys.sort((a, b) => {
       if (sortBy === "score") return first(b) - first(a);
@@ -238,7 +238,7 @@ function TeamSearch() {
                 )}
 
                 <ScoreSummary label="First round" scores={team.scores} />
-                <ScoreSummary label="Final round" scores={team.scores_final_round} />
+                <ScoreSummary label="Final round" scores={team.finalScores} />
               </Stack>
             </Row>
           );

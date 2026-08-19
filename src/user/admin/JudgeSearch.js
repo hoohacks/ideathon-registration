@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { Alert, Button, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import Layout from "../Layout";
+import { assignmentList } from "../judge/assignmentList";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
 
 function JudgeSearch() {
@@ -123,9 +124,7 @@ function JudgeSearch() {
             `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim() || "Unnamed judge";
           const isCheckedIn = Boolean(judge.checkedIn);
           const isRoundOne = judge.isRound1Judge === true;
-          const assignments = Array.isArray(judge.teamAssignments)
-            ? judge.teamAssignments.filter((a) => a && typeof a === "object")
-            : [];
+          const assignments = assignmentList(judge.teamAssignments);
 
           return (
             <Row key={judge.id} accent={isCheckedIn}>
@@ -138,9 +137,6 @@ function JudgeSearch() {
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
                     {isRoundOne && <Chip label="first round" size="small" color="primary" />}
-                    {judge.isHooHacksMember && (
-                      <Chip label="HooHacks" size="small" variant="outlined" />
-                    )}
                     {judge.wantsToMentor && (
                       <Chip label="mentor" size="small" variant="outlined" />
                     )}

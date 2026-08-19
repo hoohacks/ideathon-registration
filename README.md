@@ -36,6 +36,55 @@ alternative is to hold the file in memory and upload it after
 `createUserWithEmailAndPassword` succeeds, which would let that rule require
 auth; that has not been done here.
 
+## Schema
+
+```
+/admins/{uid}              true
+/config                    judgingRooms[]  eventStart
+/competitors/{uid}         firstName lastName email major skills learn gender
+                           schoolYear uvaSchool resume dietaryRestriction
+                           checkedIn foodCheckIn teamId registeredAt
+/judges/{uid}              firstName lastName email company withCompany
+                           wantsToJudge wantsToMentor skills[] timeslots[]
+                           checkedIn foodCheckIn isRound1Judge registeredAt
+                           teamAssignments/{teamId}
+/teams/{teamId}            name createdBy submitted
+                           members/{uid}          true
+                           submission             ideaName problemStatement
+                                                  targetIndustry pitchDeckName
+                                                  pitchDeckURL
+                           schedule               teamName id room time batch judges[]
+                           scores/{judgeUid}      problem innovation impact viability
+                                                  pitch_quality fundable notes
+                                                  teamName room time judgeUid teamId
+                                                  submittedAt
+                           finalScores/{judgeUid} same shape
+/finalRound                active activatedAt activatedBy
+                           teams/{teamId}         name averageScore timeslot room
+                                                  excludedJudges/{uid}
+```
+
+Three things are deliberate:
+
+**Sets are keyed, never arrays.** `members`, `teamAssignments` and
+`excludedJudges` are `{id: true}` / `{id: object}`. Realtime Database stores an
+array under numeric keys, so `hasChild(auth.uid)` cannot see into one and a
+delete renumbers everything after it. `teamMembers.js` and `assignmentList.js`
+read both shapes for records written before this. Because object key order is
+not meaningful, `assignmentList` re-sorts by `batch`.
+
+**Timestamps are `serverTimestamp()`,** not formatted strings. They sort, they
+range-query, and they do not trust the registrant's clock or timezone.
+
+**The schedule is written twice on purpose.** The same assignment lands in
+`teams/{id}/schedule` and in each judge's `teamAssignments`. That is what lets a
+judge load their own schedule without read access to every team. Both copies are
+written in one atomic update, so they cannot drift.
+
+Scores are validated by the rules — ranges, types, and no unknown fields.
+`src/schema.test.js` asserts those ranges still match `SCORE_FIELDS` and the
+scoring form, so the three cannot drift apart silently.
+
 ## Database rules
 
 `database.rules.json` holds the Realtime Database rules. Paste it into the
@@ -66,7 +115,7 @@ Two things about Realtime Database rules drive the whole shape of that file:
 | --- | --- |
 | anyone signed in | read their own `admins`/`judges`/`competitors` record, `config`, `finalRound`, and any team's `name` |
 | competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members; read their own team; write their own team's `submission` and `submitted` |
-| judge | read their own record and assignments; write `teams/*/scores/{ownUid}` and `scores_final_round/{ownUid}`, and read back only their own |
+| judge | read their own record and assignments; write `teams/*/scores/{ownUid}` and `finalScores/{ownUid}`, and read back only their own |
 | admin | everything, via the root rule |
 
 Notably a judge cannot set their own `isRound1Judge` or `checkedIn`, and a

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 // firebase
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, auth } from "./firebase";
-import { ref, update } from "firebase/database";
+import { ref, update, serverTimestamp } from "firebase/database";
 
 // react pop up
 import { Popup } from "reactjs-popup";
@@ -213,10 +213,9 @@ const JudgeRegistration = () => {
       skills: selected_skills,
       wantsToJudge: wantsToJudge,
       questionsAndConcerns: questionsAndConcerns,
-      registeredAt: new Date().toString(),
+      registeredAt: serverTimestamp(),
       checkedIn: false,
       foodCheckIn: false,
-      isJudge: true,
     };
 
     try {

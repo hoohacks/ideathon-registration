@@ -1,5 +1,6 @@
 import { ref, get, update } from "firebase/database";
 import { database } from "../../firebase.js";
+import { assignmentList } from "./assignmentList.js";
 
 // Fallback room list. Override it at config/judgingRooms in the database to add
 // rooms without shipping a new build.
@@ -146,9 +147,11 @@ export async function getJudgeSchedule() {
         // ---- build the schedule ----
 
         const teamAssignments = {};
+        // keyed by team id rather than an array: rules can address a single
+        // assignment, and deleting one cannot renumber the rest
         const assignmentsByJudge = {};
         judgesList.forEach((judge) => {
-            assignmentsByJudge[judge.id] = [];
+            assignmentsByJudge[judge.id] = {};
         });
 
         batches.forEach((batch, batchIndex) => {
@@ -172,7 +175,7 @@ export async function getJudgeSchedule() {
                     judgeName: displayName(judge, "Unnamed Judge"),
                     judgeId: judge.id,
                 });
-                assignmentsByJudge[judge.id].push(assignment);
+                assignmentsByJudge[judge.id][batch[seat].id] = assignment;
             });
         });
 
@@ -234,7 +237,7 @@ export async function getJudgeSchedule() {
             assignments: judgesList.map((judge) => ({
                 judgeId: judge.id,
                 judgeName: displayName(judge, "Unnamed Judge"),
-                teamAssignments: assignmentsByJudge[judge.id],
+                teamAssignments: assignmentList(assignmentsByJudge[judge.id]),
             })),
         };
     } catch (error) {

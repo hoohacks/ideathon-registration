@@ -2,6 +2,7 @@
 import { ref, get } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
+import { assignmentList } from "./assignmentList.js";
 
 export async function getPersonalSchedule() {
   const auth = getAuth();
@@ -12,8 +13,5 @@ export async function getPersonalSchedule() {
   const snap = await get(judgeRef);
   if (!snap.exists()) return [];
 
-  const raw = snap.val().teamAssignments ?? [];
-  const arr = Array.isArray(raw) ? raw : Object.values(raw);
-  // older schedules wrote a [""] placeholder when a judge had no teams
-  return arr.filter((assignment) => assignment && typeof assignment === "object");
+  return assignmentList(snap.val().teamAssignments);
 }

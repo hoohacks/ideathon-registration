@@ -50,7 +50,7 @@ export async function writeTeamScore(args) {
 }
 
 export async function writeFinalRoundScore(args) {
-  await writeScoreToPath({ ...args, pathSegment: "scores_final_round" });
+  await writeScoreToPath({ ...args, pathSegment: "finalScores" });
 }
 
 async function getScoredTeamIdsForPath(teamIds, pathSegment) {
@@ -73,5 +73,5 @@ export function getMyScoredTeamIds(teamIds) {
 }
 
 export function getMyFinalRoundScoredTeamIds(teamIds) {
-  return getScoredTeamIdsForPath(teamIds, "scores_final_round");
+  return getScoredTeamIdsForPath(teamIds, "finalScores");
 }

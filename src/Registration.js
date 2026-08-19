@@ -3,7 +3,7 @@ import React, { useState } from "react";
 // firebase
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, storage, auth } from "./firebase";
-import { ref, update } from "firebase/database";
+import { ref, update, serverTimestamp } from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage"; // avoid naming issues
 
@@ -208,7 +208,7 @@ const Registration = () => {
         gender: gender || null,
         learn: learn,
         major: major,
-        registeredAt: new Date().toString(),
+        registeredAt: serverTimestamp(),
         checkedIn: false,
         foodCheckIn: false,
         dietaryRestriction: dietRestriction.length === 0 ? "none" : dietRestriction,

@@ -90,14 +90,58 @@
         "scores": {
           "$judgeId": {
             ".read": "auth != null && auth.uid === $judgeId",
-            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()"
+            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()",
+
+            // Scores decide who wins, so the shape is pinned down rather than
+            // trusted. Deletes skip validation, so an admin can still clear one.
+            ".validate": "newData.hasChildren(['problem','innovation','impact','viability','pitch_quality','fundable','judgeUid','teamId','submittedAt'])",
+
+            "problem":       { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "innovation":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "impact":        { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "viability":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "pitch_quality": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "fundable":      { ".validate": "newData.isBoolean()" },
+            "notes":         { ".validate": "newData.isString() && newData.val().length <= 2000" },
+
+            // a judge cannot file a score under someone else's name
+            "judgeUid":      { ".validate": "newData.val() === auth.uid" },
+            "teamId":        { ".validate": "newData.isString() && newData.val() === $teamId" },
+            "teamName":      { ".validate": "newData.isString()" },
+            "room":          { ".validate": "newData.isString()" },
+            "time":          { ".validate": "newData.isString()" },
+            "submittedAt":   { ".validate": "newData.isNumber() && newData.val() <= now" },
+
+            "$other":        { ".validate": false }
           }
         },
 
-        "scores_final_round": {
+        "finalScores": {
           "$judgeId": {
             ".read": "auth != null && auth.uid === $judgeId",
-            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()"
+            ".write": "auth != null && auth.uid === $judgeId && root.child('judges').child(auth.uid).exists()",
+
+            // Scores decide who wins, so the shape is pinned down rather than
+            // trusted. Deletes skip validation, so an admin can still clear one.
+            ".validate": "newData.hasChildren(['problem','innovation','impact','viability','pitch_quality','fundable','judgeUid','teamId','submittedAt'])",
+
+            "problem":       { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "innovation":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "impact":        { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "viability":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "pitch_quality": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "fundable":      { ".validate": "newData.isBoolean()" },
+            "notes":         { ".validate": "newData.isString() && newData.val().length <= 2000" },
+
+            // a judge cannot file a score under someone else's name
+            "judgeUid":      { ".validate": "newData.val() === auth.uid" },
+            "teamId":        { ".validate": "newData.isString() && newData.val() === $teamId" },
+            "teamName":      { ".validate": "newData.isString()" },
+            "room":          { ".validate": "newData.isString()" },
+            "time":          { ".validate": "newData.isString()" },
+            "submittedAt":   { ".validate": "newData.isNumber() && newData.val() <= now" },
+
+            "$other":        { ".validate": false }
           }
         }
       }
