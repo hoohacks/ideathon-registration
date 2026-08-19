@@ -36,11 +36,17 @@ export function PageHeader({ title, stats = [], progress, children }) {
                 </Stack>
             )}
 
-            {typeof progress === "number" && (
+            {typeof progress === "number" && progress > 0 && (
                 <LinearProgress
                     variant="determinate"
                     value={Math.min(100, Math.max(0, progress))}
-                    sx={{ mt: 1.5, height: 6, borderRadius: 3 }}
+                    sx={{
+                        mt: 1.5,
+                        height: 6,
+                        borderRadius: 3,
+                        bgcolor: "divider",
+                        "& .MuiLinearProgress-bar": { borderRadius: 3 },
+                    }}
                 />
             )}
         </Box>
