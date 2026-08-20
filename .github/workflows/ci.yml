@@ -1,0 +1,63 @@
+name: CI
+
+# Runs on every push and pull request. Deploying is a separate workflow that
+# fires on a published release -- pushing to main no longer puts anything live.
+on:
+  push:
+    branches-ignore:
+      - gh-pages
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The Realtime Database emulator, which the security rules suite runs
+      # against, is a Java jar.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Firebase emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      # `npm ci` honours the lockfile. The previous workflow used
+      # `npm install --force`, which ignores it and resolves peer conflicts by
+      # picking something -- so CI could build against different versions than
+      # anyone had tested locally.
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      # These execute database.rules.json against the emulator. The rules are
+      # the only real authorization in this app -- there is no server -- so a
+      # change here is a change to who can read what.
+      - name: Security rules
+        run: npm run test:rules
+
+      - name: Build
+        run: npm run build
+        env:
+          # warnings do not fail the build; `npm run test:ci` above runs with
+          # CI=true, so lint problems still surface, just not as a hard failure
+          # on a branch someone is still working on
+          CI: false

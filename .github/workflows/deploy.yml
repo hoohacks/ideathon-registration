@@ -1,0 +1,81 @@
+name: Deploy
+
+# Publishing a GitHub Release puts the site live. Pushing to main does not --
+# that was the old behaviour, and it meant every merge was a deploy whether or
+# not anyone intended one.
+#
+# `workflow_dispatch` is the emergency handle: it redeploys whatever is on the
+# chosen ref without cutting a release, for the day of the event when something
+# needs to go out now.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Two releases published close together would otherwise race to write gh-pages
+# and the loser could be the one that sticks.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Firebase emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Install
+        run: npm ci
+
+      # A release is not the moment to find out the tests are red.
+      - name: Unit tests
+        run: npm run test:ci
+
+      - name: Security rules
+        run: npm run test:rules
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
+          commit_message: "Deploy ${{ github.event.release.tag_name || github.sha }}"
+
+      # database.rules.json and storage.rules are NOT deployed here -- they are
+      # published by hand in the Firebase console, by choice. src/schema.test.js
+      # fails when the rules change without the version marker being bumped, so
+      # this is the reminder that goes with that.
+      - name: Remind about the rules
+        run: |
+          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If \`database.rules.json\` or \`storage.rules\` changed in this release," >> $GITHUB_STEP_SUMMARY
+          echo "publish them in the Firebase console now. Nothing here does it for you." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          grep -o 'rulesVersion: [0-9]*' database.rules.json >> $GITHUB_STEP_SUMMARY || true
