@@ -20,6 +20,7 @@ import { IoChevronDown, IoMenu, IoClose } from "react-icons/io5";
 import { AuthContext } from "./App";
 import { auth } from "./firebase";
 import { tokens } from "./theme";
+import { hasRole } from "./roles";
 
 /**
  * The one bar for the whole site. It used to live under user/ and serve only
@@ -54,6 +55,7 @@ const ADMIN = [
     { to: "/user/admin/search", label: "Competitors" },
     { to: "/user/admin/judges", label: "Judges" },
     { to: "/user/admin/teams", label: "Teams" },
+    { to: "/user/admin/judging", label: "Judging progress" },
     { to: "/user/admin/metrics", label: "Metrics" },
 ];
 
@@ -137,9 +139,9 @@ function Nav({ variant = "app" }) {
     const [accountAnchor, setAccountAnchor] = useState(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
-    const isAdmin = userTypes.includes("admin");
+    const isAdmin = hasRole(userTypes, "admin");
     const primary = PRIMARY.filter(
-        (link) => !link.roles || link.roles.some((role) => userTypes.includes(role))
+        (link) => !link.roles || link.roles.some((role) => hasRole(userTypes, role))
     );
 
     const isActive = (to) =>

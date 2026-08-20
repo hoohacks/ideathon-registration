@@ -4,9 +4,10 @@ import {
   calculateAverageScore,
   countFundableVotes,
   scoreCard,
+  scoredJudgeCount,
   SCORE_FIELDS,
   SCORE_MAX_TOTAL,
-} from "../judge/finalRoundService";
+} from "../judge/scoreRubric";
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -27,7 +28,7 @@ import Layout from "../Layout";
 import { memberIds } from "../team/teamMembers";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
 
-function ScoreSummary({ label, scores }) {
+function ScoreSummary({ label, scores, judgeNames = {} }) {
   const judgeIds = Object.keys(scores ?? {});
   if (!judgeIds.length) return null;
 
@@ -44,7 +45,7 @@ function ScoreSummary({ label, scores }) {
           <Typography variant="body2">
             {average === null ? "not scored" : `${average.toFixed(1)} / ${SCORE_MAX_TOTAL}`}
             {" · "}
-            {judgeIds.length} judge{judgeIds.length === 1 ? "" : "s"}
+            {scoredJudgeCount(scores)} judge{scoredJudgeCount(scores) === 1 ? "" : "s"}
             {" · "}
             {fundable} fundable
           </Typography>
@@ -60,7 +61,9 @@ function ScoreSummary({ label, scores }) {
                 <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
                   {card === null ? "—" : `${card.toFixed(1)} / ${SCORE_MAX_TOTAL}`}
                   <Box component="span" sx={{ fontWeight: 400, color: "text.secondary" }}>
-                    {"  "}judge {judgeId.slice(0, 8)}
+                    {"  "}
+                    {judgeNames[judgeId] ?? `judge ${judgeId.slice(0, 8)}`}
+                    {scoreObj?.source === "paper" ? " (entered from paper)" : ""}
                   </Box>
                 </Typography>
                 <Typography variant="body2">
@@ -91,11 +94,37 @@ function TeamSearch() {
   const [sortBy, setSortBy] = useState("name");
   const [teams, setTeams] = useState({});
   const [submittedCount, setSubmittedCount] = useState(0);
+  const [judgeNames, setJudgeNames] = useState({});
+  // scores no longer live under /teams, so they need their own subscriptions
+  const [firstScores, setFirstScores] = useState({});
+  const [finalScores, setFinalScores] = useState({});
 
   const teamCount = Object.keys(teams).length;
   const percentSubmitted = teamCount ? (submittedCount / teamCount) * 100 : 0;
 
   useEffect(() => {
+    const stop = [
+      onValue(ref(database, "scores/first"), (snap) => setFirstScores(snap.val() ?? {})),
+      onValue(ref(database, "scores/final"), (snap) => setFinalScores(snap.val() ?? {})),
+      onValue(ref(database, "judges"), (snap) => {
+        const names = {};
+        for (const [uid, judge] of Object.entries(snap.val() ?? {})) {
+          names[uid] =
+            [judge?.firstName, judge?.lastName].filter(Boolean).join(" ").trim() ||
+            `judge ${uid.slice(0, 8)}`;
+        }
+        setJudgeNames(names);
+      }),
+    ];
+    return () => stop.forEach((fn) => fn());
+  }, []);
+
+  useEffect(() => {
+    // one cache of uid -> name across snapshots. This used to re-read every
+    // member of every team inside the subscription callback, so a single write
+    // anywhere under /teams fanned out into O(teams x members) reads.
+    const nameCache = new Map();
+
     const unsubscribe = onValue(ref(database, "/teams/"), async (snapshot) => {
       const data = snapshot.val();
       if (!data) {
@@ -114,12 +143,12 @@ function TeamSearch() {
         const members = memberIds(team.members);
         team.memberNames = await Promise.all(
           members.map(async (uid) => {
+            if (nameCache.has(uid)) return nameCache.get(uid);
             const userSnapshot = await get(ref(database, `competitors/${uid}`));
-            if (userSnapshot.exists()) {
-              const userInfo = userSnapshot.val();
-              return `${userInfo.firstName} ${userInfo.lastName}`;
-            }
-            return "Unknown user";
+            const userInfo = userSnapshot.exists() ? userSnapshot.val() : null;
+            const name = userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : "Unknown user";
+            nameCache.set(uid, name);
+            return name;
           })
         );
 
@@ -133,6 +162,16 @@ function TeamSearch() {
     return () => unsubscribe();
   }, []);
 
+  // the pre-migration copy still counts until migrate-scores.mjs has run
+  const scoresFor = useMemo(
+    () => (key) => ({ ...(teams[key]?.scores ?? {}), ...(firstScores[key] ?? {}) }),
+    [teams, firstScores]
+  );
+  const finalScoresFor = useMemo(
+    () => (key) => ({ ...(teams[key]?.finalScores ?? {}), ...(finalScores[key] ?? {}) }),
+    [teams, finalScores]
+  );
+
   const visibleTeams = useMemo(() => {
     const needle = query.toLowerCase();
     const keys = Object.keys(teams).filter((key) => {
@@ -143,15 +182,15 @@ function TeamSearch() {
       );
     });
 
-    const first = (key) => calculateAverageScore(teams[key]?.scores) ?? -1;
-    const final = (key) => calculateAverageScore(teams[key]?.finalScores) ?? -1;
+    const first = (key) => calculateAverageScore(scoresFor(key)) ?? -1;
+    const final = (key) => calculateAverageScore(finalScoresFor(key)) ?? -1;
 
     return keys.sort((a, b) => {
       if (sortBy === "score") return first(b) - first(a);
       if (sortBy === "finalScore") return final(b) - final(a);
       return (teams[a]?.name ?? "").localeCompare(teams[b]?.name ?? "");
     });
-  }, [teams, query, sortBy]);
+  }, [teams, query, sortBy, scoresFor, finalScoresFor]);
 
   return (
     <Layout maxWidth="lg">
@@ -237,8 +276,8 @@ function TeamSearch() {
                   </Box>
                 )}
 
-                <ScoreSummary label="First round" scores={team.scores} />
-                <ScoreSummary label="Final round" scores={team.finalScores} />
+                <ScoreSummary label="First round" scores={scoresFor(key)} judgeNames={judgeNames} />
+                <ScoreSummary label="Final round" scores={finalScoresFor(key)} judgeNames={judgeNames} />
               </Stack>
             </Row>
           );

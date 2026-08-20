@@ -33,14 +33,29 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
 
-    // Pitch decks are uploaded from the team page by a signed-in member.
-    match /teams/{teamId}/{fileName} {
+    // Pitch decks, uploaded from the team page by a signed-in member.
+    //
+    // The uploader's uid is a path segment because Storage rules cannot query
+    // the Realtime Database -- there is no way to ask "is this person on this
+    // team" from here. Without it, `request.auth != null` was the only
+    // condition on the write, so any signed-in account could overwrite any
+    // team's deck given the team id and the file name. Scoping the write to
+    // the uploader's own segment closes that without blocking someone
+    // replacing their own file, which create-only would have done.
+    match /teams/{teamId}/{uploaderUid}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
+                   && request.auth.uid == uploaderUid
                    && request.resource.size < 25 * 1024 * 1024
                    && (request.resource.contentType.matches('application/vnd.ms-powerpoint')
                        || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*')
                        || request.resource.contentType.matches('application/pdf'));
+    }
+
+    // Decks uploaded under the old flat layout. Readable so existing
+    // submissions keep working; no longer writable.
+    match /teams/{teamId}/{fileName} {
+      allow read: if request.auth != null;
     }
 
     // Nothing else is writable.

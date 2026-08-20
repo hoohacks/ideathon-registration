@@ -1,6 +1,7 @@
 import Layout from "./Layout";
 import { useContext, useState } from "react";
 import { AuthContext } from "../App";
+import { hasRole, roleList } from "../roles";
 import {
     Alert,
     Box,
@@ -41,6 +42,7 @@ function Row({ label, children }) {
 
 function Profile() {
     const { userData, userTypes, userCredential } = useContext(AuthContext);
+    const roles = roleList(userTypes);
     const navigate = useNavigate();
     const [sentReset, setSentReset] = useState(false);
     const [resetError, setResetError] = useState("");
@@ -48,7 +50,7 @@ function Profile() {
         userData?.dietaryRestriction ?? "none"
     );
 
-    const roles = Array.isArray(userTypes) ? userTypes : [];
+
 
     const setDietaryRestrictions = async (restriction) => {
         if (!userData || !restriction) return;
@@ -135,7 +137,7 @@ function Profile() {
                             )}
                         </Stack>
                     </Row>
-                    {roles.includes("competitor") && (
+                    {hasRole(userTypes, "competitor") && (
                         <>
                             <Divider />
                             <Row label="Dietary restrictions">

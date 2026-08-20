@@ -1,151 +1,254 @@
-import {
-  ref,
-  get,
-  set,
-  onValue,
-  serverTimestamp,
-} from "firebase/database";
-import { getAuth } from "firebase/auth";
+import { ref, get, update, onValue, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
+import { requireAdmin } from "../../roles.js";
+import { READ_LEGACY_SCORE_PATH, FIRST_ROUND } from "./getTeamInfo.js";
+import { compareForRanking, rankingEntry } from "./scoreRubric.js";
 
-// Each rubric criterion and the maximum a judge can award for it. These must
-// stay in step with the selects in ScoreSubmission -- a criterion missing here
-// is collected from judges and then silently thrown away.
-export const SCORE_FIELDS = {
-  problem: 10,
-  innovation: 10,
-  impact: 10,
-  viability: 5,
-  pitch_quality: 5,
-};
+export const FINAL_ROUND_ROOM = "Rice 011";
 
-export const SCORE_MAX_TOTAL = Object.values(SCORE_FIELDS).reduce((a, b) => a + b, 0);
+/**
+ * Below this, an average is not really a ranking — it is one person's opinion.
+ * Teams under it are still ranked, but activation reports them so an organiser
+ * can send a judge round before the cut is made rather than discovering it
+ * afterwards.
+ */
+export const MIN_JUDGES_FOR_CONFIDENCE = 2;
 
-// Score one judge's card out of SCORE_MAX_TOTAL. Criteria are summed rather
-// than averaged so a 10 point criterion counts twice as much as a 5 point one,
-// which is what the differing ranges are for. Fields the judge did not fill in
-// are left out of both the total and the denominator, so an older card that
-// predates a criterion is not penalised for it.
-export function scoreCard(entry) {
-  let earned = 0;
-  let possible = 0;
+/**
+ * Every first-round card, as { teamId: { judgeUid: card } }.
+ *
+ * Reads both the current location and the pre-migration one, because averages
+ * computed from half the cards would quietly pick the wrong finalists. Drop the
+ * legacy branch with READ_LEGACY_SCORE_PATH once the migration is verified.
+ */
+export async function loadFirstRoundScores(teamsData) {
+  const byTeam = {};
 
-  for (const [field, max] of Object.entries(SCORE_FIELDS)) {
-    const raw = entry?.[field];
-    if (raw === undefined || raw === null || raw === "") continue;
-    const value = Number(raw);
-    if (!Number.isFinite(value)) continue;
-    earned += value;
-    possible += max;
+  const snap = await get(ref(database, `scores/${FIRST_ROUND}`));
+  if (snap.exists()) {
+    for (const [teamId, cards] of Object.entries(snap.val() ?? {})) {
+      byTeam[teamId] = { ...(cards ?? {}) };
+    }
   }
 
-  if (possible === 0) return null;
-  return (earned / possible) * SCORE_MAX_TOTAL;
-}
-
-export function calculateAverageScore(scores = {}) {
-  const entries = Object.values(scores ?? {});
-  if (!entries.length) return null;
-
-  const cards = entries.map(scoreCard).filter((value) => value !== null);
-  if (!cards.length) return null;
-
-  return cards.reduce((a, b) => a + b, 0) / cards.length;
-}
-
-export function countFundableVotes(scores = {}) {
-  const entries = Object.values(scores ?? {});
-  return entries.filter((entry) => entry?.fundable === true).length;
-}
-
-export async function activateFinalRound({ limit = 4 } = {}) {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  if (!user) throw new Error("Must be signed in to activate the final round");
-
-  const teamsSnap = await get(ref(database, "teams"));
-  if (!teamsSnap.exists()) {
-    throw new Error("No teams found to evaluate for the final round");
+  if (READ_LEGACY_SCORE_PATH && teamsData) {
+    for (const [teamId, team] of Object.entries(teamsData)) {
+      if (!team?.scores) continue;
+      // the migrated copy wins: it is the one the app writes to now
+      byTeam[teamId] = { ...team.scores, ...(byTeam[teamId] ?? {}) };
+    }
   }
 
-  const teamsData = teamsSnap.val();
-  const teamEntries = Object.entries(teamsData).map(([teamId, team]) => {
-    const averageScore = calculateAverageScore(team?.scores);
-    // a judge who already saw this team in round one should not judge it again
-    const excludedJudges = team?.scores
-      ? Object.keys(team.scores).reduce((acc, judgeId) => {
-        acc[judgeId] = true;
-        return acc;
-      }, {})
-      : {};
+  return byTeam;
+}
 
-    return {
-      teamId,
-      name: team?.name ?? "Unnamed Team",
-      averageScore,
-      excludedJudges,
-    };
-  });
-
-  const eligibleTeams = teamEntries
+/**
+ * Rank every team that has at least one usable card.
+ *
+ * Ties are broken explicitly rather than left to sort stability, which would
+ * hand the last podium place to whichever team Firebase happened to give the
+ * earlier push key.
+ */
+export function rankTeams(teamsData, scoresByTeam) {
+  return Object.entries(teamsData ?? {})
+    .map(([teamId, team]) => ({
+      ...rankingEntry(teamId, team?.name, scoresByTeam?.[teamId]),
+      submitted: Boolean(team?.submitted),
+    }))
     .filter((team) => typeof team.averageScore === "number")
-    .sort((a, b) => b.averageScore - a.averageScore)
-    .slice(0, limit);
+    .sort(compareForRanking);
+}
 
-  if (!eligibleTeams.length) {
+/**
+ * Take the top `limit` teams into the final round.
+ *
+ * Writes four things in ONE atomic update, so they cannot drift:
+ *   finalRound/*                        the standings, admin-readable only
+ *   teams/{id}/finalSlot                the team's own room and time
+ *   judges/{uid}/finalAssignments/{id}  what each judge has to see
+ *
+ * The last two exist because Realtime Database needs read permission at the
+ * location being queried, and the standings must not be readable. Denormalising
+ * is the same answer the first-round schedule already uses.
+ */
+export async function activateFinalRound({ limit = 4, requireSubmitted = true } = {}) {
+  const user = await requireAdmin("activate the final round");
+
+  const [teamsSnap, judgesSnap] = await Promise.all([
+    get(ref(database, "teams")),
+    get(ref(database, "judges")),
+  ]);
+  if (!teamsSnap.exists()) throw new Error("No teams found to evaluate for the final round");
+
+  const teamsData = teamsSnap.val() ?? {};
+  const judgesData = judgesSnap.exists() ? judgesSnap.val() ?? {} : {};
+  const scoresByTeam = await loadFirstRoundScores(teamsData);
+
+  const ranked = rankTeams(teamsData, scoresByTeam)
+    // an unsubmitted team has nothing to present; it used to be eligible
+    .filter((team) => (requireSubmitted ? team.submitted : true));
+
+  if (!ranked.length) {
     throw new Error("No teams have scores yet. Final round cannot be activated.");
   }
 
-  const teamsPayload = eligibleTeams.reduce((acc, team, index) => {
-    acc[team.teamId] = {
+  const finalists = ranked.slice(0, limit);
+  const warnings = [];
+
+  const underJudged = finalists.filter((t) => t.judgeCount < MIN_JUDGES_FOR_CONFIDENCE);
+  if (underJudged.length) {
+    warnings.push(
+      `${underJudged.map((t) => t.name).join(", ")} reached the final on fewer than ` +
+        `${MIN_JUDGES_FOR_CONFIDENCE} judges.`
+    );
+  }
+
+  // a tie straddling the cut line is the one an organiser has to know about
+  const firstOut = ranked[limit];
+  if (firstOut && finalists.length === limit) {
+    const lastIn = finalists[limit - 1];
+    if (lastIn.averageScore === firstOut.averageScore) {
+      warnings.push(
+        `${lastIn.name} and ${firstOut.name} tied on average; the tiebreak put ` +
+          `${lastIn.name} through.`
+      );
+    }
+  }
+
+  const updates = {};
+  const teamsPayload = {};
+
+  finalists.forEach((team, index) => {
+    const timeslot = `Slot ${index + 1}`;
+
+    // a judge who already saw this team in round one should not judge it again
+    const excludedJudges = Object.keys(scoresByTeam[team.teamId] ?? {}).reduce((acc, uid) => {
+      acc[uid] = true;
+      return acc;
+    }, {});
+
+    teamsPayload[team.teamId] = {
       name: team.name,
       averageScore: team.averageScore,
-      excludedJudges: team.excludedJudges,
-      timeslot: `Slot ${index + 1}`,
-      room: "Rice 011",
+      fundableVotes: team.fundableVotes,
+      judgeCount: team.judgeCount,
+      excludedJudges,
+      timeslot,
+      room: FINAL_ROUND_ROOM,
     };
-    return acc;
-  }, {});
 
-  const payload = {
-    active: true,
-    activatedAt: serverTimestamp(),
-    activatedBy: user.uid,
-    teams: teamsPayload,
-  };
+    updates[`teams/${team.teamId}/finalSlot`] = { room: FINAL_ROUND_ROOM, timeslot };
+  });
 
-  await set(ref(database, "finalRound"), payload);
-  return payload;
+  // clear any slot left over from a previous activation
+  for (const teamId of Object.keys(teamsData)) {
+    if (!(teamId in teamsPayload)) updates[`teams/${teamId}/finalSlot`] = null;
+  }
+
+  // every judge gets exactly the finalists they are not excluded from. The
+  // filtering used to happen in the browser, which only worked because judges
+  // could read excludedJudges — that is, because the standings leaked.
+  for (const judgeUid of Object.keys(judgesData)) {
+    const assignments = {};
+    for (const [teamId, details] of Object.entries(teamsPayload)) {
+      if (details.excludedJudges[judgeUid]) continue;
+      assignments[teamId] = {
+        teamId,
+        teamName: details.name,
+        room: details.room,
+        timeslot: details.timeslot,
+      };
+    }
+    updates[`judges/${judgeUid}/finalAssignments`] = Object.keys(assignments).length
+      ? assignments
+      : null;
+  }
+
+  updates["finalRound/active"] = true;
+  updates["finalRound/activatedAt"] = serverTimestamp();
+  updates["finalRound/activatedBy"] = user.uid;
+  updates["finalRound/teams"] = teamsPayload;
+
+  await update(ref(database), updates);
+
+  return { ok: true, finalists, warnings, ranked };
 }
 
+/**
+ * Close the final round.
+ *
+ * Every denormalised copy is cleared in the same update as the flag. Leaving
+ * `finalAssignments` behind would leave every judge holding write access to
+ * /scores/final for those teams, because that node is what the rules treat as
+ * proof of assignment.
+ *
+ * The standings are archived rather than deleted. Deactivating used to destroy
+ * them outright while the final scores survived underneath, so reactivating
+ * recomputed a possibly different finalist set against cards from the old one.
+ */
 export async function deactivateFinalRound() {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  if (!user) throw new Error("Must be signed in to deactivate the final round");
+  const user = await requireAdmin("deactivate the final round");
 
-  const payload = {
-    active: false,
-    deactivatedAt: serverTimestamp(),
-    deactivatedBy: user.uid,
-    teams: null,
-  };
+  const [currentSnap, judgesSnap, teamsSnap] = await Promise.all([
+    get(ref(database, "finalRound/teams")),
+    get(ref(database, "judges")),
+    get(ref(database, "teams")),
+  ]);
 
-  await set(ref(database, "finalRound"), payload);
-  return payload;
+  const updates = {};
+
+  if (currentSnap.exists()) {
+    updates[`finalRound/archive/${Date.now()}`] = {
+      teams: currentSnap.val(),
+      archivedAt: serverTimestamp(),
+      archivedBy: user.uid,
+    };
+  }
+
+  for (const judgeUid of Object.keys(judgesSnap.val() ?? {})) {
+    updates[`judges/${judgeUid}/finalAssignments`] = null;
+  }
+  for (const teamId of Object.keys(teamsSnap.val() ?? {})) {
+    updates[`teams/${teamId}/finalSlot`] = null;
+  }
+
+  updates["finalRound/active"] = false;
+  updates["finalRound/teams"] = null;
+  updates["finalRound/deactivatedAt"] = serverTimestamp();
+  updates["finalRound/deactivatedBy"] = user.uid;
+
+  await update(ref(database), updates);
+  return { ok: true };
 }
 
-export function subscribeToFinalRoundState(callback) {
-  const finalRoundRef = ref(database, "finalRound");
+/**
+ * Whether the final round is open. Readable by anyone signed in — it is the
+ * only part of /finalRound that is.
+ */
+export function subscribeToFinalRoundActive(callback) {
   const unsubscribe = onValue(
-    finalRoundRef,
-    (snapshot) => {
-      callback(snapshot.exists() ? snapshot.val() : { active: false });
-    },
+    ref(database, "finalRound/active"),
+    (snapshot) => callback({ active: snapshot.val() === true }),
     (error) => {
       console.error("Failed to subscribe to final round state:", error);
       callback({ active: false, error: error.message });
     }
   );
+  return () => unsubscribe();
+}
 
+/**
+ * The standings, with the average scores. Admin only — mount this behind a role
+ * check or every judge logs a permission error on each page load.
+ */
+export function subscribeToFinalRoundStandings(callback) {
+  const unsubscribe = onValue(
+    ref(database, "finalRound/teams"),
+    (snapshot) => callback({ teams: snapshot.exists() ? snapshot.val() : null }),
+    (error) => {
+      console.error("Failed to subscribe to final round standings:", error);
+      callback({ teams: null, error: error.message });
+    }
+  );
   return () => unsubscribe();
 }

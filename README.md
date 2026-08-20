@@ -65,30 +65,36 @@ both places.
 ```
 /admins/{uid}              true
 /config                    judgingRooms[]  eventStart
+                           scheduleMeta           generatedAt generatedBy teams
+                                                  judges onlyCheckedIn
 /competitors/{uid}         firstName lastName email major skills learn gender
                            schoolYear uvaSchool resume dietaryRestriction
                            checkedIn foodCheckIn teamId registeredAt
 /judges/{uid}              firstName lastName email company withCompany
                            wantsToJudge wantsToMentor skills[] timeslots[]
                            checkedIn foodCheckIn isRound1Judge registeredAt
-                           teamAssignments/{teamId}
+                           teamAssignments/{teamId}   teamName id room time batch judges[]
+                           finalAssignments/{teamId}  teamId teamName room timeslot
 /teams/{teamId}            name createdBy submitted
                            members/{uid}          true
                            submission             ideaName problemStatement
                                                   targetIndustry pitchDeckName
                                                   pitchDeckURL
                            schedule               teamName id room time batch judges[]
-                           scores/{judgeUid}      problem innovation impact viability
-                                                  pitch_quality fundable notes
-                                                  teamName room time judgeUid teamId
-                                                  submittedAt
-                           finalScores/{judgeUid} same shape
+                           finalSlot              room timeslot
+/scores/{round}/{teamId}/{judgeUid}
+                           problem innovation impact viability pitch_quality
+                           fundable notes teamName room time judgeUid teamId
+                           enteredBy source submittedAt
+                           round is "first" or "final"
 /finalRound                active activatedAt activatedBy
-                           teams/{teamId}         name averageScore timeslot room
+                           teams/{teamId}         name averageScore fundableVotes
+                                                  judgeCount timeslot room
                                                   excludedJudges/{uid}
+                           archive/{ts}           a previous standings set
 ```
 
-Three things are deliberate:
+Some things are deliberate:
 
 **Sets are keyed, never arrays.** `members`, `teamAssignments` and
 `excludedJudges` are `{id: true}` / `{id: object}`. Realtime Database stores an
@@ -105,6 +111,25 @@ range-query, and they do not trust the registrant's clock or timezone.
 judge load their own schedule without read access to every team. Both copies are
 written in one atomic update, so they cannot drift.
 
+The final round works the same way, for the same reason plus a sharper one:
+`/finalRound/teams` carries every finalist's average score, and Realtime
+Database needs read permission *at the node being queried*, so a judge cannot
+list the finalists without also being handed the standings. Activation therefore
+writes `teams/{id}/finalSlot` for the team and `judges/{uid}/finalAssignments`
+for the judge, in the same atomic update as the standings themselves.
+
+**Scores live at `/scores`, not under the team.** Rules cascade and cannot be
+revoked deeper, so a team member's read on `teams/$teamId` would grant
+everything beneath it — including the judges' free-text notes. Nothing holds a
+read anywhere above `/scores/{round}/{teamId}/{judgeUid}`, so the only ways in
+are your own card and the admin rule at the root.
+
+**`enteredBy` is who pressed the button; `judgeUid` is whose card it is.** They
+differ only when an organiser keys in a score from paper. `judgeUid` is pinned
+to the path key and `enteredBy` to `auth.uid`, so a judge still cannot file
+under another judge, and an admin can no longer be blocked by their own
+validation rule from recording a score on someone's behalf.
+
 Scores are validated by the rules — ranges, types, and no unknown fields.
 `src/schema.test.js` asserts those ranges still match `SCORE_FIELDS` and the
 scoring form, so the three cannot drift apart silently.
@@ -114,6 +139,17 @@ scoring form, so the three cannot drift apart silently.
 `database.rules.json` holds the Realtime Database rules. Paste it into the
 Firebase console (Realtime Database -> Rules) or deploy it with
 `firebase deploy --only database`. The console strips the `//` comments.
+
+**Nothing deploys them for you, on purpose.** CI builds and publishes the site;
+it does not touch the rules. The failure that creates — changing the rules in
+git and never republishing them — is caught by a digest check in
+`src/schema.test.js`: edit the rules and `npm test` fails until you bump
+`// rulesVersion:` at the top of the file and paste the new digest it prints.
+That failure is the reminder to republish. Do it before the release goes out,
+not after.
+
+`storage.rules` has no equivalent guard, so it is on the release checklist
+below. Forgetting it silently breaks resume and pitch deck uploads.
 
 Two things about Realtime Database rules drive the whole shape of that file:
 
@@ -137,23 +173,51 @@ Two things about Realtime Database rules drive the whole shape of that file:
 
 | Actor | Can |
 | --- | --- |
-| anyone signed in | read their own `admins`/`judges`/`competitors` record, `config`, `finalRound`, and any team's `name` |
-| competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members; read their own team; write their own team's `submission` and `submitted` |
-| judge | read their own record and assignments; write `teams/*/scores/{ownUid}` and `finalScores/{ownUid}`, and read back only their own |
+| anyone signed in | read their own `admins`/`judges`/`competitors` record, `config`, `finalRound/active`, `finalRound/activatedAt`, and any team's `name` |
+| competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members; read their own team, including its `finalSlot`; write their own team's `submission` and `submitted` |
+| judge | read their own record and both assignment lists; read `submission` for teams they are assigned to; write `scores/{round}/{teamId}/{ownUid}` for those teams, and read back only their own |
 | admin | everything, via the root rule |
 
-Notably a judge cannot set their own `isRound1Judge` or `checkedIn`, and a
-competitor cannot check themselves in or touch their team's `schedule` or
-`scores`.
+Notably:
 
-### Known trade-off
+- A judge cannot set their own `isRound1Judge`, `checkedIn`, `teamAssignments`
+  or `finalAssignments`. That last one is load-bearing rather than tidy: the
+  score rules treat an entry in either assignment node as proof of assignment,
+  so a judge who could seed one at registration could file a score for any team
+  in the event.
+- A judge can revise a score but not delete one. Admins can, through the root
+  rule.
+- A competitor cannot check themselves in, seed a `schedule` or `finalSlot` on
+  a team they create, or read any score at all.
+- **Nobody but an admin can read the standings.** `/finalRound` has no `.read`
+  at the node itself, because one there would cascade into `finalRound/teams`
+  and hand every signed-in account the top four with their average scores before
+  they are announced.
 
-A team member can read their own team node, and scores live under it, so a
-determined competitor could read their own team's judge scores and notes
-through the console. They cannot read any other team's. Closing this properly
-means either moving scores to a top-level `/scores/{teamId}` node or replacing
-`$teamId/.read` with per-field read rules and splitting the single subscription
-in `src/user/team/Team.js` into one per field. Neither is done here.
+### Testing the rules
+
+The rules are the only real authorization in this app — there is no server, and
+every React role check is advisory, since anyone can set `userTypes` in DevTools
+and paint an admin page. So they are tested twice over:
+
+| Suite | What it catches | Needs |
+| --- | --- | --- |
+| `src/schema.test.js` | a clause deleted, a range drifting from the code, scores reappearing under `/teams`, `/finalRound` regaining a `.read` | nothing |
+| `test/rules/` | a clause that is *wrong* — it executes the rules against the emulator and actually tries the reads | a JVM |
+
+```
+npm test           # everything under src/, no JVM needed
+npm run test:rules # executes database.rules.json against the emulator
+```
+
+The Realtime Database emulator is a Java jar, so `npm run test:rules` needs a
+JDK 17+ on the PATH; `npx firebase setup:emulators:database` pre-downloads it.
+For an iterative loop, run `npm run emulators` in one terminal and
+`npm run test:rules:watch` in another. CI runs both suites.
+
+The emulator runs under the project id `demo-ideathon`. The `demo-` prefix
+makes it fully offline, so a misconfigured test can never reach the real
+project.
 
 ## Migrating existing teams
 
@@ -170,14 +234,63 @@ ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... node scripts/migrate-team-members
 It reports what it would change and writes nothing. Add `--apply` to commit the
 change. On a fresh project there is nothing to migrate and it exits saying so.
 
+## Moving scores off the team node
+
+Scores used to live at `teams/{id}/scores`. Rules cascade, so the read a team
+member holds on their own team reached them; a competitor could read their own
+judges' numbers and notes through the console. They now live at
+`/scores/{round}/{teamId}/{judgeUid}`, which nobody holds a read above.
+
+An event with live data has to be walked across. The rules and the client are
+coupled — the write path itself moves — so there is no ordering in which
+old-client/new-rules and new-client/old-rules both work. Hence a short
+coordinated cutover rather than a compatibility window. Scores are deliberately
+**not** dual-written: that doubles the failure surface during a live event and
+leaves a divergence to reconcile afterwards.
+
+| Step | Do | To undo |
+| --- | --- | --- |
+| 0 | Export the whole database from the console. | — |
+| 1 | `npm run rules:cutover`, publish the generated `database.rules.cutover.json`. Both score locations are live, so the deployed app keeps working. | republish the previous rules |
+| 2 | Deploy this build. It reads and writes `/scores`, and falls back to the old location for reads so historical scores do not appear to vanish. | redeploy the previous `gh-pages` commit |
+| 3 | `npm run rules:cutover -- --freeze` and publish that, then run the migration below. The freeze matters: a judge who submits between the migration's read and its write would otherwise be read-missed and then nulled. | `--rollback` (below) |
+| 4 | Publish `database.rules.json`. Press **Generate Schedule** once. Delete the fallback: set `READ_LEGACY_SCORE_PATH = false` in `src/user/judge/getTeamInfo.js` and remove the legacy branches it guards. | republish the step 1 rules |
+| 5 | Sign in as a real competitor account and confirm the console denies `/scores` and `/finalRound`. | — |
+
+```
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... node scripts/migrate-scores.mjs
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=... node scripts/migrate-scores.mjs --apply
+```
+
+**Read the dry run.** The whole migration is one atomic update, so a single
+malformed legacy record rejects all of it — and Realtime Database will not tell
+you which path failed, only `PERMISSION_DENIED` for the lot. The dry run
+validates every record against the rules first and lists any it will skip. It
+also reports judges whose `teamAssignments` are still array-shaped, who cannot
+score at all until the schedule is regenerated, because `hasChild()` cannot see
+into an array.
+
+`--apply` writes a timestamped backup to `scripts/backups/` before touching
+anything. To reverse it:
+
+```
+ADMIN_EMAIL=... ADMIN_PASSWORD=... node scripts/migrate-scores.mjs --rollback scripts/backups/scores-....json --apply
+```
+
+Those backups contain judges' free-text notes, so the directory is gitignored.
+
+Step 4 is what actually closes the leak. Until then the old location still
+exists and the old `/finalRound` read is still granted.
+
 ## Configuration
 
-Two optional database nodes change behaviour without a deploy:
+Optional database nodes that change behaviour without a deploy:
 
 | Path | Effect |
 | --- | --- |
 | `config/judgingRooms` | list of room names for the first round; falls back to the 12 in `getJudgeSchedule.js`. A batch cannot have more teams than there are rooms |
 | `config/eventStart` | ISO timestamp the home page counts down to |
+| `config/scheduleMeta` | written by schedule generation, not by hand. It is what makes the "you are about to replace every assignment" confirmation survive a page reload |
 
 ## Judging
 
@@ -187,13 +300,77 @@ Two optional database nodes change behaviour without a deploy:
    split into three batches; each team in a batch gets its own room, and every
    judge visits exactly one team per batch. Generation validates room and judge
    supply first and writes nothing if it cannot produce a complete schedule.
-3. Judges score from their assignment cards. Scores are keyed by team id.
-4. **Activate Final Round** takes the top four teams by average score and
-   excludes the judges who already saw them in round one.
+   Tick **only schedule judges who have checked in** to leave no-shows out.
+3. Judges score from their assignment cards, which also carry the team's idea,
+   problem statement and pitch deck. Scores are keyed by team id.
+4. Watch **Judging progress** (Admin -> Judging progress) while the round runs.
+5. **Activate Final Round** takes the top four and excludes the judges who
+   already saw them in round one.
 
 Scoring is out of 40: problem, innovation and impact are worth 10 each,
 viability and pitch quality 5 each. `fundable` is recorded as a tally, not
-scored.
+scored. Nothing is pre-selected on the score card — the form used to open on
+5/5/5/3/3/Yes, which meant an untouched card was a complete, submittable score.
+
+### When something goes wrong on the day
+
+**Judging progress** is the page for this. It shows, per team, who is assigned
+and who has actually submitted, and per judge, what they still owe. Teams with
+no scores sort to the top in red.
+
+| Problem | Do this |
+| --- | --- |
+| A judge has not turned up | **Judges** on the affected team row -> add or swap. This rewrites one team's assignment, not the whole schedule. Regenerating would move every assignment in the event and strand the scores already collected. |
+| A judge's phone died, or they scored on paper | **Record score** on the team row. The card is filed under that judge and stamped with your account in `enteredBy`. |
+| A judge says they submitted but nothing shows | Ask whether their page says "saved on this device". Scores that could not reach the database queue on the judge's phone and send themselves on reconnect — the page must stay open. There is a **Retry now** button. |
+| A team has no scores and time is running out | Assign a checked-in judge from another room, or record the score yourself. |
+| Scores appear from a judge who is not assigned | Expected after a regenerate: scores are keyed by team and judge, so moving an assignment does not move them. Judging progress lists these explicitly, because they still count toward the average. |
+
+Judges do not need to be told any of this. Their side degrades on its own: every
+keystroke is drafted to the device, a submit that cannot reach the database is
+queued rather than lost, and a hung write times out after eight seconds instead
+of spinning forever.
+
+### Picking the winner
+
+`activateFinalRound` sorts on average score and breaks ties explicitly —
+fundable votes, then how many judges saw the team, then name. Without that the
+last podium place went to whichever team Firebase happened to give the earlier
+push key.
+
+It reports, rather than silently swallows, two things worth knowing before the
+result is announced: a finalist judged by fewer than two people, and a tie that
+straddled the cut line.
+
+Deactivating archives the standings to `finalRound/archive/{timestamp}` instead
+of deleting them, and withdraws every judge's `finalAssignments` in the same
+update — otherwise judges keep write access to `/scores/final` after the round
+has closed.
+
+## Deploying
+
+The site is served from the `gh-pages` branch at
+`hoohacks.github.io/ideathon-registration`.
+
+**Publishing a GitHub Release deploys.** Pushing to `main` does not. Every push
+and pull request runs CI (unit tests, the rules emulator suite, and a build);
+only a published release builds and pushes to `gh-pages`. There is also a
+`workflow_dispatch` on the Deploy workflow, which is the handle to reach for
+during the event when something has to go out now.
+
+### Release checklist
+
+1. Merge to `main` and let CI go green.
+2. If `database.rules.json` changed, publish it in the Firebase console.
+   `npm test` will have already forced you to bump `// rulesVersion:`, so the
+   diff tells you whether it did.
+3. If `storage.rules` changed, publish that too. Nothing checks this one, and
+   forgetting it silently breaks resume and pitch deck uploads.
+4. Publish a release. The Deploy workflow does the rest.
+
+The root `CNAME` file is inert: its value contains a path, which is not a valid
+CNAME value, and it sits outside `public/` so the build never copies it. The
+custom domain is not in use.
 
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

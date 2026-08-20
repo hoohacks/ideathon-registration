@@ -1,6 +1,8 @@
-import { ref, get, update } from "firebase/database";
+import { ref, get, update, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
+import { requireAdmin } from "../../roles.js";
 import { assignmentList } from "./assignmentList.js";
+import { FIRST_ROUND } from "./getTeamInfo.js";
 
 // Fallback room list. Override it at config/judgingRooms in the database to add
 // rooms without shipping a new build.
@@ -80,12 +82,21 @@ function displayName(person, fallback) {
  *
  * Returns { ok, error, warnings, stats, assignments }. It never throws, and it
  * never writes a partial schedule -- validation runs before anything is saved.
+ *
+ * `onlyCheckedIn` restricts the pool to judges who have actually arrived.
+ * Check-in state used to be ignored entirely, so a judge who never turned up
+ * still got a third of the rooms and the teams they were sent to went unseen,
+ * with nothing anywhere reporting it.
  */
-export async function getJudgeSchedule() {
+export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
     const warnings = [];
     const fail = (error) => ({ ok: false, error, warnings, stats: null, assignments: [] });
 
     try {
+        // a guard rail, not the boundary: the root rule is what actually stops
+        // a non-admin, but failing here gives a usable message instead of a
+        // bare PERMISSION_DENIED from a multi-path update
+        const admin = await requireAdmin("generate the judging schedule");
         const [judgeSnapshot, teamSnapshot, rooms] = await Promise.all([
             get(ref(database, "judges")),
             get(ref(database, "teams")),
@@ -98,9 +109,18 @@ export async function getJudgeSchedule() {
         const judgeData = judgeSnapshot.val();
         const teamData = teamSnapshot.val();
 
-        const judgesList = Object.entries(judgeData)
+        const roundOneJudges = Object.entries(judgeData)
             .filter(([, details]) => details?.isRound1Judge === true)
             .map(([id, details]) => ({ id, ...details }));
+
+        const judgesList = onlyCheckedIn
+            ? roundOneJudges.filter((judge) => judge.checkedIn === true)
+            : roundOneJudges;
+
+        const absent = roundOneJudges.length - judgesList.length;
+        if (onlyCheckedIn && absent > 0) {
+            warnings.push(`${absent} first round judge(s) have not checked in and were left out.`);
+        }
 
         const teamsList = Object.entries(teamData)
             .filter(([, details]) => details?.submitted)
@@ -110,7 +130,9 @@ export async function getJudgeSchedule() {
 
         if (!judgesList.length) {
             return fail(
-                "No judges are marked as first round judges. Mark them on the Judge Search page, then generate again."
+                onlyCheckedIn && roundOneJudges.length
+                    ? "None of the first round judges have checked in yet. Check them in on the Judge Search page, or generate without the check-in filter."
+                    : "No judges are marked as first round judges. Mark them on the Judge Search page, then generate again."
             );
         }
 
@@ -217,6 +239,18 @@ export async function getJudgeSchedule() {
             updates[`teams/${teamId}/schedule`] = teamAssignments[teamId] ?? null;
         });
 
+        // Written so the regenerate confirmation survives a page reload. It
+        // used to hang off React state, which meant a refresh silently removed
+        // the only thing standing between a stray click and every assignment in
+        // the event being replaced.
+        updates["config/scheduleMeta"] = {
+            generatedAt: serverTimestamp(),
+            generatedBy: admin.uid,
+            teams: teamsList.length,
+            judges: judgesList.length,
+            onlyCheckedIn,
+        };
+
         await update(ref(database), updates);
 
         const judgeCounts = Object.values(teamAssignments).map((a) => a.judges.length);
@@ -244,6 +278,29 @@ export async function getJudgeSchedule() {
         console.error("Error generating judge schedule:", error);
         return fail(error.message || "Something went wrong generating the schedule.");
     }
+}
+
+/**
+ * What the last generation did, plus how much scoring has happened since.
+ *
+ * The scored count is read live rather than stored, because it is the number
+ * that makes regenerating dangerous: scores are keyed by team and judge, so
+ * moving assignments does not delete them -- it strands them. They keep
+ * counting toward the averages while belonging to a judge who is no longer
+ * assigned, which is invisible unless someone is told.
+ */
+export async function readScheduleMeta() {
+    const [metaSnap, scoresSnap] = await Promise.all([
+        get(ref(database, "config/scheduleMeta")),
+        get(ref(database, `scores/${FIRST_ROUND}`)),
+    ]);
+
+    if (!metaSnap.exists()) return null;
+
+    return {
+        ...metaSnap.val(),
+        scoredTeams: scoresSnap.exists() ? Object.keys(scoresSnap.val() ?? {}).length : 0,
+    };
 }
 
 export default getJudgeSchedule;

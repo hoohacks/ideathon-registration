@@ -2,6 +2,7 @@ import Layout from "./Layout";
 import { useContext, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { AuthContext } from "../App";
+import { hasRole, roleList } from "../roles";
 import { Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { ref, onValue } from "firebase/database";
 import { database } from "../firebase";
@@ -100,9 +101,9 @@ function Home() {
         return () => clearInterval(interval);
     }, [eventStart]);
 
-    const roles = Array.isArray(userTypes) ? userTypes : [];
-    const isCompetitor = roles.includes("competitor");
-    const isJudge = roles.includes("judge");
+    const roles = roleList(userTypes);
+    const isCompetitor = hasRole(userTypes, "competitor");
+    const isJudge = hasRole(userTypes, "judge");
     const onATeam = Boolean(userData?.teamId);
 
     const steps = [];

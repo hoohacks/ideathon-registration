@@ -22,10 +22,10 @@ import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.js"
 import TeamDashboard from "./user/admin/TeamSearch.js"
+import JudgingProgress from "./user/admin/JudgingProgress.js"
+import { ROLES, hasRole } from "./roles.js"
 
 const AuthContext = createContext(null);
-
-const ROLES = ["competitor", "judge", "admin"];
 
 function useAuth() {
   return useContext(AuthContext);
@@ -48,7 +48,7 @@ function ProtectedRoute({ children, requiredRoles }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRoles && !requiredRoles.some(role => userTypes.includes(role))) {
+  if (requiredRoles && !requiredRoles.some(role => hasRole(userTypes, role))) {
     return <Navigate to="/user/home" replace />;
   }
 
@@ -169,6 +169,7 @@ function App() {
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
             <Route path="judges" element={<ProtectedRoute requiredRoles={["admin"]}><JudgeDashboard /></ProtectedRoute>} />
             <Route path="teams" element={<ProtectedRoute requiredRoles={["admin"]}><TeamDashboard /></ProtectedRoute>} />
+            <Route path="judging" element={<ProtectedRoute requiredRoles={["admin"]}><JudgingProgress /></ProtectedRoute>} />
           </Route>
         </Route>
       </Routes>
@@ -176,6 +177,6 @@ function App() {
   )
 }
 
-export { AuthContext, useAuth };
+export { AuthContext, useAuth, ProtectedRoute };
 
 export default App

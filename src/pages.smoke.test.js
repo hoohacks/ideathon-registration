@@ -97,6 +97,7 @@ const Assignments = require("./user/judge/Assignments").default;
 const Search = require("./user/admin/Search").default;
 const JudgeSearch = require("./user/admin/JudgeSearch").default;
 const TeamSearch = require("./user/admin/TeamSearch").default;
+const JudgingProgress = require("./user/admin/JudgingProgress").default;
 const Metrics = require("./RegisteredAtDisplay").default;
 const Scan = require("./user/admin/Scan").default;
 const Login = require("./Login").default;
@@ -148,6 +149,14 @@ describe("pages render without crashing", () => {
   test("judging as an admin shows the schedule controls", async () => {
     renderPage(Assignments, { userTypes: ["admin"] });
     expect(await screen.findByText("Generate schedule")).toBeInTheDocument();
+  });
+
+  test("judging progress", async () => {
+    renderPage(JudgingProgress, { userTypes: ["admin"] });
+    expect(await screen.findByRole("heading", { name: "Judging progress" })).toBeInTheDocument();
+    // the two things an organiser is actually watching during the event
+    expect(await screen.findByText(/scores in/)).toBeInTheDocument();
+    expect(await screen.findByText(/no scores/)).toBeInTheDocument();
   });
 
   test("competitor dashboard", async () => {

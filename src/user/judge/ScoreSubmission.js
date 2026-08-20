@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -17,36 +18,22 @@ import {
   Typography,
 } from "@mui/material";
 import { IoInformationCircleOutline } from "react-icons/io5";
+import { RUBRIC, SCORE_MAX_TOTAL, NOTES_MAX_LENGTH } from "./scoreRubric";
+import { loadDraft, saveDraft } from "./scoreDraft";
 
-const rubric = {
-  problem: {
-    label: "Problem",
-    range: 10,
-    desc: "Does the submission identify and describe an addressable need, want, problem or opportunity in society? Does it identify a target customer base?",
-  },
-  innovation: {
-    label: "Innovation",
-    range: 10,
-    desc: "Does the submission present a novel, original and compelling solution? Does it describe the alternatives while making a compelling case for how their idea improves on them?",
-  },
-  impact: {
-    label: "Impact",
-    range: 10,
-    desc: "Does the submission discuss the impact it will make, and how large? How strongly did it cover how stakeholders and potential users could benefit?",
-  },
-  viability: {
-    label: "Viability",
-    range: 5,
-    desc: "Is the submission feasible, and how hard would it be to implement? How well did it address risks, cost, timeframe or measures of success?",
-  },
-  pitch_quality: {
-    label: "Pitch quality",
-    range: 5,
-    desc: "How well did they present? Were they confident and professional? Did they have appropriate evidence to support their idea?",
-  },
+const CRITERIA = Object.keys(RUBRIC);
+
+/**
+ * Nothing is pre-selected. The form used to open on 5/5/5/3/3/Yes, which meant
+ * an untouched card was a complete, submittable score — a mis-tap filed a
+ * middling score for a team nobody had watched, indistinguishable afterwards
+ * from a real one. An unfilled criterion now blocks submission instead.
+ */
+const EMPTY = {
+  ...Object.fromEntries(CRITERIA.map((field) => [field, ""])),
+  fundable: "",
+  notes: "",
 };
-
-const MAX_TOTAL = Object.values(rubric).reduce((sum, f) => sum + f.range, 0);
 
 function Criterion({ field, spec, value, onChange }) {
   return (
@@ -89,26 +76,46 @@ function ScoreSubmission({
   room = "TBD",
   time = "TBD",
   submitting = false,
+  // { round, teamId, judgeUid } — identifies the draft. Omitted in tests.
+  draftTarget = null,
+  // true when this judge has already filed a card for this team
+  isOverwrite = false,
   onClose = () => {},
   onSubmit = () => {},
 }) {
-  const [values, setValues] = useState({
-    problem: "5",
-    innovation: "5",
-    impact: "5",
-    viability: "3",
-    pitch_quality: "3",
-    fundable: "yes",
-    notes: "",
-  });
+  const [values, setValues] = useState(EMPTY);
+  const [restored, setRestored] = useState(false);
+
+  // Restoring has to happen before the first save, or the effect below writes
+  // the empty form over a draft the judge is about to get back.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    const draft = draftTarget ? loadDraft(draftTarget) : null;
+    if (draft) {
+      setValues({ ...EMPTY, ...draft });
+      setRestored(true);
+    }
+  }, [draftTarget]);
+
+  // Persist on every change. The dialog is unmounted on close, so without this
+  // a cancel, a refresh or a dead battery loses everything typed.
+  useEffect(() => {
+    if (!hydrated.current || !draftTarget) return;
+    if (values === EMPTY) return;
+    saveDraft(draftTarget, values);
+  }, [values, draftTarget]);
 
   const [busy, setBusy] = useState(false);
   const inFlight = submitting || busy;
 
-  const runningTotal = Object.keys(rubric).reduce(
-    (sum, field) => sum + Number(values[field] || 0),
-    0
+  const missing = useMemo(
+    () => CRITERIA.filter((field) => values[field] === "").length + (values.fundable === "" ? 1 : 0),
+    [values]
   );
+
+  const runningTotal = CRITERIA.reduce((sum, field) => sum + Number(values[field] || 0), 0);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -118,14 +125,10 @@ function ScoreSubmission({
   async function handleSubmit(e) {
     e.preventDefault();
     // the write is async, so without this guard a double click writes twice
-    if (inFlight) return;
+    if (inFlight || missing) return;
 
     const score = {
-      problem: Number(values.problem),
-      innovation: Number(values.innovation),
-      impact: Number(values.impact),
-      viability: Number(values.viability),
-      pitch_quality: Number(values.pitch_quality),
+      ...Object.fromEntries(CRITERIA.map((field) => [field, Number(values[field])])),
       fundable: values.fundable === "yes",
       notes: values.notes,
       teamName,
@@ -157,7 +160,18 @@ function ScoreSubmission({
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent dividers sx={{ py: 2 }}>
           <Stack spacing={1.75}>
-            {Object.entries(rubric).map(([field, spec]) => (
+            {restored && (
+              <Alert severity="info" sx={{ py: 0.25 }}>
+                Picked up where you left off on this device.
+              </Alert>
+            )}
+            {isOverwrite && (
+              <Alert severity="warning" sx={{ py: 0.25 }}>
+                You have already scored this team. Submitting replaces that score.
+              </Alert>
+            )}
+
+            {Object.entries(RUBRIC).map(([field, spec]) => (
               <Criterion
                 key={field}
                 field={field}
@@ -194,19 +208,22 @@ function ScoreSubmission({
               multiline
               minRows={2}
               fullWidth
+              // the rules reject anything longer, so stop the judge at the
+              // limit rather than losing the card on submit
+              inputProps={{ maxLength: NOTES_MAX_LENGTH }}
             />
           </Stack>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
           <Typography variant="body2">
-            Total {runningTotal} / {MAX_TOTAL}
+            {missing ? `${missing} left to fill in` : `Total ${runningTotal} / ${SCORE_MAX_TOTAL}`}
           </Typography>
           <Stack direction="row" spacing={1}>
             <Button onClick={onClose} disabled={inFlight} variant="outlined">
               Cancel
             </Button>
-            <Button type="submit" variant="contained" disabled={inFlight}>
+            <Button type="submit" variant="contained" disabled={inFlight || missing > 0}>
               {inFlight ? "Submitting…" : "Submit score"}
             </Button>
           </Stack>

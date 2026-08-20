@@ -18,18 +18,25 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
+    "react-router-dom": "^6.4.1",
     "react-scripts": "^5.0.1",
     "react-zxing": "^2.1.0",
     "reactjs-popup": "^2.0.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build",
-    "migrate:members": "node scripts/migrate-team-members.mjs",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:ci": "cross-env CI=true react-scripts test --watchAll=false",
+    "test:rules": "firebase emulators:exec --only database --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
+    "test:rules:watch": "vitest --config vitest.rules.config.mjs",
+    "emulators": "firebase emulators:start --only database --project demo-ideathon",
+    "rules:cutover": "node scripts/make-cutover-rules.mjs",
+    "migrate:members": "node scripts/migrate-team-members.mjs",
+    "migrate:scores": "node scripts/migrate-scores.mjs",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -51,7 +58,13 @@
     ]
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^2.0.7",
+    "cross-env": "^7.0.3",
+    "firebase-tools": "^13.29.1",
     "gh-pages": "^4.0.0",
-    "react-router-dom": "^6.4.1"
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=18 <23"
   }
 }

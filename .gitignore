@@ -26,3 +26,16 @@ scripts/jwt.key
 
 # local firebase config; firebase.js carries the real values
 .env
+
+# firebase emulator (rules tests)
+firebase-debug.log
+database-debug.log
+ui-debug.log
+.firebase/
+
+# generated during the score migration cutover; regenerate with
+# npm run rules:cutover
+database.rules.cutover.json
+
+# migration backups contain judges' free-text notes
+scripts/backups/

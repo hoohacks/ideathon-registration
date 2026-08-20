@@ -4,7 +4,9 @@ import {
   Box,
   Button,
   Card,
+  Checkbox,
   Divider,
+  FormControlLabel,
   Grid,
   Snackbar,
   Stack,
@@ -12,22 +14,22 @@ import {
 } from "@mui/material";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
-import { getJudgeSchedule } from "./getJudgeSchedule";
-import { getPersonalSchedule } from "./getPersonalSchedule";
+import { getJudgeSchedule, readScheduleMeta } from "./getJudgeSchedule";
+import { getPersonalSchedule, getFinalRoundSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
+import { hasRole } from "../../roles";
 import {
   findTeamIdByName,
-  writeTeamScore,
-  writeFinalRoundScore,
+  submitScore,
   getMyScoredTeamIds,
   getMyFinalRoundScoredTeamIds,
+  FIRST_ROUND,
+  FINAL_ROUND,
 } from "./getTeamInfo";
-import {
-  activateFinalRound,
-  deactivateFinalRound,
-  subscribeToFinalRoundState,
-} from "./finalRoundService";
+import { activateFinalRound, deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
+import { useJudgingSync } from "./useJudgingSync";
+import { clearDraft } from "./scoreDraft";
 
 function Section({ title, caption, children }) {
   return (
@@ -58,23 +60,29 @@ function Assignments() {
   }
 
   const [generating, setGenerating] = useState(false);
+  const [onlyCheckedIn, setOnlyCheckedIn] = useState(false);
   const [generateResult, setGenerateResult] = useState(null);
+  const [scheduleMeta, setScheduleMeta] = useState(null);
   const [personalAssignments, setPersonalAssignments] = useState([]);
+  const [finalAssignments, setFinalAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   // scored teams are tracked by database id, never by name -- team names are
   // not unique and would collide
   const [scoredTeamIds, setScoredTeamIds] = useState(() => new Set());
   const [finalRoundScoredTeamIds, setFinalRoundScoredTeamIds] = useState(() => new Set());
-  const [finalRoundState, setFinalRoundState] = useState({ active: false });
+  const [finalRoundActive, setFinalRoundActive] = useState(false);
   const [finalRoundLoading, setFinalRoundLoading] = useState(true);
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
 
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
-  const userRoles = Array.isArray(userTypes) ? userTypes : [];
-  const canManageSchedule = userRoles.includes("admin");
-  const canViewAssignments = userRoles.includes("judge");
+  const canManageSchedule = hasRole(userTypes, "admin");
+  const canViewAssignments = hasRole(userTypes, "judge");
+
+  const { online, pendingCount, pendingTeamIds, syncing, retry } = useJudgingSync(
+    canViewAssignments ? currentUserId : null
+  );
 
   const loadPersonalSchedule = useCallback(async () => {
     if (!canViewAssignments) {
@@ -88,6 +96,12 @@ function Assignments() {
       setScoredTeamIds(await getMyScoredTeamIds((teams ?? []).map((t) => t.id)));
     } catch (err) {
       console.error("Error fetching personal schedule:", err);
+      // silently showing "no assignments yet" for what is really a failed read
+      // sends a judge to find an organiser for a problem that is not theirs
+      setToast({
+        severity: "error",
+        message: "Could not load your assignments. Check your connection and reload.",
+      });
     } finally {
       setLoadingAssignments(false);
     }
@@ -97,11 +111,26 @@ function Assignments() {
     loadPersonalSchedule();
   }, [loadPersonalSchedule]);
 
+  useEffect(() => {
+    if (!canManageSchedule) return;
+    readScheduleMeta().then(setScheduleMeta).catch(() => setScheduleMeta(null));
+  }, [canManageSchedule, generateResult]);
+
   async function handleGenerateClick() {
     if (generating) return;
-    if (generateResult?.ok) {
+
+    // The confirmation used to hang off React state, so a reload cleared it and
+    // the next click silently replaced every assignment in the event. The
+    // marker is read back from the database instead, which survives the reload.
+    const existing = scheduleMeta ?? (await readScheduleMeta().catch(() => null));
+    if (existing?.generatedAt) {
+      const when = new Date(existing.generatedAt).toLocaleString();
+      const scored = existing.scoredTeams ?? 0;
+      const warning = scored
+        ? `\n\n${scored} team(s) already have scores. Those scores are NOT deleted, but they will belong to judges who are no longer assigned, and they keep counting toward the averages.`
+        : "";
       const confirmed = window.confirm(
-        "A schedule has already been generated. Regenerating replaces every judge and team assignment. Continue?"
+        `A schedule was generated on ${when}. Regenerating replaces every judge and team assignment.${warning}\n\nContinue?`
       );
       if (!confirmed) return;
     }
@@ -109,7 +138,7 @@ function Assignments() {
     try {
       setGenerating(true);
       setGenerateResult(null);
-      const result = await getJudgeSchedule();
+      const result = await getJudgeSchedule({ onlyCheckedIn });
       setGenerateResult(result);
       if (result.ok) await loadPersonalSchedule();
     } catch (err) {
@@ -128,7 +157,11 @@ function Assignments() {
     setTogglingFinalRound(true);
     setFinalRoundError(null);
     try {
-      await activateFinalRound();
+      const result = await activateFinalRound();
+      setGenerateResult(null);
+      if (result.warnings?.length) {
+        setToast({ severity: "warning", message: result.warnings.join(" ") });
+      }
     } catch (err) {
       console.error("Failed to activate final round:", err);
       setFinalRoundError(err.message || "Failed to activate final round.");
@@ -139,7 +172,7 @@ function Assignments() {
 
   async function handleDeactivateFinalRound() {
     const confirmed = window.confirm(
-      "Deactivate final round judging? This hides final-round assignments until reactivated."
+      "Deactivate final round judging? Assignments are withdrawn from every judge and the standings are archived."
     );
     if (!confirmed) return;
 
@@ -163,8 +196,8 @@ function Assignments() {
       const teamName = selected?.teamName;
       if (!teamName) throw new Error("No team selected");
 
-      const isFinalRound = selected?.round === "final";
-      const alreadyScored = isFinalRound ? finalRoundScoredTeamIds : scoredTeamIds;
+      const round = selected?.round === FINAL_ROUND ? FINAL_ROUND : FIRST_ROUND;
+      const isFinalRound = round === FINAL_ROUND;
 
       // schedules written before assignments carried an id fall back to a name
       // lookup, which is why duplicate team names are worth avoiding
@@ -174,20 +207,21 @@ function Assignments() {
         return;
       }
 
-      if (alreadyScored.has(teamId)) {
-        setToast({ severity: "warning", message: `You already scored ${teamName}.` });
-        return;
-      }
+      const result = await submitScore({ round, teamId, teamName, score: scores });
 
-      if (isFinalRound) {
-        await writeFinalRoundScore({ teamId, teamName, score: scores });
-        setFinalRoundScoredTeamIds((prev) => new Set(prev).add(teamId));
+      // the outbox owns the card either way now, so the draft has done its job
+      if (currentUserId) clearDraft({ round, teamId, judgeUid: currentUserId });
+
+      const record = isFinalRound ? setFinalRoundScoredTeamIds : setScoredTeamIds;
+      if (result.status === "saved") {
+        record((prev) => new Set(prev).add(teamId));
+        setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
       } else {
-        await writeTeamScore({ teamId, teamName, score: scores });
-        setScoredTeamIds((prev) => new Set(prev).add(teamId));
+        setToast({
+          severity: "warning",
+          message: `No connection. ${teamName}'s score is saved on this device and will send itself when you are back online.`,
+        });
       }
-
-      setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
       closeModal();
     } catch (e) {
       console.error(e);
@@ -198,59 +232,61 @@ function Assignments() {
   }
 
   useEffect(() => {
-    const unsubscribe = subscribeToFinalRoundState((state) => {
-      setFinalRoundState(state || { active: false });
+    const unsubscribe = subscribeToFinalRoundActive((state) => {
+      setFinalRoundActive(Boolean(state?.active));
       setFinalRoundLoading(false);
       setFinalRoundError(state?.error ?? null);
     });
     return () => unsubscribe();
   }, []);
 
-  const finalRoundTeams = useMemo(() => {
-    if (!finalRoundState?.active || !finalRoundState?.teams) return [];
-    return Object.entries(finalRoundState.teams).map(([teamId, details]) => ({
-      teamId,
-      name: details?.name ?? "Unnamed Team",
-      averageScore: details?.averageScore ?? null,
-      excludedJudges: details?.excludedJudges ?? {},
-      room: details?.room ?? "TBD",
-      timeslot: details?.timeslot ?? "TBD",
-    }));
-  }, [finalRoundState]);
-
-  const finalAssignmentsForJudge = useMemo(() => {
-    if (!finalRoundTeams.length || !currentUserId) return [];
-    return finalRoundTeams.filter((team) => !team.excludedJudges?.[currentUserId]);
-  }, [finalRoundTeams, currentUserId]);
-
-  const finalRoundTeamIdsForJudge = useMemo(
-    () => finalAssignmentsForJudge.map((team) => team.teamId).filter(Boolean),
-    [finalAssignmentsForJudge]
-  );
-
+  // The judge's finalists come from their own record. Deriving them in the
+  // browser from /finalRound only worked because every judge could read the
+  // standings -- team names and average scores -- before they were announced.
   useEffect(() => {
     let cancelled = false;
-    async function fetchFinalRoundScores() {
-      try {
-        if (!finalRoundState?.active || finalRoundTeamIdsForJudge.length === 0) {
-          if (!cancelled) setFinalRoundScoredTeamIds(new Set());
-          return;
+    async function load() {
+      if (!finalRoundActive || !canViewAssignments) {
+        if (!cancelled) {
+          setFinalAssignments([]);
+          setFinalRoundScoredTeamIds(new Set());
         }
-        const scored = await getMyFinalRoundScoredTeamIds(finalRoundTeamIdsForJudge);
+        return;
+      }
+      try {
+        const teams = await getFinalRoundSchedule();
+        if (cancelled) return;
+        setFinalAssignments(teams);
+        const scored = await getMyFinalRoundScoredTeamIds(teams.map((t) => t.id));
         if (!cancelled) setFinalRoundScoredTeamIds(scored);
       } catch (err) {
-        console.error("Error fetching final round scores:", err);
+        console.error("Error fetching final round assignments:", err);
       }
     }
-
-    fetchFinalRoundScores();
+    load();
     return () => {
       cancelled = true;
     };
-  }, [finalRoundState?.active, finalRoundTeamIdsForJudge]);
+  }, [finalRoundActive, canViewAssignments]);
 
   const stats = generateResult?.ok ? generateResult.stats : null;
-  const remaining = personalAssignments.filter((a) => !scoredTeamIds.has(a.id)).length;
+
+  const remaining = useMemo(
+    () =>
+      personalAssignments.filter(
+        (a) => !scoredTeamIds.has(a.id) && !pendingTeamIds.has(a.id)
+      ).length,
+    [personalAssignments, scoredTeamIds, pendingTeamIds]
+  );
+
+  const draftTarget = useMemo(() => {
+    if (!selected?.teamId || !currentUserId) return null;
+    return {
+      round: selected.round === FINAL_ROUND ? FINAL_ROUND : FIRST_ROUND,
+      teamId: selected.teamId,
+      judgeUid: currentUserId,
+    };
+  }, [selected, currentUserId]);
 
   return (
     <Layout maxWidth="lg">
@@ -271,6 +307,23 @@ function Assignments() {
           )}
         </Stack>
 
+        {canViewAssignments && (pendingCount > 0 || !online) && (
+          <Alert
+            severity={pendingCount > 0 ? "warning" : "info"}
+            action={
+              pendingCount > 0 ? (
+                <Button color="inherit" size="small" onClick={retry} disabled={syncing}>
+                  {syncing ? "Sending…" : "Retry now"}
+                </Button>
+              ) : undefined
+            }
+          >
+            {pendingCount > 0
+              ? `${pendingCount} score${pendingCount === 1 ? "" : "s"} saved on this device and waiting to send. Keep this page open.`
+              : "You are offline. Scores will be saved on this device until the connection is back."}
+          </Alert>
+        )}
+
         {canManageSchedule && (
           <Card sx={{ p: 2 }}>
             <Stack
@@ -284,11 +337,11 @@ function Assignments() {
               <Button variant="contained" onClick={handleGenerateClick} disabled={generating}>
                 {generating
                   ? "Generating…"
-                  : generateResult?.ok
+                  : scheduleMeta?.generatedAt
                   ? "Regenerate schedule"
                   : "Generate schedule"}
               </Button>
-              {finalRoundState?.active ? (
+              {finalRoundActive ? (
                 <Button
                   variant="outlined"
                   onClick={handleDeactivateFinalRound}
@@ -307,11 +360,25 @@ function Assignments() {
               )}
             </Stack>
 
-            {(generateResult || finalRoundError || finalRoundState?.active) && (
+            <FormControlLabel
+              sx={{ mt: 1 }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={onlyCheckedIn}
+                  onChange={(e) => setOnlyCheckedIn(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  Only schedule judges who have checked in
+                </Typography>
+              }
+            />
+
+            {(generateResult || finalRoundError || finalRoundActive || scheduleMeta) && (
               <Stack spacing={1} sx={{ mt: 2 }}>
-                {finalRoundState?.active && (
-                  <Alert severity="info">Final round is active.</Alert>
-                )}
+                {finalRoundActive && <Alert severity="info">Final round is active.</Alert>}
                 {generateResult && !generateResult.ok && (
                   <Alert severity="error">{generateResult.error}</Alert>
                 )}
@@ -330,6 +397,12 @@ function Assignments() {
                       : `${stats.minJudgesPerTeam}–${stats.maxJudgesPerTeam}`}{" "}
                     judges.
                   </Alert>
+                )}
+                {!generateResult && scheduleMeta?.generatedAt && (
+                  <Typography variant="body2">
+                    Schedule generated {new Date(scheduleMeta.generatedAt).toLocaleString()}.
+                    Use Judging progress to move a single judge rather than regenerating.
+                  </Typography>
                 )}
                 {finalRoundError && <Alert severity="error">{finalRoundError}</Alert>}
               </Stack>
@@ -357,8 +430,9 @@ function Assignments() {
                         teamName={assignment.teamName}
                         room={assignment.room}
                         time={assignment.time}
-                        onButtonClick={(card) => openFor({ ...card, round: "first" })}
+                        onButtonClick={(card) => openFor({ ...card, round: FIRST_ROUND })}
                         disabled={scoredTeamIds.has(assignment.id)}
+                        pending={pendingTeamIds.has(assignment.id)}
                       />
                     </Grid>
                   ))}
@@ -366,11 +440,11 @@ function Assignments() {
               )}
             </Section>
 
-            {finalRoundState?.active && (
+            {finalRoundActive && (
               <>
                 <Divider />
                 <Section title="Final round">
-                  {finalAssignmentsForJudge.length === 0 ? (
+                  {finalAssignments.length === 0 ? (
                     <Card sx={{ p: 3 }}>
                       <Typography variant="body2" align="center">
                         No final round assignments for you.
@@ -378,15 +452,16 @@ function Assignments() {
                     </Card>
                   ) : (
                     <Grid container spacing={2}>
-                      {finalAssignmentsForJudge.map((team) => (
-                        <Grid item xs={12} sm={6} md={4} key={`final-${team.teamId}`}>
+                      {finalAssignments.map((team) => (
+                        <Grid item xs={12} sm={6} md={4} key={`final-${team.id}`}>
                           <ScheduleCard
-                            teamId={team.teamId}
-                            teamName={team.name}
+                            teamId={team.id}
+                            teamName={team.teamName}
                             room={team.room}
-                            time={team.timeslot}
-                            disabled={finalRoundScoredTeamIds.has(team.teamId)}
-                            onButtonClick={(card) => openFor({ ...card, round: "final" })}
+                            time={team.timeslot ?? team.time}
+                            disabled={finalRoundScoredTeamIds.has(team.id)}
+                            pending={pendingTeamIds.has(team.id)}
+                            onButtonClick={(card) => openFor({ ...card, round: FINAL_ROUND })}
                           />
                         </Grid>
                       ))}
@@ -409,6 +484,12 @@ function Assignments() {
           room={selected.room}
           time={selected.time}
           submitting={submitting}
+          draftTarget={draftTarget}
+          isOverwrite={
+            selected.round === FINAL_ROUND
+              ? finalRoundScoredTeamIds.has(selected.teamId)
+              : scoredTeamIds.has(selected.teamId)
+          }
           onClose={closeModal}
           onSubmit={handleSubmit}
         />
@@ -416,7 +497,7 @@ function Assignments() {
 
       <Snackbar
         open={Boolean(toast)}
-        autoHideDuration={4000}
+        autoHideDuration={6000}
         onClose={() => setToast(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >

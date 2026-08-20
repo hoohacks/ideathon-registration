@@ -2,7 +2,7 @@ import Layout from "../Layout";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../App";
 import { ref, get, set, onValue } from "firebase/database";
-import { database, storage } from "../../firebase";
+import { auth, database, storage } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { memberIds } from "./teamMembers";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -40,7 +40,7 @@ function Team() {
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
-    const [finalRound, setFinalRound] = useState({ active: false });
+
 
     // Get team ID from userData if available
     const teamId = userData ? userData.teamId : null;
@@ -50,7 +50,10 @@ function Team() {
 
         const storageReference = storageRef(
             storage,
-            `teams/${teamId}/${event.target.files[0].name}`
+            // the uploader's uid is part of the path so storage.rules can stop
+            // one team overwriting another's deck; it cannot read the database
+            // to check membership
+            `teams/${teamId}/${auth.currentUser?.uid}/${event.target.files[0].name}`
         );
         const uploadResumeToDB = uploadBytesResumable(
             storageReference,
@@ -140,14 +143,6 @@ function Team() {
         navigate('/user/team');
     }
 
-    useEffect(() => {
-        const finalRoundRef = ref(database, "finalRound");
-        const unsubscribe = onValue(finalRoundRef, (snapshot) => {
-            setFinalRound(snapshot.exists() ? snapshot.val() : { active: false });
-        });
-        return () => unsubscribe();
-    }, []);
-
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
         if (!teamId) return;
@@ -202,7 +197,10 @@ function Team() {
     }
 
     const schedule = teamData?.schedule;
-    const finalSlot = finalRound?.active ? finalRound?.teams?.[teamId] : null;
+    // Written into the team by activateFinalRound. Subscribing to /finalRound
+    // for this used to hand every competitor the full standings -- team names
+    // and average scores -- before they were announced.
+    const finalSlot = teamData?.finalSlot;
 
     return (
         <>
