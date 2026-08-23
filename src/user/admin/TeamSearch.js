@@ -37,6 +37,7 @@ import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
 import { deleteScore } from "./dangerZone";
 import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo";
 import PaperScoreDialog from "./PaperScoreDialog";
+import TeamEditDrawer from "./edit/TeamEditDrawer";
 
 function ScoreSummary({ label, round, teamId, teamName, scores, judgeNames = {}, onDelete }) {
   const judgeIds = Object.keys(scores ?? {});
@@ -123,6 +124,7 @@ function TeamSearch() {
   const [reentering, setReentering] = useState(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  const [editing, setEditing] = useState(null);
 
   /**
    * A deleted card cannot be written back: enteredBy is pinned to auth.uid, so
@@ -292,6 +294,14 @@ function TeamSearch() {
                       variant="outlined"
                     />
                   )}
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setEditing({ teamId: key, team })}
+                    sx={{ ml: "auto" }}
+                  >
+                    Edit
+                  </Button>
                 </Stack>
 
                 <Typography variant="body2">
@@ -370,6 +380,18 @@ function TeamSearch() {
             setReentering(null);
             setToast({ severity: "success", message: "Card re-entered." });
           }}
+        />
+      )}
+
+      {editing && (
+        <TeamEditDrawer
+          team={editing.team}
+          teamId={editing.teamId}
+          onClose={() => setEditing(null)}
+          onResult={(result, message) =>
+            setToast(result?.ok
+              ? { severity: "success", message }
+              : { severity: "error", message: result?.error ?? "Something went wrong." })}
         />
       )}
 
