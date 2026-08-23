@@ -111,3 +111,86 @@ export async function applyAdminAction({ action, summary, changes = [], undoable
     return { ok: false, error: error.message || "The change could not be saved." };
   }
 }
+
+/** Swap before and after. A create reverses into a delete and vice versa. */
+export function reverseChanges(changes) {
+  return changes.map(({ path, before, after }) => ({ path, before: after, after: before }));
+}
+
+/**
+ * Has anything moved since the entry was written?
+ *
+ * Undo restores a captured value, so if a later edit touched the same path an
+ * unguarded undo would silently discard it. Structural comparison via JSON: the
+ * values came out of the database, so they are plain JSON already.
+ */
+export function findDrift(changes, current) {
+  for (const { path, after } of changes) {
+    const now = current[path] ?? null;
+    if (JSON.stringify(now) !== JSON.stringify(after ?? null)) {
+      return { path, expected: after ?? null, actual: now };
+    }
+  }
+  return null;
+}
+
+export async function undoAdminAction(entryId) {
+  let entry;
+  try {
+    const snap = await get(ref(database, `adminLog/${entryId}`));
+    if (!snap.exists()) return { ok: false, error: "That log entry no longer exists." };
+    entry = snap.val();
+  } catch (error) {
+    return { ok: false, error: error.message || "Could not read that log entry." };
+  }
+
+  if (entry.undone) {
+    return { ok: false, error: "That change has already been undone." };
+  }
+  if (entry.undoable === false || !entry.changes) {
+    return { ok: false, error: "That change cannot be undone. It was too large to record in full." };
+  }
+
+  const changes = decodeChanges(entry.changes);
+
+  let current;
+  try {
+    current = await captureBefore(changes.map((change) => change.path));
+  } catch (error) {
+    return { ok: false, error: error.message || "Could not check the current values." };
+  }
+
+  const drift = findDrift(changes, current);
+  if (drift) {
+    return {
+      ok: false,
+      error:
+        `${drift.path} has changed since this action, so undoing it would discard ` +
+        `that edit. Nothing was changed.`,
+      drift,
+    };
+  }
+
+  let actingUid;
+  try {
+    actingUid = (await requireAdmin("undo a change")).uid;
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+
+  // The undo goes through applyAdminAction, so it is logged like anything else,
+  // and marking the original happens in the same atomic update as the reversal.
+  return applyAdminAction({
+    action: `undo:${entry.action}`,
+    summary: `Undid: ${entry.summary}`,
+    changes: [
+      ...reverseChanges(changes),
+      {
+        path: `adminLog/${entryId}/undone`,
+        before: null,
+        after: { at: serverTimestamp(), by: actingUid },
+      },
+    ],
+    undoable: false,
+  });
+}

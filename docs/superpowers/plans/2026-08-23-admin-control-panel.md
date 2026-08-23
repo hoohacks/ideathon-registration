@@ -689,7 +689,7 @@ describe("undoing an entry", () => {
     whenLogSays({ ...logged, undone: { at: 1, by: "admin-2" } });
     const result = await undoAdminAction("entry-0");
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/already undone/i);
+    expect(result.error).toMatch(/already been undone/i);
   });
 
   test("refuses an entry that is not there", async () => {

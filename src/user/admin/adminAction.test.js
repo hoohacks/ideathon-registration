@@ -130,3 +130,111 @@ describe("failure is returned, never thrown", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
+
+const { reverseChanges, findDrift, undoAdminAction } = require("./adminAction");
+
+describe("reversing a change-set", () => {
+  test("before and after swap", () => {
+    expect(reverseChanges([{ path: "a", before: 1, after: 2 }]))
+      .toEqual([{ path: "a", before: 2, after: 1 }]);
+  });
+
+  test("a create reverses into a delete", () => {
+    expect(reverseChanges([{ path: "a", before: null, after: { x: 1 } }]))
+      .toEqual([{ path: "a", before: { x: 1 }, after: null }]);
+  });
+});
+
+describe("the drift check", () => {
+  /**
+   * Undo restores a captured value. If someone else edited the same path since,
+   * a naive undo silently discards their work -- so it refuses instead, and says
+   * which path moved.
+   */
+  test("passes when nothing moved", () => {
+    const changes = [{ path: "teams/t1/name", before: "Alpha", after: "Omega" }];
+    expect(findDrift(changes, { "teams/t1/name": "Omega" })).toBeNull();
+  });
+
+  test("catches a later edit and names the path", () => {
+    const changes = [{ path: "teams/t1/name", before: "Alpha", after: "Omega" }];
+    const drift = findDrift(changes, { "teams/t1/name": "Something Else" });
+    expect(drift.path).toBe("teams/t1/name");
+    expect(drift.actual).toBe("Something Else");
+  });
+
+  test("compares structurally, not by reference", () => {
+    const changes = [{ path: "config/judgingRooms", before: ["A"], after: ["A", "B"] }];
+    expect(findDrift(changes, { "config/judgingRooms": ["A", "B"] })).toBeNull();
+  });
+
+  test("an absent path matches a null after-value", () => {
+    const changes = [{ path: "teams/t1/schedule", before: { room: "A" }, after: null }];
+    expect(findDrift(changes, { "teams/t1/schedule": null })).toBeNull();
+  });
+});
+
+describe("undoing an entry", () => {
+  const logged = {
+    action: "team.rename",
+    summary: "Alpha to Omega",
+    undoable: true,
+    changes: [{ path: "teams/t1/name", before: '"Alpha"', after: '"Omega"' }],
+  };
+
+  function whenLogSays(entry, currentValues = {}) {
+    mockGet.mockImplementation(async (r) => {
+      if (r.path.startsWith("adminLog/")) {
+        return { exists: () => Boolean(entry), val: () => entry };
+      }
+      const value = currentValues[r.path];
+      return { exists: () => value !== undefined, val: () => value };
+    });
+  }
+
+  test("applies the reverse and marks the original undone", async () => {
+    whenLogSays(logged, { "teams/t1/name": "Omega" });
+
+    const result = await undoAdminAction("entry-0");
+    expect(result.ok).toBe(true);
+
+    const payload = mockUpdate.mock.calls[0][1];
+    expect(payload["teams/t1/name"]).toBe("Alpha");
+    expect(payload["adminLog/entry-0/undone"]).toMatchObject({ by: "admin-1" });
+  });
+
+  test("the undo is itself logged", async () => {
+    whenLogSays(logged, { "teams/t1/name": "Omega" });
+    await undoAdminAction("entry-0");
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("undo:team.rename");
+  });
+
+  test("refuses when the value moved since, naming the path", async () => {
+    whenLogSays(logged, { "teams/t1/name": "Edited By Someone Else" });
+
+    const result = await undoAdminAction("entry-0");
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("teams/t1/name");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("refuses an entry marked not undoable", async () => {
+    whenLogSays({ ...logged, undoable: false });
+    const result = await undoAdminAction("entry-0");
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/cannot be undone/i);
+  });
+
+  test("refuses an entry already undone", async () => {
+    whenLogSays({ ...logged, undone: { at: 1, by: "admin-2" } });
+    const result = await undoAdminAction("entry-0");
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/already been undone/i);
+  });
+
+  test("refuses an entry that is not there", async () => {
+    whenLogSays(null);
+    const result = await undoAdminAction("missing");
+    expect(result.ok).toBe(false);
+  });
+});
