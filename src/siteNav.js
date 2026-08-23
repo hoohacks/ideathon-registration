@@ -57,6 +57,7 @@ const ADMIN = [
     { to: "/user/admin/teams", label: "Teams" },
     { to: "/user/admin/judging", label: "Judging progress" },
     { to: "/user/admin/metrics", label: "Metrics" },
+    { to: "/user/admin/control", label: "Control panel" },
 ];
 
 function initialsOf(userData) {

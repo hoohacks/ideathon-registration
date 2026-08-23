@@ -35,6 +35,7 @@ jest.mock("firebase/database", () => ({
   query: (r) => r,
   orderByChild: jest.fn(),
   equalTo: jest.fn(),
+  limitToLast: jest.fn(),
   serverTimestamp: () => 0,
 }));
 
@@ -100,6 +101,7 @@ const TeamSearch = require("./user/admin/TeamSearch").default;
 const JudgingProgress = require("./user/admin/JudgingProgress").default;
 const Metrics = require("./RegisteredAtDisplay").default;
 const Scan = require("./user/admin/Scan").default;
+const Control = require("./user/admin/Control").default;
 const Login = require("./Login").default;
 const ForgotPassword = require("./ForgotPassword").default;
 
@@ -185,6 +187,11 @@ describe("pages render without crashing", () => {
     // the two things it can record, and the camera it records them with
     expect(screen.getByRole("button", { name: "Event" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Food" })).toBeInTheDocument();
+  });
+
+  test("control panel", async () => {
+    renderPage(Control, { userTypes: ["admin"] });
+    expect(await screen.findByRole("heading", { name: "Control panel" })).toBeInTheDocument();
   });
 
   test("metrics with no registrations invites rather than showing empty axes", async () => {

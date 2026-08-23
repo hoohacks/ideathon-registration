@@ -165,3 +165,45 @@ describe("signed in", () => {
     expect(screen.getByText("home page")).toBeInTheDocument();
   });
 });
+
+describe("every admin route is actually guarded", () => {
+  /**
+   * The tests above prove ProtectedRoute redirects correctly. They cannot prove
+   * a given route was wrapped in it -- and forgetting the wrapper on a new admin
+   * page is the mistake that renders the whole control panel to anyone who
+   * types the URL. This reads App.js the way schema.test.js reads the rules
+   * file: it catches a missing guard, not a wrong one.
+   */
+  const fs = require("fs");
+  const path = require("path");
+  const APP = fs.readFileSync(path.join(process.cwd(), "src", "App.js"), "utf8");
+
+  /**
+   * Slice out the <Route path="admin"> branch and look only inside it. Matching
+   * on path names alone does not work: there are two routes called "judging" --
+   * the judge-facing /user/judging, which is correctly open to judges, and the
+   * admin /user/admin/judging, which is not.
+   */
+  const lines = APP.split("\n");
+  const start = lines.findIndex((line) => line.includes('<Route path="admin">'));
+  const end = lines.findIndex((line, i) => i > start && line.includes("</Route>"));
+  const adminRoutes = lines
+    .slice(start + 1, end)
+    .filter((line) => line.includes("<Route path="));
+
+  test("the control panel route exists", () => {
+    expect(APP).toContain('<Route path="control"');
+  });
+
+  test("every route naming an admin page requires the admin role", () => {
+    const unguarded = adminRoutes.filter(
+      (line) => !/requiredRoles=\{\["admin"\]\}/.test(line)
+    );
+    expect(unguarded).toEqual([]);
+  });
+
+  test("the admin branch is not empty, so the filter above is really matching", () => {
+    // guards the guard: a regex that matches nothing would pass silently
+    expect(adminRoutes.length).toBeGreaterThanOrEqual(7);
+  });
+});
