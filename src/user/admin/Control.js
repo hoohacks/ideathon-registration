@@ -7,6 +7,7 @@ import { PageHeader } from "./adminUi";
 import RoomsSection from "./control/RoomsSection";
 import ScheduleSection from "./control/ScheduleSection";
 import EventSection from "./control/EventSection";
+import AdminsSection from "./control/AdminsSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
@@ -65,6 +66,7 @@ function Control() {
         />
         <ScheduleSection config={config} onResult={report} />
         <EventSection config={config} onResult={report} />
+        <AdminsSection admins={admins} onResult={report} />
       </Stack>
 
       <Snackbar
