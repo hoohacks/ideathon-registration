@@ -15,10 +15,17 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Alert,
   Box,
+  Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Link,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Typography,
@@ -27,8 +34,11 @@ import { IoChevronDown } from "react-icons/io5";
 import Layout from "../Layout";
 import { memberIds } from "../team/teamMembers";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
+import { deleteScore } from "./dangerZone";
+import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo";
+import PaperScoreDialog from "./PaperScoreDialog";
 
-function ScoreSummary({ label, scores, judgeNames = {} }) {
+function ScoreSummary({ label, round, teamId, teamName, scores, judgeNames = {}, onDelete }) {
   const judgeIds = Object.keys(scores ?? {});
   if (!judgeIds.length) return null;
 
@@ -80,6 +90,17 @@ function ScoreSummary({ label, scores, judgeNames = {} }) {
                     “{scoreObj.notes}”
                   </Typography>
                 )}
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => onDelete({
+                    round, teamId, teamName,
+                    judgeUid: judgeId, judgeName: judgeNames[judgeId],
+                  })}
+                  sx={{ mt: 0.25 }}
+                >
+                  Delete this card
+                </Button>
               </Box>
             );
           })}
@@ -98,6 +119,31 @@ function TeamSearch() {
   // scores no longer live under /teams, so they need their own subscriptions
   const [firstScores, setFirstScores] = useState({});
   const [finalScores, setFinalScores] = useState({});
+  const [deleting, setDeleting] = useState(null);
+  const [reentering, setReentering] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  /**
+   * A deleted card cannot be written back: enteredBy is pinned to auth.uid, so
+   * only its original author could restore it. Re-typing it through the paper
+   * dialog is the recovery path, and it stamps correct new provenance.
+   */
+  const confirmDelete = async () => {
+    setBusy(true);
+    try {
+      const result = await deleteScore(deleting);
+      if (!result.ok) {
+        setToast({ severity: "error", message: result.error });
+        return;
+      }
+      setToast({ severity: "success", message: "Card deleted. Re-enter it if it was a mistake." });
+      setReentering({ ...deleting, card: result.card });
+      setDeleting(null);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const teamCount = Object.keys(teams).length;
   const percentSubmitted = teamCount ? (submittedCount / teamCount) * 100 : 0;
@@ -276,13 +322,60 @@ function TeamSearch() {
                   </Box>
                 )}
 
-                <ScoreSummary label="First round" scores={scoresFor(key)} judgeNames={judgeNames} />
-                <ScoreSummary label="Final round" scores={finalScoresFor(key)} judgeNames={judgeNames} />
+                <ScoreSummary
+                  label="First round" round={FIRST_ROUND}
+                  teamId={key} teamName={team.name}
+                  scores={scoresFor(key)} judgeNames={judgeNames} onDelete={setDeleting}
+                />
+                <ScoreSummary
+                  label="Final round" round={FINAL_ROUND}
+                  teamId={key} teamName={team.name}
+                  scores={finalScoresFor(key)} judgeNames={judgeNames} onDelete={setDeleting}
+                />
               </Stack>
             </Row>
           );
         })}
       </RowList>
+
+      {deleting && (
+        <Dialog open onClose={busy ? undefined : () => setDeleting(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Delete this score?</DialogTitle>
+          <DialogContent dividers>
+            <Alert severity="warning">
+              {deleting.judgeName ?? "This judge"}'s {deleting.round} round card for{" "}
+              {deleting.teamName}. It cannot be undone -- the rules pin a card to the
+              person who entered it, so nobody else can write it back. You will be
+              offered the values to re-type.
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={() => setDeleting(null)} disabled={busy} variant="outlined">Cancel</Button>
+            <Button onClick={confirmDelete} disabled={busy} variant="contained" color="error">
+              {busy ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {reentering && (
+        <PaperScoreDialog
+          team={{ teamId: reentering.teamId, name: reentering.teamName }}
+          judges={Object.entries(judgeNames).map(([judgeId, judgeName]) => ({ judgeId, judgeName }))}
+          round={reentering.round}
+          initialJudgeUid={reentering.judgeUid}
+          initialValues={reentering.card}
+          onClose={() => setReentering(null)}
+          onSaved={() => {
+            setReentering(null);
+            setToast({ severity: "success", message: "Card re-entered." });
+          }}
+        />
+      )}
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={() => setToast(null)}>
+        {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert> : undefined}
+      </Snackbar>
     </Layout>
   );
 }
