@@ -5,6 +5,8 @@ import { database } from "../../firebase";
 import Layout from "../Layout";
 import { PageHeader } from "./adminUi";
 import RoomsSection from "./control/RoomsSection";
+import ScheduleSection from "./control/ScheduleSection";
+import EventSection from "./control/EventSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
@@ -61,6 +63,8 @@ function Control() {
           teamsData={teamsData}
           onResult={report}
         />
+        <ScheduleSection config={config} onResult={report} />
+        <EventSection config={config} onResult={report} />
       </Stack>
 
       <Snackbar
