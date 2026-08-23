@@ -1,5 +1,5 @@
 {
-  // rulesVersion: 2 -- bump this whenever anything below changes, and republish
+  // rulesVersion: 3 -- bump this whenever anything below changes, and republish
   // in the Firebase console. `npm test` fails if the rules change without it,
   // because nothing else in this project can tell you the deployed rules have
   // drifted from the ones in git. See "Publishing the rules" in the README.
@@ -212,6 +212,48 @@
             "$other":        { ".validate": false }
           }
         }
+      }
+    },
+
+    // Who changed what, from the admin control panel. Rules cascade, so the
+    // root admin grant at the top already covers read and write here; this
+    // block only pins the shape. It is NOT tamper-proof -- an admin can delete
+    // entries, and deletes skip .validate. It is a forensics aid, not a ledger.
+    "adminLog": {
+      "$entryId": {
+        ".validate": "newData.hasChildren(['at','by','action','summary'])",
+
+        "at":       { ".validate": "newData.isNumber() && newData.val() <= now" },
+
+        // Pinned to the caller, the same way enteredBy is on a score card, so
+        // one admin cannot write history under another admin's name.
+        "by":       { ".validate": "newData.val() === auth.uid" },
+
+        "byName":   { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "action":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "summary":  { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "undoable": { ".validate": "newData.isBoolean()" },
+
+        // before/after are JSON strings, not live values: Realtime Database
+        // drops nulls on write, so a literal null before-value would vanish
+        // from the entry and an undo would restore the wrong thing.
+        "changes": {
+          "$i": {
+            ".validate": "newData.hasChild('path')",
+            "path":   { ".validate": "newData.isString() && newData.val().length <= 300" },
+            "before": { ".validate": "newData.isString()" },
+            "after":  { ".validate": "newData.isString()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "undone": {
+          "at":     { ".validate": "newData.isNumber() && newData.val() <= now" },
+          "by":     { ".validate": "newData.val() === auth.uid" },
+          "$other": { ".validate": false }
+        },
+
+        "$other": { ".validate": false }
       }
     }
   }

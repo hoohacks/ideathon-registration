@@ -186,8 +186,8 @@ describe("the deployed rules cannot drift from these ones unnoticed", () => {
    * When it fails: republish database.rules.json in the console, bump
    * `// rulesVersion:` at the top of that file, and put the printed digest here.
    */
-  const EXPECTED_VERSION = 2;
-  const EXPECTED_DIGEST = "275bfaf9a0072e38668a4be2dfc1f092d3954797670e4ae958fe734e00477986";
+  const EXPECTED_VERSION = 3;
+  const EXPECTED_DIGEST = "907277d82c7b9e88e82c52ffa02f1641a9d172107203ec7faab2157c98317b6e";
 
   // sorted so a pure reordering of the file is not treated as a rules change
   function sortDeep(value) {
@@ -260,5 +260,27 @@ describe("judge assignments survive the keyed shape", () => {
   test("drops the empty-string placeholder older schedules wrote", () => {
     expect(assignmentList([""])).toEqual([]);
     expect(assignmentList(null)).toEqual([]);
+  });
+});
+
+describe("the audit log pins its author", () => {
+  /**
+   * The log is a forensics aid, not a ledger — an admin holds root write and
+   * deletes skip .validate, so entries can be erased. These pin the two things
+   * rules genuinely can enforce: who an entry is attributed to, and its shape.
+   */
+  test("by is compared to auth.uid, so entries cannot be forged", () => {
+    expect(RULES.rules.adminLog.$entryId.by[".validate"]).toContain("auth.uid");
+  });
+
+  test("unknown keys are refused at both levels", () => {
+    expect(RULES.rules.adminLog.$entryId.$other[".validate"]).toBe(false);
+    expect(RULES.rules.adminLog.$entryId.changes.$i.$other[".validate"]).toBe(false);
+  });
+
+  test("before and after are strings, because RTDB drops a literal null", () => {
+    const change = RULES.rules.adminLog.$entryId.changes.$i;
+    expect(change.before[".validate"]).toContain("isString");
+    expect(change.after[".validate"]).toContain("isString");
   });
 });
