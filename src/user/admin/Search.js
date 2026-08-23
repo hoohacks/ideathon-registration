@@ -4,22 +4,28 @@ import { database } from "../../firebase";
 import React, { useEffect, useMemo, useState } from "react";
 
 import {
+  Alert,
   Button,
   Chip,
   Link,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import Layout from "../Layout";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
+import CompetitorEditDrawer from "./edit/CompetitorEditDrawer";
 
 function Search() {
   const [query, setQuery] = useState("");
   const [checkedInFilter, setCheckedInFilter] = useState("");
   const [dietaryFilter, setDietaryFilter] = useState("");
   const [competitors, setCompetitors] = useState([]);
+  const [teams, setTeams] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const checkedInCount = competitors.filter((person) => person.checkedIn).length;
   const percentCheckedIn = competitors.length
@@ -34,6 +40,14 @@ function Search() {
       );
     });
 
+    return () => unsubscribe();
+  }, []);
+
+  // the edit drawer offers a team move, which needs the list of teams to move to
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, "/teams/"), (snapshot) =>
+      setTeams(snapshot.val() ?? {})
+    );
     return () => unsubscribe();
   }, []);
 
@@ -168,19 +182,40 @@ function Search() {
                   </Stack>
                 </Stack>
 
-                <Button
-                  size="small"
-                  variant={isCheckedIn ? "contained" : "outlined"}
-                  onClick={() => handleCheckIn(person)}
-                  sx={{ minWidth: 116 }}
-                >
-                  {isCheckedIn ? "Checked in" : "Check in"}
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" onClick={() => setEditing(person)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={isCheckedIn ? "contained" : "outlined"}
+                    onClick={() => handleCheckIn(person)}
+                    sx={{ minWidth: 116 }}
+                  >
+                    {isCheckedIn ? "Checked in" : "Check in"}
+                  </Button>
+                </Stack>
               </Stack>
             </Row>
           );
         })}
       </RowList>
+
+      {editing && (
+        <CompetitorEditDrawer
+          person={editing}
+          teams={teams}
+          onClose={() => setEditing(null)}
+          onResult={(result, message) =>
+            setToast(result?.ok
+              ? { severity: "success", message }
+              : { severity: "error", message: result?.error ?? "Something went wrong." })}
+        />
+      )}
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={() => setToast(null)}>
+        {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert> : undefined}
+      </Snackbar>
     </Layout>
   );
 }
