@@ -3,16 +3,19 @@ import { database } from "../../firebase";
 
 import React, { useEffect, useMemo, useState } from "react";
 
-import { Alert, Button, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Button, Chip, MenuItem, Snackbar, Stack, TextField, Typography } from "@mui/material";
 import Layout from "../Layout";
 import { assignmentList } from "../judge/assignmentList";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
+import JudgeEditDrawer from "./edit/JudgeEditDrawer";
 
 function JudgeSearch() {
   const [query, setQuery] = useState("");
   const [checkedInFilter, setCheckedInFilter] = useState("");
   const [roundOneFilter, setRoundOneFilter] = useState("");
   const [judges, setJudges] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, "/judges/"), (snapshot) => {
@@ -163,6 +166,9 @@ function JudgeSearch() {
                 </Stack>
 
                 <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" onClick={() => setEditing(judge)}>
+                    Edit
+                  </Button>
                   <Button
                     size="small"
                     variant={isRoundOne ? "contained" : "outlined"}
@@ -185,6 +191,21 @@ function JudgeSearch() {
           );
         })}
       </RowList>
+
+      {editing && (
+        <JudgeEditDrawer
+          judge={editing}
+          onClose={() => setEditing(null)}
+          onResult={(result, message) =>
+            setToast(result?.ok
+              ? { severity: "success", message }
+              : { severity: "error", message: result?.error ?? "Something went wrong." })}
+        />
+      )}
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={() => setToast(null)}>
+        {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert> : undefined}
+      </Snackbar>
     </Layout>
   );
 }
