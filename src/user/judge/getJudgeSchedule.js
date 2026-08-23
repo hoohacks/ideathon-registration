@@ -4,22 +4,12 @@ import { requireAdmin } from "../../roles.js";
 import { assignmentList } from "./assignmentList.js";
 import { FIRST_ROUND } from "./getTeamInfo.js";
 
-// Fallback room list. Override it at config/judgingRooms in the database to add
-// rooms without shipping a new build.
-export const DEFAULT_ROOMS = [
-    "Rice 110",
-    "Rice 109",
-    "Rice 108",
-    "Rice 103",
-    "Rice 204",
-    "Rice 011",
-    "Rice 032",
-    "Rice 303",
-    "Rice 314",
-    "Rice 514",
-    "Rice 540",
-    "Rice 414",
-];
+// The judging rooms live at config/judgingRooms and nowhere else. There is
+// deliberately no fallback list here: a hardcoded one silently papers over an
+// empty config, so an organiser who removed a room on the control panel would
+// see it come back at the next generation, and nobody could tell whether the
+// rooms in use were the ones they had chosen or the ones the build shipped
+// with. Rooms are venue facts, not code. Add them on the control panel.
 
 export const BATCH_COUNT = 3;
 
@@ -53,19 +43,27 @@ export function teamIndexFor(judgeIndex, batchIndex, batchSize) {
     return (judgeIndex + batchIndex * Math.floor(judgeIndex / batchSize)) % batchSize;
 }
 
+/**
+ * The configured rooms, or an empty list.
+ *
+ * Returning [] rather than a built-in list is the point: an empty config is a
+ * real state that has to stop a generation with a clear message, not one that
+ * quietly succeeds using rooms nobody chose. A read failure is also [] -- both
+ * mean "we do not know the rooms", and guessing would send teams to rooms the
+ * event may not have booked.
+ */
 async function fetchRooms() {
     try {
         const snapshot = await get(ref(database, "config/judgingRooms"));
-        if (snapshot.exists()) {
-            const value = snapshot.val();
-            const rooms = (Array.isArray(value) ? value : Object.values(value))
-                .filter((room) => typeof room === "string" && room.trim().length > 0);
-            if (rooms.length) return rooms;
-        }
+        if (!snapshot.exists()) return [];
+
+        const value = snapshot.val();
+        return (Array.isArray(value) ? value : Object.values(value))
+            .filter((room) => typeof room === "string" && room.trim().length > 0);
     } catch (error) {
-        console.warn("Could not read config/judgingRooms, using the built-in list:", error);
+        console.warn("Could not read config/judgingRooms:", error);
+        return [];
     }
-    return DEFAULT_ROOMS;
 }
 
 /**
@@ -170,10 +168,19 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
         const batches = splitIntoBatches(teamsList, batchConfig.batchCount).filter((batch) => batch.length > 0);
         const largestBatch = Math.max(...batches.map((batch) => batch.length));
 
+        // Its own case, ahead of the count comparison: "0 rooms are configured"
+        // is a different problem from "not enough of them", and the answer is
+        // not to add a few more.
+        if (!rooms.length) {
+            return fail(
+                "No judging rooms are configured. Add them on the control panel, then generate again."
+            );
+        }
+
         if (largestBatch > rooms.length) {
             return fail(
                 `${teamsList.length} teams need ${largestBatch} rooms per batch but only ${rooms.length} are configured. ` +
-                "Add rooms at config/judgingRooms in the database, then generate again."
+                "Add more rooms on the control panel, then generate again."
             );
         }
 

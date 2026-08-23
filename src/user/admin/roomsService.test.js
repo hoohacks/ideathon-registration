@@ -7,17 +7,34 @@
  * copy. Removing a room therefore has to touch all of them or none.
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
+
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: jest.fn(async () => ({ exists: () => false, val: () => null })),
-  update: jest.fn(async () => {}),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 0,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
 jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
 
-const { roomsInUse, remapChanges } = require("./roomsService");
+const { roomsInUse, remapChanges, listRooms, removeRoom } = require("./roomsService");
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test. Every implementation has to be re-established.
+ */
+beforeEach(() => {
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
+});
 
 const teamsData = {
   t1: { name: "Lumen", schedule: { id: "t1", teamName: "Lumen", room: "Rice 110", time: "5:00 PM", batch: 1, judges: [{ judgeId: "j1", judgeName: "Ada" }, { judgeId: "j2", judgeName: "Bo" }] } },
@@ -91,5 +108,45 @@ describe("remapping every copy of a room", () => {
     const stale = { j9: { teamAssignments: { gone: { room: "Rice 110" } } } };
     const changes = remapChanges({ from: "Rice 110", to: "Rice 204", teamsData, judgesData: stale });
     expect(changes.map((c) => c.path)).not.toContain("judges/j9/teamAssignments/gone/room");
+  });
+});
+
+describe("rooms live only in the database", () => {
+  /**
+   * There used to be a DEFAULT_ROOMS list in getJudgeSchedule.js. A built-in
+   * list silently papers over an empty config: an organiser who removed the
+   * last room would see twelve of them reappear at the next generation, with
+   * nothing to say whether the rooms in use were chosen or shipped.
+   */
+  test("an unconfigured database has no rooms, not a built-in list", async () => {
+    expect(await listRooms()).toEqual([]);
+  });
+
+  test("an empty stored list stays empty", async () => {
+    mockGet.mockResolvedValue({ exists: () => true, val: () => [] });
+    expect(await listRooms()).toEqual([]);
+  });
+
+  test("blank entries are dropped without resurrecting a default", async () => {
+    mockGet.mockResolvedValue({ exists: () => true, val: () => ["", "  ", null] });
+    expect(await listRooms()).toEqual([]);
+  });
+
+  test("stored rooms are returned as given", async () => {
+    mockGet.mockResolvedValue({ exists: () => true, val: () => ["Rice 110", "Rice 204"] });
+    expect(await listRooms()).toEqual(["Rice 110", "Rice 204"]);
+  });
+
+  test("removing the last room is allowed, leaving none", async () => {
+    mockGet.mockImplementation(async (r) => {
+      if (r.path === "config/judgingRooms") {
+        return { exists: () => true, val: () => ["Rice 110"] };
+      }
+      return { exists: () => false, val: () => null };
+    });
+
+    const result = await removeRoom("Rice 110");
+    expect(result.ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["config/judgingRooms"]).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Chip, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Button, Chip, Stack, TextField, Typography } from "@mui/material";
 import { RowList, Row } from "../adminUi";
 import { roomsInUse, addRoom, renameRoom, removeRoom } from "../roomsService";
 import RemapDialog from "./RemapDialog";
@@ -62,7 +62,14 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
         </Button>
       </Stack>
 
-      <RowList empty="No rooms configured. The scheduler will fall back to its built-in list.">
+      {rooms.length === 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          No rooms are configured, so a schedule cannot be generated. There is no
+          built-in list — add the rooms this event has booked.
+        </Alert>
+      )}
+
+      <RowList empty="No rooms yet. Add the first one above.">
         {rooms.map((room) => {
           const occupants = inUse[room] ?? [];
           const isRenaming = renaming === room;

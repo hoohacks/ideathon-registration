@@ -1,7 +1,6 @@
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase.js";
 import { applyAdminAction } from "./adminAction.js";
-import { DEFAULT_ROOMS } from "../judge/getJudgeSchedule.js";
 
 /**
  * The judging room list, and what happens to a schedule when it changes.
@@ -13,6 +12,9 @@ import { DEFAULT_ROOMS } from "../judge/getJudgeSchedule.js";
  *
  * So removing a room in use is not a list edit. It is a fan-out, and it must be
  * atomic or a team walks to one room while its judges walk to another.
+ *
+ * There is no built-in room list anywhere in the code. Rooms are venue facts,
+ * added and removed here and stored only at config/judgingRooms.
  */
 
 /** Which teams are scheduled in which room. Pure; takes a /teams snapshot. */
@@ -64,13 +66,17 @@ export function remapChanges({ from, to, teamsData, judgesData }) {
   return changes;
 }
 
+/**
+ * The configured rooms, or an empty list. There is no built-in fallback: rooms
+ * are added and removed here, so a list that appeared from nowhere would make
+ * a removal look like it had failed.
+ */
 export async function listRooms() {
   const snap = await get(ref(database, "config/judgingRooms"));
-  if (!snap.exists()) return [...DEFAULT_ROOMS];
+  if (!snap.exists()) return [];
   const value = snap.val();
-  const rooms = (Array.isArray(value) ? value : Object.values(value))
+  return (Array.isArray(value) ? value : Object.values(value))
     .filter((room) => typeof room === "string" && room.trim().length > 0);
-  return rooms.length ? rooms : [...DEFAULT_ROOMS];
 }
 
 async function loadWorld() {

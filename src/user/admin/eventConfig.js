@@ -8,9 +8,11 @@ import { EVENT_START } from "../../eventInfo.js";
 /**
  * Batch count, batch times, event start and the final round room.
  *
- * All four were module constants. They remain as fallbacks -- the pattern
- * DEFAULT_ROOMS already uses -- so an absent config node behaves exactly as it
- * did before rather than producing an event with zero batches.
+ * All four were module constants and remain so as fallbacks. Unlike the room
+ * list, these are structural rather than venue facts: an event always has some
+ * number of batches, so an absent node should behave as it did before rather
+ * than refusing to generate. Rooms are the opposite -- there is no sensible
+ * default for which rooms a venue booked, so those have no fallback at all.
  *
  * Changing any of these affects the NEXT schedule generation. A schedule
  * already written keeps the times it was built with; that is what the room

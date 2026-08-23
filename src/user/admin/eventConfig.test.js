@@ -1,9 +1,9 @@
 /**
  * Event configuration.
  *
- * These were module constants. They stay as fallbacks -- the pattern
- * DEFAULT_ROOMS already uses -- so an absent config node behaves exactly as
- * before rather than producing an event with zero batches.
+ * These were module constants and stay as fallbacks, because an event always
+ * has some number of batches. The room list deliberately has no fallback --
+ * there is no sensible default for which rooms a venue booked.
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
