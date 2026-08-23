@@ -21,9 +21,15 @@ const RULES_PATH = path.join(process.cwd(), "database.rules.json");
 const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
 
 const RULES = (() => {
-  // the console strips // comments; JSON.parse will not
+  // the console strips // comments; JSON.parse will not.
+  //
+  // No `$` on that pattern, deliberately. On a Windows checkout with
+  // core.autocrlf the lines still end in \r, and `.` never matches \r while an
+  // unanchored `$` only matches at end of input -- so with a `$` here every
+  // comment line survived stripping and JSON.parse died on line 2. Leaving the
+  // \r behind is harmless; JSON treats it as whitespace.
   const stripped = RAW_RULES.split("\n")
-    .map((line) => line.replace(/^\s*\/\/.*$/, ""))
+    .map((line) => line.replace(/^\s*\/\/.*/, ""))
     .join("\n");
   return JSON.parse(stripped);
 })();

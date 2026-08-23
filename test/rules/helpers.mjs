@@ -22,9 +22,11 @@ function rulesSource() {
   // the console strips // comments and JSON.parse cannot; the emulator's parser
   // accepts them, but stripping keeps this identical to what src/schema.test.js
   // reads and removes one way for the two to disagree
+  // no `$` on that pattern: see the matching note in src/schema.test.js -- on a
+  // CRLF checkout an anchored `$` never matches, and every comment survives
   return raw
     .split("\n")
-    .map((line) => line.replace(/^\s*\/\/.*$/, ""))
+    .map((line) => line.replace(/^\s*\/\/.*/, ""))
     .join("\n");
 }
 
