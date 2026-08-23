@@ -9,6 +9,7 @@ import ScheduleSection from "./control/ScheduleSection";
 import EventSection from "./control/EventSection";
 import AdminsSection from "./control/AdminsSection";
 import ActivityFeed from "./control/ActivityFeed";
+import DangerSection from "./control/DangerSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
@@ -69,6 +70,7 @@ function Control() {
         <EventSection config={config} onResult={report} />
         <AdminsSection admins={admins} onResult={report} />
         <ActivityFeed log={log} onResult={report} />
+        <DangerSection onResult={report} />
       </Stack>
 
       <Snackbar
