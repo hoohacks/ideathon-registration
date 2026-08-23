@@ -68,6 +68,32 @@ async function fetchRooms() {
     return DEFAULT_ROOMS;
 }
 
+/**
+ * Batch count and times, overridable at config/batchCount and config/batchTimes
+ * so the shape of the day can change without a deploy. Same fallback contract
+ * as fetchRooms: an absent or malformed node behaves exactly as the built-in
+ * constants did, rather than producing an event with zero batches.
+ */
+export async function fetchBatchConfig() {
+    try {
+        const [countSnap, timesSnap] = await Promise.all([
+            get(ref(database, "config/batchCount")),
+            get(ref(database, "config/batchTimes")),
+        ]);
+
+        const count = countSnap.exists() ? Number(countSnap.val()) : BATCH_COUNT;
+        const times = timesSnap.exists() ? timesSnap.val() : BATCH_TIMES;
+
+        return {
+            batchCount: Number.isInteger(count) && count >= 1 ? count : BATCH_COUNT,
+            batchTimes: times && typeof times === "object" ? times : BATCH_TIMES,
+        };
+    } catch (error) {
+        console.warn("Could not read the batch config, using the built-in values:", error);
+        return { batchCount: BATCH_COUNT, batchTimes: BATCH_TIMES };
+    }
+}
+
 function displayName(person, fallback) {
     const name = [person?.firstName, person?.lastName].filter(Boolean).join(" ").trim();
     return name || fallback;
@@ -97,10 +123,11 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
         // a non-admin, but failing here gives a usable message instead of a
         // bare PERMISSION_DENIED from a multi-path update
         const admin = await requireAdmin("generate the judging schedule");
-        const [judgeSnapshot, teamSnapshot, rooms] = await Promise.all([
+        const [judgeSnapshot, teamSnapshot, rooms, batchConfig] = await Promise.all([
             get(ref(database, "judges")),
             get(ref(database, "teams")),
             fetchRooms(),
+            fetchBatchConfig(),
         ]);
 
         if (!judgeSnapshot.exists()) return fail("There are no judges registered yet.");
@@ -140,7 +167,7 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             return fail("No teams have submitted a project yet, so there is nothing to judge.");
         }
 
-        const batches = splitIntoBatches(teamsList).filter((batch) => batch.length > 0);
+        const batches = splitIntoBatches(teamsList, batchConfig.batchCount).filter((batch) => batch.length > 0);
         const largestBatch = Math.max(...batches.map((batch) => batch.length));
 
         if (largestBatch > rooms.length) {
@@ -184,7 +211,7 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
                     teamName: team.name ?? "Unnamed Team",
                     id: team.id,
                     room: rooms[seat],
-                    time: BATCH_TIMES[batchNumber] ?? "TBD",
+                    time: batchConfig.batchTimes[batchNumber] ?? "TBD",
                     batch: batchNumber,
                     judges: [],
                 };
