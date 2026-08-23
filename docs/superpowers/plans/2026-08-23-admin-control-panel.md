@@ -23,6 +23,10 @@
 - Keep files ~100–150 lines. One responsibility each.
 - Pure change-builders take data snapshots as arguments and return `changes[]`. All `get`/`update` lives in the async wrapper.
 - Unit tests mock firebase exactly as `src/user/judge/schedule.test.js` does. Rules tests use `test/rules/helpers.mjs`.
+- **Two jest constraints, both found the hard way in Task 2 — follow them in every test file:**
+  1. A `jest.mock()` factory may not reference an out-of-scope variable **unless its name starts with `mock`** (case-insensitive). Hence `mockGet` / `mockUpdate`, never `getMock` / `updateMock`.
+  2. create-react-app sets **`resetMocks: true`**, which strips the implementation off every `jest.fn` before each test. An implementation passed at declaration (`jest.fn(async () => …)`) is **gone by the first test** and the mock returns `undefined`. Re-establish every implementation — including `requireAdmin` — in `beforeEach`.
+- **The RTDB emulator does not always shut down** after `npm run test:rules`, leaving port 9000 held and the next run failing with "port taken". Kill the stale `firebase-database-emulator` java process before re-running.
 
 **Test commands:**
 - One unit file: `npx cross-env CI=true react-scripts test --watchAll=false src/user/admin/adminAction.test.js`
@@ -303,13 +307,13 @@ Create `src/user/admin/adminAction.test.js`:
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
-const updateMock = jest.fn(async () => {});
-const getMock = jest.fn(async () => ({ exists: () => false, val: () => null }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
 
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: (...args) => getMock(...args),
-  update: (...args) => updateMock(...args),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 1700000000000,
 }));
@@ -329,9 +333,21 @@ const {
   UNDO_SIZE_CAP,
 } = require("./adminAction");
 
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
 beforeEach(() => {
-  updateMock.mockClear();
-  getMock.mockClear();
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
 
 describe("encoding survives what Realtime Database does to values", () => {
@@ -361,9 +377,9 @@ describe("the change and its log entry land together", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
 
-    const payload = updateMock.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls[0][1];
     expect(payload["teams/t1/name"]).toBe("Omega");
     expect(payload["adminLog/entry-1"]).toMatchObject({
       action: "team.rename",
@@ -374,7 +390,7 @@ describe("the change and its log entry land together", () => {
 
   test("the entry records the author, never a caller-supplied one", async () => {
     await applyAdminAction({ action: "x", summary: "y", changes: [] });
-    expect(updateMock.mock.calls[0][1]["adminLog/entry-1"].by).toBe("admin-1");
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].by).toBe("admin-1");
   });
 
   test("an oversized change-set logs counts only and refuses undo", async () => {
@@ -386,12 +402,12 @@ describe("the change and its log entry land together", () => {
 
     await applyAdminAction({ action: "schedule.clear", summary: "cleared", changes: big });
 
-    const entry = updateMock.mock.calls[0][1]["adminLog/entry-1"];
+    const entry = mockUpdate.mock.calls[0][1]["adminLog/entry-1"];
     expect(entry.undoable).toBe(false);
     expect(entry.changes).toBeUndefined();
     expect(entry.summary).toContain("400");
     // the changes themselves are still applied — only the record is trimmed
-    expect(updateMock.mock.calls[0][1]["teams/t0/schedule"]).toBeNull();
+    expect(mockUpdate.mock.calls[0][1]["teams/t0/schedule"]).toBeNull();
   });
 
   test("the cap is a byte budget, not a count", () => {
@@ -401,7 +417,7 @@ describe("the change and its log entry land together", () => {
 
 describe("failure is returned, never thrown", () => {
   test("a rejected write comes back as { ok: false }", async () => {
-    updateMock.mockRejectedValueOnce(new Error("PERMISSION_DENIED"));
+    mockUpdate.mockRejectedValueOnce(new Error("PERMISSION_DENIED"));
     const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("PERMISSION_DENIED");
@@ -413,7 +429,7 @@ describe("failure is returned, never thrown", () => {
     const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("Only an organiser");
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 ```
@@ -627,7 +643,7 @@ describe("undoing an entry", () => {
   };
 
   function whenLogSays(entry, currentValues = {}) {
-    getMock.mockImplementation(async (r) => {
+    mockGet.mockImplementation(async (r) => {
       if (r.path.startsWith("adminLog/")) {
         return { exists: () => Boolean(entry), val: () => entry };
       }
@@ -642,7 +658,7 @@ describe("undoing an entry", () => {
     const result = await undoAdminAction("entry-0");
     expect(result.ok).toBe(true);
 
-    const payload = updateMock.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls[0][1];
     expect(payload["teams/t1/name"]).toBe("Alpha");
     expect(payload["adminLog/entry-0/undone"]).toMatchObject({ by: "admin-1" });
   });
@@ -650,7 +666,7 @@ describe("undoing an entry", () => {
   test("the undo is itself logged", async () => {
     whenLogSays(logged, { "teams/t1/name": "Omega" });
     await undoAdminAction("entry-0");
-    expect(updateMock.mock.calls[0][1]["adminLog/entry-1"].action).toBe("undo:team.rename");
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("undo:team.rename");
   });
 
   test("refuses when the value moved since, naming the path", async () => {
@@ -659,7 +675,7 @@ describe("undoing an entry", () => {
     const result = await undoAdminAction("entry-0");
     expect(result.ok).toBe(false);
     expect(result.error).toContain("teams/t1/name");
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   test("refuses an entry marked not undoable", async () => {
@@ -1130,13 +1146,13 @@ Create `src/user/admin/eventConfig.test.js`:
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
-const updateMock = jest.fn(async () => {});
-const getMock = jest.fn(async () => ({ exists: () => false, val: () => null }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
 
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: (...args) => getMock(...args),
-  update: (...args) => updateMock(...args),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 0,
 }));
@@ -1147,10 +1163,21 @@ const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRo
   require("./eventConfig");
 const { BATCH_COUNT, BATCH_TIMES } = require("../judge/getJudgeSchedule");
 
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
 beforeEach(() => {
-  updateMock.mockClear();
-  getMock.mockReset();
-  getMock.mockResolvedValue({ exists: () => false, val: () => null });
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
 
 describe("reading config falls back to the built-in values", () => {
@@ -1162,7 +1189,7 @@ describe("reading config falls back to the built-in values", () => {
   });
 
   test("stored values win", async () => {
-    getMock.mockImplementation(async (r) => {
+    mockGet.mockImplementation(async (r) => {
       const stored = {
         "config/batchCount": 4,
         "config/batchTimes": { 1: "6:00 PM", 2: "6:15 PM", 3: "6:30 PM", 4: "6:45 PM" },
@@ -1183,13 +1210,13 @@ describe("writing config", () => {
   test("a batch count is written and logged", async () => {
     const result = await setBatchCount(4);
     expect(result.ok).toBe(true);
-    expect(updateMock.mock.calls[0][1]["config/batchCount"]).toBe(4);
-    expect(updateMock.mock.calls[0][1]["adminLog/entry-1"].action).toBe("config.batchCount");
+    expect(mockUpdate.mock.calls[0][1]["config/batchCount"]).toBe(4);
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("config.batchCount");
   });
 
   test("a batch count below one is refused", async () => {
     expect((await setBatchCount(0)).ok).toBe(false);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   test("a non-integer batch count is refused", async () => {
@@ -1197,7 +1224,7 @@ describe("writing config", () => {
   });
 
   test("batch times must cover every batch", async () => {
-    getMock.mockImplementation(async (r) => {
+    mockGet.mockImplementation(async (r) => {
       const stored = { "config/batchCount": 3 }[r.path];
       return { exists: () => stored !== undefined, val: () => stored };
     });
@@ -1211,7 +1238,7 @@ describe("writing config", () => {
   test("a valid event start is written", async () => {
     const result = await setEventStart("2026-10-18T09:00:00");
     expect(result.ok).toBe(true);
-    expect(updateMock.mock.calls[0][1]["config/eventStart"]).toBe("2026-10-18T09:00:00");
+    expect(mockUpdate.mock.calls[0][1]["config/eventStart"]).toBe("2026-10-18T09:00:00");
   });
 
   test("an empty final round room is refused", async () => {
@@ -1423,13 +1450,13 @@ Create `src/user/admin/adminsService.test.js`:
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
-const updateMock = jest.fn(async () => {});
-const getMock = jest.fn(async () => ({ exists: () => false, val: () => null }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
 
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: (...args) => getMock(...args),
-  update: (...args) => updateMock(...args),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 0,
 }));
@@ -1438,10 +1465,21 @@ jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "
 
 const { revokeGuard, grantAdmin, revokeAdmin } = require("./adminsService");
 
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
 beforeEach(() => {
-  updateMock.mockClear();
-  getMock.mockReset();
-  getMock.mockResolvedValue({ exists: () => false, val: () => null });
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
 
 describe("the two revokes that must never go through", () => {
@@ -1473,18 +1511,18 @@ describe("granting", () => {
   test("writes true at the uid and logs it", async () => {
     const result = await grantAdmin({ uid: "u9", name: "Sam Lee" });
     expect(result.ok).toBe(true);
-    expect(updateMock.mock.calls[0][1]["admins/u9"]).toBe(true);
-    expect(updateMock.mock.calls[0][1]["adminLog/entry-1"].summary).toContain("Sam Lee");
+    expect(mockUpdate.mock.calls[0][1]["admins/u9"]).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].summary).toContain("Sam Lee");
   });
 
   test("granting someone who already has it is refused", async () => {
-    getMock.mockImplementation(async (r) =>
+    mockGet.mockImplementation(async (r) =>
       r.path === "admins" ? { exists: () => true, val: () => ({ u9: true }) }
                           : { exists: () => false, val: () => null });
 
     const result = await grantAdmin({ uid: "u9", name: "Sam Lee" });
     expect(result.ok).toBe(false);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   test("granting with no uid is refused", async () => {
@@ -1494,25 +1532,25 @@ describe("granting", () => {
 
 describe("revoking", () => {
   test("removes the uid when the guards pass", async () => {
-    getMock.mockImplementation(async (r) =>
+    mockGet.mockImplementation(async (r) =>
       r.path === "admins"
         ? { exists: () => true, val: () => ({ "admin-1": true, u9: true }) }
         : { exists: () => false, val: () => null });
 
     const result = await revokeAdmin("u9");
     expect(result.ok).toBe(true);
-    expect(updateMock.mock.calls[0][1]["admins/u9"]).toBeNull();
+    expect(mockUpdate.mock.calls[0][1]["admins/u9"]).toBeNull();
   });
 
   test("the guard is enforced by the service, not just the UI", async () => {
-    getMock.mockImplementation(async (r) =>
+    mockGet.mockImplementation(async (r) =>
       r.path === "admins"
         ? { exists: () => true, val: () => ({ "admin-1": true }) }
         : { exists: () => false, val: () => null });
 
     const result = await revokeAdmin("admin-1");
     expect(result.ok).toBe(false);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 ```
@@ -1680,13 +1718,13 @@ Create `src/user/admin/recordEdits.test.js`:
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
-const updateMock = jest.fn(async () => {});
-const getMock = jest.fn(async () => ({ exists: () => false, val: () => null }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
 
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: (...args) => getMock(...args),
-  update: (...args) => updateMock(...args),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 0,
 }));
@@ -1700,10 +1738,21 @@ const {
   COMPETITOR_FIELDS,
 } = require("./recordEdits");
 
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
 beforeEach(() => {
-  updateMock.mockClear();
-  getMock.mockReset();
-  getMock.mockResolvedValue({ exists: () => false, val: () => null });
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
 
 describe("renaming a team reaches every copy of the name", () => {
@@ -1777,10 +1826,10 @@ describe("moving a competitor between teams", () => {
 
 describe("editing plain fields", () => {
   test("only allow-listed fields are written", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => "old" });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => "old" });
 
     await editCompetitor("u1", { firstName: "Jane", checkedIn: true, isAdmin: true });
-    const payload = updateMock.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls[0][1];
 
     expect(payload["competitors/u1/firstName"]).toBe("Jane");
     expect(payload["competitors/u1/isAdmin"]).toBeUndefined();
@@ -1791,10 +1840,10 @@ describe("editing plain fields", () => {
   });
 
   test("an edit that changes nothing is refused rather than logged as noise", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => "Jane" });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => "Jane" });
     const result = await editCompetitor("u1", { firstName: "Jane" });
     expect(result.ok).toBe(false);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 ```
@@ -2023,13 +2072,13 @@ Create `src/user/admin/dangerZone.test.js`:
  */
 jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
 
-const updateMock = jest.fn(async () => {});
-const getMock = jest.fn(async () => ({ exists: () => false, val: () => null }));
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
 
 jest.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
-  get: (...args) => getMock(...args),
-  update: (...args) => updateMock(...args),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
   push: () => ({ key: "entry-1" }),
   serverTimestamp: () => 0,
 }));
@@ -2043,10 +2092,21 @@ const {
   clearSchedule,
 } = require("./dangerZone");
 
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
 beforeEach(() => {
-  updateMock.mockClear();
-  getMock.mockReset();
-  getMock.mockResolvedValue({ exists: () => false, val: () => null });
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
 
 describe("overriding one team's slot", () => {
@@ -2094,7 +2154,7 @@ describe("deleting a score", () => {
   };
 
   test("removes the card and returns it for re-entry", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => card });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => card });
 
     const result = await deleteScore({
       round: "first", teamId: "t1", judgeUid: "j1", teamName: "Lumen", judgeName: "Ada",
@@ -2102,27 +2162,27 @@ describe("deleting a score", () => {
 
     expect(result.ok).toBe(true);
     expect(result.card).toEqual(card);
-    expect(updateMock.mock.calls[0][1]["scores/first/t1/j1"]).toBeNull();
+    expect(mockUpdate.mock.calls[0][1]["scores/first/t1/j1"]).toBeNull();
   });
 
   test("is marked not undoable, because enteredBy is pinned to auth.uid", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => card });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => card });
     await deleteScore({ round: "first", teamId: "t1", judgeUid: "j1" });
-    expect(updateMock.mock.calls[0][1]["adminLog/entry-1"].undoable).toBe(false);
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].undoable).toBe(false);
   });
 
   test("the whole card is kept in the entry so it can be re-typed", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => card });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => card });
     await deleteScore({ round: "first", teamId: "t1", judgeUid: "j1" });
 
-    const logged = updateMock.mock.calls[0][1]["adminLog/entry-1"];
+    const logged = mockUpdate.mock.calls[0][1]["adminLog/entry-1"];
     expect(JSON.parse(logged.changes[0].before)).toEqual(card);
   });
 
   test("a card that is not there is refused", async () => {
     const result = await deleteScore({ round: "first", teamId: "t1", judgeUid: "j1" });
     expect(result.ok).toBe(false);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   test("an unknown round is refused", async () => {
@@ -2132,17 +2192,17 @@ describe("deleting a score", () => {
 
 describe("un-submitting a team", () => {
   test("flips the flag and logs it", async () => {
-    getMock.mockResolvedValue({ exists: () => true, val: () => true });
+    mockGet.mockResolvedValue({ exists: () => true, val: () => true });
     const result = await setTeamSubmitted({ teamId: "t1", teamName: "Lumen", submitted: false });
 
     expect(result.ok).toBe(true);
-    expect(updateMock.mock.calls[0][1]["teams/t1/submitted"]).toBe(false);
+    expect(mockUpdate.mock.calls[0][1]["teams/t1/submitted"]).toBe(false);
   });
 });
 
 describe("clearing the schedule", () => {
   test("nulls every team schedule and every judge assignment", async () => {
-    getMock.mockImplementation(async (r) => {
+    mockGet.mockImplementation(async (r) => {
       if (r.path === "teams") {
         return { exists: () => true, val: () => ({ t1: { schedule: { room: "A" } }, t2: {} }) };
       }
@@ -2155,7 +2215,7 @@ describe("clearing the schedule", () => {
     const result = await clearSchedule();
     expect(result.ok).toBe(true);
 
-    const payload = updateMock.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls[0][1];
     expect(payload["teams/t1/schedule"]).toBeNull();
     expect(payload["judges/j1/teamAssignments"]).toBeNull();
     expect(payload["config/scheduleMeta"]).toBeNull();

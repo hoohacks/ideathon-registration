@@ -1,0 +1,132 @@
+/**
+ * The primitive every admin write goes through.
+ *
+ * The property that matters: the change and its log entry are in ONE update
+ * call. Two calls would let a change land with no record of it, which is
+ * exactly the situation the log exists to explain.
+ */
+jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
+
+const mockUpdate = jest.fn(async () => {});
+const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
+
+jest.mock("firebase/database", () => ({
+  ref: (_db, path) => ({ path }),
+  get: (...args) => mockGet(...args),
+  update: (...args) => mockUpdate(...args),
+  push: () => ({ key: "entry-1" }),
+  serverTimestamp: () => 1700000000000,
+}));
+
+jest.mock("firebase/auth", () => ({
+  getAuth: () => ({ currentUser: { uid: "admin-1" } }),
+}));
+
+jest.mock("../../roles.js", () => ({
+  requireAdmin: jest.fn(async () => ({ uid: "admin-1" })),
+}));
+
+const {
+  encodeChanges,
+  decodeChanges,
+  applyAdminAction,
+  UNDO_SIZE_CAP,
+} = require("./adminAction");
+const { requireAdmin } = require("../../roles.js");
+
+/**
+ * create-react-app sets `resetMocks: true`, which strips the implementation off
+ * every jest.fn before each test -- so an implementation passed to jest.fn() at
+ * declaration is gone by the time the first test runs, and the mock silently
+ * returns undefined. Every implementation has to be re-established here.
+ */
+beforeEach(() => {
+  mockUpdate.mockReset();
+  mockUpdate.mockResolvedValue(undefined);
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+  requireAdmin.mockReset();
+  requireAdmin.mockResolvedValue({ uid: "admin-1" });
+});
+
+describe("encoding survives what Realtime Database does to values", () => {
+  test("null round-trips, because RTDB drops a literal null on write", () => {
+    const [encoded] = encodeChanges([{ path: "a/b", before: null, after: 3 }]);
+    expect(encoded.before).toBe("null");
+    expect(decodeChanges([encoded])[0].before).toBeNull();
+  });
+
+  test("objects and arrays round-trip", () => {
+    const changes = [{ path: "config/judgingRooms", before: ["A", "B"], after: ["A"] }];
+    expect(decodeChanges(encodeChanges(changes))).toEqual(changes);
+  });
+
+  test("false and empty string are preserved, not treated as absent", () => {
+    const changes = [{ path: "t/submitted", before: true, after: false }];
+    expect(decodeChanges(encodeChanges(changes))[0].after).toBe(false);
+  });
+});
+
+describe("the change and its log entry land together", () => {
+  test("one update call carries both", async () => {
+    const result = await applyAdminAction({
+      action: "team.rename",
+      summary: "Alpha to Omega",
+      changes: [{ path: "teams/t1/name", before: "Alpha", after: "Omega" }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+
+    const payload = mockUpdate.mock.calls[0][1];
+    expect(payload["teams/t1/name"]).toBe("Omega");
+    expect(payload["adminLog/entry-1"]).toMatchObject({
+      action: "team.rename",
+      by: "admin-1",
+      undoable: true,
+    });
+  });
+
+  test("the entry records the author, never a caller-supplied one", async () => {
+    await applyAdminAction({ action: "x", summary: "y", changes: [] });
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].by).toBe("admin-1");
+  });
+
+  test("an oversized change-set logs counts only and refuses undo", async () => {
+    const big = Array.from({ length: 400 }, (_, i) => ({
+      path: `teams/t${i}/schedule`,
+      before: { room: "Rice 110", notes: "x".repeat(200) },
+      after: null,
+    }));
+
+    await applyAdminAction({ action: "schedule.clear", summary: "cleared", changes: big });
+
+    const entry = mockUpdate.mock.calls[0][1]["adminLog/entry-1"];
+    expect(entry.undoable).toBe(false);
+    expect(entry.changes).toBeUndefined();
+    expect(entry.summary).toContain("400");
+    // the changes themselves are still applied -- only the record is trimmed
+    expect(mockUpdate.mock.calls[0][1]["teams/t0/schedule"]).toBeNull();
+  });
+
+  test("the cap is a byte budget, not a count", () => {
+    expect(UNDO_SIZE_CAP).toBe(50000);
+  });
+});
+
+describe("failure is returned, never thrown", () => {
+  test("a rejected write comes back as { ok: false }", async () => {
+    mockUpdate.mockRejectedValueOnce(new Error("PERMISSION_DENIED"));
+    const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("PERMISSION_DENIED");
+  });
+
+  test("a non-admin caller comes back as { ok: false }", async () => {
+    requireAdmin.mockRejectedValueOnce(new Error("Only an organiser can x"));
+    const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("Only an organiser");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
