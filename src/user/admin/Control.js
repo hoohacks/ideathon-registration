@@ -4,6 +4,7 @@ import { onValue, ref, query, limitToLast } from "firebase/database";
 import { database } from "../../firebase";
 import Layout from "../Layout";
 import { PageHeader } from "./adminUi";
+import RoomsSection from "./control/RoomsSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
@@ -55,7 +56,11 @@ function Control() {
       />
 
       <Stack spacing={3}>
-        {/* sections land here in Tasks 10-14 */}
+        <RoomsSection
+          rooms={config.judgingRooms ?? []}
+          teamsData={teamsData}
+          onResult={report}
+        />
       </Stack>
 
       <Snackbar
