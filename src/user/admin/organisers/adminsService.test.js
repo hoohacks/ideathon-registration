@@ -6,7 +6,7 @@
  * console. That makes emptying /admins unrecoverable from inside the app, which
  * is why revokeGuard exists and why it is a pure function with its own tests.
  */
-jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
+jest.mock("../../../firebase", () => ({ database: {}, auth: {} }));
 
 const mockUpdate = jest.fn(async () => {});
 const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
@@ -19,10 +19,10 @@ jest.mock("firebase/database", () => ({
   serverTimestamp: () => 0,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
-jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
+jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
 
 const { revokeGuard, grantAdmin, revokeAdmin } = require("./adminsService");
-const { requireAdmin } = require("../../roles.js");
+const { requireAdmin } = require("../../../roles.js");
 
 /**
  * create-react-app sets `resetMocks: true`, which strips the implementation off

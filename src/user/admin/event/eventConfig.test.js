@@ -5,7 +5,7 @@
  * has some number of batches. The room list deliberately has no fallback --
  * there is no sensible default for which rooms a venue booked.
  */
-jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
+jest.mock("../../../firebase", () => ({ database: {}, auth: {} }));
 
 const mockUpdate = jest.fn(async () => {});
 const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
@@ -18,12 +18,12 @@ jest.mock("firebase/database", () => ({
   serverTimestamp: () => 0,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
-jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
+jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
 
 const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom } =
   require("./eventConfig");
-const { BATCH_COUNT, BATCH_TIMES } = require("../judge/getJudgeSchedule");
-const { requireAdmin } = require("../../roles.js");
+const { BATCH_COUNT, BATCH_TIMES } = require("../../judge/getJudgeSchedule");
+const { requireAdmin } = require("../../../roles.js");
 
 /**
  * create-react-app sets `resetMocks: true`, which strips the implementation off

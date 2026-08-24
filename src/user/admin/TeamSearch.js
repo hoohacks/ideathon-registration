@@ -34,10 +34,10 @@ import { IoChevronDown } from "react-icons/io5";
 import Layout from "../Layout";
 import { memberIds } from "../team/teamMembers";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
-import { deleteScore } from "./dangerZone";
+import { deleteScore } from "./danger/dangerZone";
 import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo";
-import PaperScoreDialog from "./PaperScoreDialog";
-import TeamEditDrawer from "./edit/TeamEditDrawer";
+import PaperScoreDialog from "./scores/PaperScoreDialog";
+import TeamEditDrawer from "./records/TeamEditDrawer";
 
 function ScoreSummary({ label, round, teamId, teamName, scores, judgeNames = {}, onDelete }) {
   const judgeIds = Object.keys(scores ?? {});

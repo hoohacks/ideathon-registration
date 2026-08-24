@@ -1,6 +1,6 @@
 import { ref, get } from "firebase/database";
-import { database } from "../../firebase.js";
-import { applyAdminAction, captureBefore } from "./adminAction.js";
+import { database } from "../../../firebase.js";
+import { applyAdminAction, captureBefore } from "../adminAction.js";
 
 /**
  * Editing a record.

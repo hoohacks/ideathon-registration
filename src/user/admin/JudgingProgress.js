@@ -20,8 +20,8 @@ import { onValue, ref } from "firebase/database";
 import { database } from "../../firebase";
 import Layout from "../Layout";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
-import { buildProgress, TEAM_OK, TEAM_THIN, TEAM_UNJUDGED } from "./judgingStatus";
-import PaperScoreDialog from "./PaperScoreDialog";
+import { buildProgress, TEAM_OK, TEAM_THIN, TEAM_UNJUDGED } from "./scores/judgingStatus";
+import PaperScoreDialog from "./scores/PaperScoreDialog";
 import { SCORE_MAX_TOTAL } from "../judge/scoreRubric";
 import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo";
 import {

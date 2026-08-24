@@ -4,12 +4,12 @@ import { onValue, ref, query, limitToLast } from "firebase/database";
 import { database } from "../../firebase";
 import Layout from "../Layout";
 import { PageHeader } from "./adminUi";
-import RoomsSection from "./control/RoomsSection";
-import ScheduleSection from "./control/ScheduleSection";
-import EventSection from "./control/EventSection";
-import AdminsSection from "./control/AdminsSection";
-import ActivityFeed from "./control/ActivityFeed";
-import DangerSection from "./control/DangerSection";
+import RoomsSection from "./rooms/RoomsSection";
+import ScheduleSection from "./event/ScheduleSection";
+import EventSection from "./event/EventSection";
+import AdminsSection from "./organisers/AdminsSection";
+import ActivityFeed from "./activity/ActivityFeed";
+import DangerSection from "./danger/DangerSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the

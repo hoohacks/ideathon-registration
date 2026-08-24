@@ -1,6 +1,6 @@
 import { ref, get } from "firebase/database";
-import { database } from "../../firebase.js";
-import { applyAdminAction } from "./adminAction.js";
+import { database } from "../../../firebase.js";
+import { applyAdminAction } from "../adminAction.js";
 
 /**
  * The judging room list, and what happens to a schedule when it changes.

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, MenuItem, TextField } from "@mui/material";
-import EditDrawer from "../control/EditDrawer";
-import { editJudge } from "../recordEdits";
+import EditDrawer from "./EditDrawer";
+import { editJudge } from "./recordEdits";
 
 /**
  * Fixing a judge record.

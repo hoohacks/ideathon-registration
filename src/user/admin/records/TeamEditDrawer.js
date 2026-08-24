@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Divider, MenuItem, TextField, Typography } from "@mui/material";
-import EditDrawer from "../control/EditDrawer";
-import { renameTeam } from "../recordEdits";
-import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../dangerZone";
-import { listRooms } from "../roomsService";
+import EditDrawer from "./EditDrawer";
+import { renameTeam } from "./recordEdits";
+import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../danger/dangerZone";
+import { listRooms } from "../rooms/roomsService";
 
 /**
  * Everything about one team an organiser may need to change on the day.

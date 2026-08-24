@@ -4,7 +4,7 @@ import {
   FormControlLabel, Stack, TextField, Typography,
 } from "@mui/material";
 import { IoChevronDown } from "react-icons/io5";
-import { clearSchedule } from "../dangerZone";
+import { clearSchedule } from "./dangerZone";
 import { readScheduleMeta } from "../../judge/getJudgeSchedule";
 
 const CONFIRM_WORD = "clear";

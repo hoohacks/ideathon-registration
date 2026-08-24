@@ -1,7 +1,7 @@
 import { ref, get } from "firebase/database";
-import { database } from "../../firebase.js";
-import { applyAdminAction, captureBefore } from "./adminAction.js";
-import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo.js";
+import { database } from "../../../firebase.js";
+import { applyAdminAction, captureBefore } from "../adminAction.js";
+import { FIRST_ROUND, FINAL_ROUND } from "../../judge/getTeamInfo.js";
 
 /**
  * Break-glass tooling: the things you reach for when something has already

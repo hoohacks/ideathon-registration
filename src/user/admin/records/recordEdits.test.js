@@ -6,7 +6,7 @@
  * teamAssignments, because a judge cannot read the teams node. Renaming
  * without the fan-out leaves judges calling a team by a name nobody else uses.
  */
-jest.mock("../../firebase", () => ({ database: {}, auth: {} }));
+jest.mock("../../../firebase", () => ({ database: {}, auth: {} }));
 
 const mockUpdate = jest.fn(async () => {});
 const mockGet = jest.fn(async () => ({ exists: () => false, val: () => null }));
@@ -19,7 +19,7 @@ jest.mock("firebase/database", () => ({
   serverTimestamp: () => 0,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
-jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
+jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
 
 const {
   renameTeamChanges,
@@ -27,7 +27,7 @@ const {
   editCompetitor,
   COMPETITOR_FIELDS,
 } = require("./recordEdits");
-const { requireAdmin } = require("../../roles.js");
+const { requireAdmin } = require("../../../roles.js");
 
 /**
  * create-react-app sets `resetMocks: true`, which strips the implementation off

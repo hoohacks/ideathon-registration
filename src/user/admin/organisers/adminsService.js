@@ -1,7 +1,7 @@
 import { ref, get } from "firebase/database";
 import { getAuth } from "firebase/auth";
-import { database } from "../../firebase.js";
-import { applyAdminAction } from "./adminAction.js";
+import { database } from "../../../firebase.js";
+import { applyAdminAction } from "../adminAction.js";
 
 /**
  * Who is an organiser.

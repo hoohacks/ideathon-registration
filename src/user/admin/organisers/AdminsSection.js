@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Chip, Stack, TextField, Typography } from "@mui/material";
 import { RowList, Row } from "../adminUi";
 import { useAuth } from "../../../App";
-import { findPeopleByEmail, grantAdmin, revokeAdmin, revokeGuard } from "../adminsService";
+import { findPeopleByEmail, grantAdmin, revokeAdmin, revokeGuard } from "./adminsService";
 
 /**
  * Who is an organiser.

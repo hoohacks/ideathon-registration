@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import Layout from "../Layout";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
-import CompetitorEditDrawer from "./edit/CompetitorEditDrawer";
+import CompetitorEditDrawer from "./records/CompetitorEditDrawer";
 
 function Search() {
   const [query, setQuery] = useState("");

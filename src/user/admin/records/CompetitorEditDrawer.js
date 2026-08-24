@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, MenuItem, TextField } from "@mui/material";
-import EditDrawer from "../control/EditDrawer";
-import { editCompetitor, moveCompetitorToTeam } from "../recordEdits";
+import EditDrawer from "./EditDrawer";
+import { editCompetitor, moveCompetitorToTeam } from "./recordEdits";
 
 const DIETARY = ["none", "vegetarian", "vegan", "halal", "kosher", "gluten-free", "other"];
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, Button, Chip, Stack, TextField, Typography } from "@mui/material";
 import { RowList, Row } from "../adminUi";
-import { roomsInUse, addRoom, renameRoom, removeRoom } from "../roomsService";
+import { roomsInUse, addRoom, renameRoom, removeRoom } from "./roomsService";
 import RemapDialog from "./RemapDialog";
 
 /**

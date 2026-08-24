@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Stack, TextField, Typography } from "@mui/material";
-import { setEventStart } from "../eventConfig";
+import { setEventStart } from "./eventConfig";
 import { EVENT_START } from "../../../eventInfo";
 
 /**

@@ -7,7 +7,7 @@ import { Alert, Button, Chip, MenuItem, Snackbar, Stack, TextField, Typography }
 import Layout from "../Layout";
 import { assignmentList } from "../judge/assignmentList";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
-import JudgeEditDrawer from "./edit/JudgeEditDrawer";
+import JudgeEditDrawer from "./records/JudgeEditDrawer";
 
 function JudgeSearch() {
   const [query, setQuery] = useState("");

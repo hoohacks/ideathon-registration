@@ -1,5 +1,5 @@
-import { assignmentList } from "../judge/assignmentList";
-import { calculateAverageScore, countFundableVotes, scoredJudgeCount } from "../judge/scoreRubric";
+import { assignmentList } from "../../judge/assignmentList";
+import { calculateAverageScore, countFundableVotes, scoredJudgeCount } from "../../judge/scoreRubric";
 
 /**
  * Turns the raw judging nodes into the two questions an organiser actually has

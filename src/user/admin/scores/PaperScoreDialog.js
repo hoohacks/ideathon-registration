@@ -11,8 +11,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { RUBRIC, SCORE_MAX_TOTAL, NOTES_MAX_LENGTH } from "../judge/scoreRubric";
-import { writeScoreOnBehalf } from "../judge/getTeamInfo";
+import { RUBRIC, SCORE_MAX_TOTAL, NOTES_MAX_LENGTH } from "../../judge/scoreRubric";
+import { writeScoreOnBehalf } from "../../judge/getTeamInfo";
 
 /**
  * Enter a card on a judge's behalf, from paper or a dead phone.
