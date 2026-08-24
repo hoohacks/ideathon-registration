@@ -163,3 +163,98 @@ describe("clearing the schedule", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("clearing scores as well, to start from scratch", () => {
+  /**
+   * Clearing the schedule leaves scores alone by default -- they are keyed by
+   * team and judge, so they survive a regeneration and re-attach. Starting over
+   * for real is a separate, louder choice.
+   *
+   * The part that is easy to miss: READ_LEGACY_SCORE_PATH is still true, so
+   * pre-migration cards live at teams/{id}/scores as well as under /scores.
+   * A reset that only cleared /scores would leave cards that still show in the
+   * dashboard and still count toward the averages the final round is picked
+   * from -- which is exactly not starting from scratch.
+   */
+  const world = (extra = {}) => async (r) => {
+    const data = {
+      teams: {
+        t1: { schedule: { room: "A" }, scores: { j1: { problem: 8 } } },
+        t2: { finalScores: { j2: { problem: 7 } } },
+      },
+      judges: { j1: { teamAssignments: { t1: {} } } },
+      scores: { first: { t1: { j1: { problem: 8 } } }, final: {} },
+      ...extra,
+    }[r.path];
+    return { exists: () => data !== undefined, val: () => data };
+  };
+
+  test("scores are left alone by default", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule();
+
+    const payload = mockUpdate.mock.calls[0][1];
+    expect(payload["scores"]).toBeUndefined();
+    expect(payload["teams/t1/scores"]).toBeUndefined();
+    expect(payload["teams/t1/schedule"]).toBeNull();
+  });
+
+  test("includeScores wipes the whole scores node", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule({ includeScores: true });
+
+    expect(mockUpdate.mock.calls[0][1]["scores"]).toBeNull();
+  });
+
+  test("and the pre-migration copies on the team nodes", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule({ includeScores: true });
+
+    const payload = mockUpdate.mock.calls[0][1];
+    expect(payload["teams/t1/scores"]).toBeNull();
+    expect(payload["teams/t2/finalScores"]).toBeNull();
+  });
+
+  test("a team with no legacy copy is not given an empty write", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule({ includeScores: true });
+
+    const payload = mockUpdate.mock.calls[0][1];
+    expect("teams/t2/scores" in payload).toBe(false);
+    expect("teams/t1/finalScores" in payload).toBe(false);
+  });
+
+  test("the schedule and the scores go in one atomic update", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule({ includeScores: true });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  test("scores can be cleared even when there is no schedule left", async () => {
+    mockGet.mockImplementation(async (r) => {
+      const data = {
+        teams: { t1: { scores: { j1: { problem: 8 } } } },
+        judges: {},
+        scores: { first: { t1: { j1: {} } } },
+      }[r.path];
+      return { exists: () => data !== undefined, val: () => data };
+    });
+
+    const result = await clearSchedule({ includeScores: true });
+    expect(result.ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["scores"]).toBeNull();
+  });
+
+  test("refuses when there is genuinely nothing to clear", async () => {
+    mockGet.mockImplementation(async () => ({ exists: () => false, val: () => null }));
+    const result = await clearSchedule({ includeScores: true });
+    expect(result.ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("the summary says scores went, so the feed is not misleading", async () => {
+    mockGet.mockImplementation(world());
+    await clearSchedule({ includeScores: true });
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].summary).toMatch(/score/i);
+  });
+});

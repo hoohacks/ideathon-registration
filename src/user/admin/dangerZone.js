@@ -109,14 +109,25 @@ export async function setTeamSubmitted({ teamId, teamName, submitted }) {
 }
 
 /**
- * Wipe every assignment. Regenerating is the normal path; this exists for when
- * the schedule is wrong enough that starting from nothing is clearer.
+ * Wipe every assignment, and optionally every score with them.
  *
- * Scores are deliberately NOT touched. They are keyed by team and judge, so
- * they survive and re-attach if the same pairing comes back -- the same reason
- * getJudgeSchedule warns about stranding rather than deleting.
+ * By default scores are left alone. They are keyed by team and judge, so they
+ * survive a regeneration and re-attach if the same pairing comes back -- the
+ * same reason getJudgeSchedule warns about stranding rather than deleting.
+ * Losing them because you wanted to redo the rooms would be a bad trade.
+ *
+ * `includeScores` is the deliberate, louder choice: a real start from scratch.
+ * It has to clear two places, not one. READ_LEGACY_SCORE_PATH is still true, so
+ * pre-migration cards live at teams/{id}/scores and teams/{id}/finalScores as
+ * well as under /scores, and both are still read -- by the Teams dashboard and
+ * by the averages the final round is picked from. Clearing only /scores would
+ * leave those behind, which is precisely not starting from scratch.
+ *
+ * Admins already hold the permission for this: the root rule reaches /scores,
+ * and a delete skips .validate, so the card shape never gets to reject a null.
+ * test/rules/scores.test.mjs pins both.
  */
-export async function clearSchedule() {
+export async function clearSchedule({ includeScores = false } = {}) {
   const [teamsSnap, judgesSnap] = await Promise.all([
     get(ref(database, "teams")),
     get(ref(database, "judges")),
@@ -141,20 +152,52 @@ export async function clearSchedule() {
     }
   }
 
-  if (!changes.length) return { ok: false, error: "There is no schedule to clear." };
+  const assignmentCount = changes.length;
 
-  const meta = await captureBefore(["config/scheduleMeta"]);
-  changes.push({
-    path: "config/scheduleMeta",
-    before: meta["config/scheduleMeta"],
-    after: null,
-  });
+  let scoreCount = 0;
+  if (includeScores) {
+    const scoresSnap = await get(ref(database, "scores"));
+    if (scoresSnap.exists()) {
+      changes.push({ path: "scores", before: scoresSnap.val(), after: null });
+      scoreCount += 1;
+    }
 
-  return applyAdminAction({
-    action: "schedule.clear",
-    summary: `Cleared the schedule: ${changes.length - 1} assignment records`,
-    changes,
-  });
+    // the pre-migration copies, which are still read
+    for (const [teamId, team] of Object.entries(teamsData)) {
+      for (const field of ["scores", "finalScores"]) {
+        if (team?.[field]) {
+          changes.push({ path: `teams/${teamId}/${field}`, before: team[field], after: null });
+          scoreCount += 1;
+        }
+      }
+    }
+  }
+
+  if (!changes.length) {
+    return {
+      ok: false,
+      error: includeScores
+        ? "There is no schedule and no scores to clear."
+        : "There is no schedule to clear.",
+    };
+  }
+
+  // Only worth clearing when there was a schedule; on a scores-only reset there
+  // is no generation metadata to remove.
+  if (assignmentCount) {
+    const meta = await captureBefore(["config/scheduleMeta"]);
+    changes.push({
+      path: "config/scheduleMeta",
+      before: meta["config/scheduleMeta"],
+      after: null,
+    });
+  }
+
+  const summary = includeScores
+    ? `Cleared the schedule and every score: ${assignmentCount} assignment records, ${scoreCount} score locations`
+    : `Cleared the schedule: ${assignmentCount} assignment records`;
+
+  return applyAdminAction({ action: "schedule.clear", summary, changes });
 }
 
 /**

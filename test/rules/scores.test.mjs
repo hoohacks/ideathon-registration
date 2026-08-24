@@ -257,3 +257,43 @@ describe("the final round", () => {
     );
   });
 });
+
+describe("an admin can wipe scores to start over", () => {
+  /**
+   * The danger zone offers a full reset, so this has to be true. It relies on
+   * two things that are easy to assume rather than check: the root admin grant
+   * reaches /scores even though nothing below it grants a read or a write, and
+   * a delete skips .validate -- so the score card shape, which would reject a
+   * null, never gets a say.
+   */
+  test("an admin deletes a single card", async () => {
+    await assertSucceeds(set(ref(db("admin"), "scores/first/team1/judge1"), null));
+  });
+
+  test("an admin deletes a whole team's cards", async () => {
+    await assertSucceeds(set(ref(db("admin"), "scores/first/team1"), null));
+  });
+
+  test("an admin deletes every score in the event", async () => {
+    await assertSucceeds(set(ref(db("admin"), "scores"), null));
+  });
+
+  test("an admin clears the pre-migration copy on the team node too", async () => {
+    // READ_LEGACY_SCORE_PATH is still true, so a reset that missed these would
+    // leave cards that still show in the dashboard and still count toward the
+    // averages the final round is picked from
+    await assertSucceeds(set(ref(db("admin"), "teams/team1/scores"), null));
+    await assertSucceeds(set(ref(db("admin"), "teams/team1/finalScores"), null));
+  });
+
+  test("a judge still cannot delete their own card", async () => {
+    // newData.exists() in the write rule: a judge may revise a score, never
+    // withdraw one. Only an admin can remove it.
+    await assertFails(set(ref(db("judge1"), "scores/first/team1/judge1"), null));
+  });
+
+  test("a competitor cannot delete anything", async () => {
+    await assertFails(set(ref(db("alice"), "scores/first/team1/judge1"), null));
+    await assertFails(set(ref(db("alice"), "scores"), null));
+  });
+});

@@ -329,6 +329,16 @@ copied into `teams/{id}/schedule` and into every assigned judge's
 room offers to move those teams elsewhere and writes every copy in one atomic
 update. Without that, a team walks to a room nobody has listed.
 
+**Clearing the schedule keeps scores by default.** They are keyed by team and
+judge, so they survive a regeneration and re-attach if the same pairing comes
+back — losing them because you wanted to redo the rooms would be a bad trade.
+The danger zone has a separate **Also delete every score** checkbox for a real
+reset, with its own confirmation phrase so a click-through cannot carry into it.
+That clears both `/scores` and the pre-migration copies at `teams/{id}/scores`,
+which are still read while `READ_LEGACY_SCORE_PATH` is true; clearing only the
+first would leave cards showing in the dashboard and counting toward the
+averages the final round is picked from. It cannot be undone.
+
 **Every change made here is recorded at `/adminLog`** with the value before and
 after, and most can be undone from the Recent activity feed. An undo restores
 the recorded value and refuses if anything has moved since, naming the path
