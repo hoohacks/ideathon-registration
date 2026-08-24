@@ -148,6 +148,11 @@ git and never republishing them — is caught by a digest check in
 That failure is the reminder to republish. Do it before the release goes out,
 not after.
 
+The current version is **3**, which added validation for `/adminLog`. That
+block only pins the shape of a log entry — the root admin rule already covered
+read and write there — so until the rules are republished the control panel
+still works and its entries are simply unvalidated. Republish anyway.
+
 `storage.rules` has no equivalent guard, so it is on the release checklist
 below. Forgetting it silently breaks resume and pitch deck uploads.
 
@@ -288,9 +293,65 @@ Optional database nodes that change behaviour without a deploy:
 
 | Path | Effect |
 | --- | --- |
-| `config/judgingRooms` | list of room names for the first round; falls back to the 12 in `getJudgeSchedule.js`. A batch cannot have more teams than there are rooms |
+| `config/judgingRooms` | room names for the first round. **Required — there is no fallback list in the code.** Edit it on the control panel, not by hand. A batch cannot have more teams than there are rooms |
+| `config/batchCount` | how many batches teams are split into; falls back to `BATCH_COUNT` |
+| `config/batchTimes` | the time each batch presents; falls back to `BATCH_TIMES` |
+| `config/finalRoundRoom` | falls back to `FINAL_ROUND_ROOM` |
 | `config/eventStart` | ISO timestamp the home page counts down to |
 | `config/scheduleMeta` | written by schedule generation, not by hand. It is what makes the "you are about to replace every assignment" confirmation survive a page reload |
+
+All of these are editable on the **control panel**; the table is here so the
+paths are findable when something has to be inspected directly.
+
+Note the asymmetry. Batch count, batch times and the final round room keep
+built-in fallbacks, because they are structural — an event always has some
+number of batches, and a missing node should behave as it always did. Rooms
+have none, because there is no sensible default for which rooms a venue booked.
+A hardcoded list would mean an organiser who removed the last room watched
+twelve reappear at the next generation, unable to tell whether the rooms in use
+were chosen or shipped. With no rooms configured, generation stops and says so.
+
+## The control panel
+
+`/user/admin/control` holds the settings that used to need the Firebase
+console: the judging rooms, the batch count and times, the final round room,
+the event start date, and who counts as an organiser. The Competitors, Judges
+and Teams dashboards gained an **Edit** button per row for the rest.
+
+Three things there are worth knowing before the day.
+
+**Judging rooms live only in the database.** There is no built-in list. Add the
+rooms the event has booked before generating a schedule, or generation refuses.
+
+**Removing a room a schedule is using is not a list edit.** The room name is
+copied into `teams/{id}/schedule` and into every assigned judge's
+`teamAssignments`, because a judge cannot read the teams node. Removing such a
+room offers to move those teams elsewhere and writes every copy in one atomic
+update. Without that, a team walks to a room nobody has listed.
+
+**Every change made here is recorded at `/adminLog`** with the value before and
+after, and most can be undone from the Recent activity feed. An undo restores
+the recorded value and refuses if anything has moved since, naming the path
+that changed rather than quietly discarding someone else's edit.
+
+Two things it deliberately will not do:
+
+- **Create or delete competitors, judges and teams.** The client SDK cannot
+  delete a Firebase Auth account, so a "delete" could only remove the database
+  record and would leave a working login that resolves to no role.
+- **Undo a deleted score.** `enteredBy` is pinned to `auth.uid` by the rules —
+  that pin is what stops a judge filing a card under another judge — so nobody
+  but the original author could write a card back. Deleting one offers its
+  values back for re-entry through the paper score dialog instead, which stamps
+  correct new provenance rather than forging the old.
+
+The log is a coordination and forensics aid, not a ledger: admins hold root
+write and deletes skip validation, so entries can be erased by anyone who can
+write them. It answers "what changed at 4:52", not "prove nobody tampered".
+
+The scanner is deliberately **not** logged. It is the normal high-volume path,
+and a feed that is mostly scans is not worth reading. Reversing a check-in from
+a dashboard row is an override, and that is recorded.
 
 ## Judging
 
