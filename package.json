@@ -31,13 +31,15 @@
     "test:ci": "cross-env CI=true react-scripts test --watchAll=false",
     "test:rules": "firebase emulators:exec --only database --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
     "test:rules:watch": "vitest --config vitest.rules.config.mjs",
-    "emulators": "firebase emulators:start --only database --project demo-ideathon",
+    "emulators": "firebase emulators:start --only database,auth,storage --project demo-ideathon",
     "rules:cutover": "node scripts/make-cutover-rules.mjs",
     "migrate:members": "node scripts/migrate-team-members.mjs",
     "migrate:scores": "node scripts/migrate-scores.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "start:emulator": "cross-env REACT_APP_USE_EMULATOR=true react-scripts start",
+    "seed": "node scripts/seed-event.mjs"
   },
   "eslintConfig": {
     "extends": [
