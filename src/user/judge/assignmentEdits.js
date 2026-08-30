@@ -91,6 +91,135 @@ export async function findConflict(judgeUid, teamId, batch) {
   );
 }
 
+/**
+ * What a team could be slotted into, for a team that has no schedule entry.
+ *
+ * A team that submits after the schedule was generated has nowhere to go: the
+ * slot override edits an existing entry and returns nothing when there is none,
+ * so the only remaining move was a full regenerate -- which rewrites every
+ * assignment in the event and strands every score collected so far. That is the
+ * same bad trade the rest of this file exists to avoid for a no-show judge.
+ *
+ * Returns, per batch, the time it presents and which configured rooms are still
+ * free in it.
+ */
+export async function findOpenSlots() {
+  const [teamsSnap, roomsSnap] = await Promise.all([
+    get(ref(database, "teams")),
+    get(ref(database, "config/judgingRooms")),
+  ]);
+
+  const rawRooms = roomsSnap.exists() ? roomsSnap.val() : [];
+  const rooms = (Array.isArray(rawRooms) ? rawRooms : Object.values(rawRooms ?? {}))
+    .filter((room) => typeof room === "string" && room.trim().length > 0);
+
+  const byBatch = new Map();
+  for (const team of Object.values(teamsSnap.val() ?? {})) {
+    const schedule = team?.schedule;
+    if (!schedule?.batch) continue;
+    if (!byBatch.has(schedule.batch)) {
+      byBatch.set(schedule.batch, { batch: schedule.batch, time: schedule.time, taken: new Set() });
+    }
+    byBatch.get(schedule.batch).taken.add(schedule.room);
+  }
+
+  return [...byBatch.values()]
+    .sort((a, b) => a.batch - b.batch)
+    .map(({ batch, time, taken }) => ({
+      batch,
+      time,
+      freeRooms: rooms.filter((room) => !taken.has(room)),
+    }));
+}
+
+/**
+ * Give a team its own schedule entry without regenerating anything.
+ *
+ * Writes the team's entry and each chosen judge's copy in ONE update, the same
+ * shape getJudgeSchedule produces, so nothing downstream can tell the
+ * difference between a team scheduled here and one scheduled by a generation.
+ */
+export async function scheduleTeamIntoBatch({
+  teamId,
+  batch,
+  room,
+  time,
+  judgeUids = [],
+  allowConflict = false,
+}) {
+  await requireAdmin("schedule a team");
+
+  if (!room || !batch) return { ok: false, error: "Pick a batch and a room." };
+  if (!judgeUids.length) {
+    return { ok: false, error: "Pick at least one judge, or the team presents to an empty room." };
+  }
+
+  const [teamSnap, teamsSnap, judgesSnap] = await Promise.all([
+    get(ref(database, `teams/${teamId}`)),
+    get(ref(database, "teams")),
+    get(ref(database, "judges")),
+  ]);
+
+  if (!teamSnap.exists()) return { ok: false, error: "That team no longer exists." };
+  const team = teamSnap.val();
+  if (team.schedule) {
+    return {
+      ok: false,
+      error: "That team is already scheduled. Use the slot override to move it instead.",
+    };
+  }
+
+  // the room has to be free at that time, or two teams present to one room
+  const clash = Object.entries(teamsSnap.val() ?? {}).find(
+    ([id, other]) =>
+      id !== teamId && other?.schedule?.batch === batch && other?.schedule?.room === room
+  );
+  if (clash) {
+    return {
+      ok: false,
+      error: `${clash[1].name ?? "Another team"} is already in ${room} in batch ${batch}.`,
+    };
+  }
+
+  const judges = judgesSnap.val() ?? {};
+  const missing = judgeUids.filter((uid) => !judges[uid]);
+  if (missing.length) return { ok: false, error: "One of those judges is not registered." };
+
+  if (!allowConflict) {
+    for (const uid of judgeUids) {
+      const existing = assignmentList(judges[uid]?.teamAssignments).find(
+        (assignment) => assignment.batch === batch && assignment.id !== teamId
+      );
+      if (existing) {
+        return {
+          ok: false,
+          conflict: existing,
+          error:
+            `${displayName(judges[uid])} is already in ${existing.room} at ${existing.time} ` +
+            `for ${existing.teamName} in batch ${batch}.`,
+        };
+      }
+    }
+  }
+
+  const assignment = {
+    teamName: team.name ?? "Unnamed Team",
+    id: teamId,
+    room,
+    time: time ?? "TBD",
+    batch,
+    judges: judgeUids.map((uid) => ({ judgeId: uid, judgeName: displayName(judges[uid]) })),
+  };
+
+  const updates = { [`teams/${teamId}/schedule`]: assignment };
+  for (const uid of judgeUids) {
+    updates[`judges/${uid}/teamAssignments/${teamId}`] = assignment;
+  }
+
+  await update(ref(database), updates);
+  return { ok: true, assignment };
+}
+
 export async function assignJudgeToTeam({ judgeUid, teamId, allowConflict = false }) {
   await requireAdmin("change judging assignments");
   const { schedule, judges } = await loadContext(teamId, judgeUid);

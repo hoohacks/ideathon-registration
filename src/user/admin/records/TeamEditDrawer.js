@@ -4,6 +4,9 @@ import EditDrawer from "./EditDrawer";
 import { renameTeam } from "./recordEdits";
 import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../danger/dangerZone";
 import { listRooms } from "../rooms/roomsService";
+import { findOpenSlots, scheduleTeamIntoBatch } from "../../judge/assignmentEdits";
+import { ref, get } from "firebase/database";
+import { database } from "../../../firebase";
 
 /**
  * Everything about one team an organiser may need to change on the day.
@@ -92,9 +95,7 @@ export default function TeamEditDrawer({ team, teamId, onClose, onResult }) {
           />
         </>
       ) : (
-        <Alert severity="info">
-          This team has no schedule entry. Generate a schedule before overriding a slot.
-        </Alert>
+        <ScheduleIntoBatch teamId={teamId} run={run} saving={saving} />
       )}
 
       <Divider />
@@ -160,6 +161,141 @@ function FinalRoundControls({ team, teamId, name, saving, run }) {
         )}
       >
         {team.finalSlot ? "Update final round slot" : "Add to the final round"}
+      </Button>
+    </>
+  );
+}
+
+/**
+ * Slotting a team that has no schedule entry into an existing batch.
+ *
+ * A team that submits after the schedule was generated used to have nowhere to
+ * go. The slot override edits an existing entry and does nothing when there is
+ * none, so the only remaining move was a full regenerate -- which rewrites
+ * every assignment in the event and strands every score already collected. For
+ * one late team that is a catastrophic trade, and the same escape hatch already
+ * existed for a no-show judge.
+ *
+ * Only rooms that are actually free in the chosen batch are offered, because a
+ * clash here puts two teams in one room at one time.
+ */
+function ScheduleIntoBatch({ teamId, run, saving }) {
+  const [slots, setSlots] = useState([]);
+  const [judges, setJudges] = useState([]);
+  const [batch, setBatch] = useState("");
+  const [room, setRoom] = useState("");
+  const [picked, setPicked] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      findOpenSlots(),
+      get(ref(database, "judges")).then((snap) => snap.val() ?? {}),
+    ])
+      .then(([openSlots, judgesData]) => {
+        if (!live) return;
+        setSlots(openSlots);
+        setJudges(
+          Object.entries(judgesData)
+            .filter(([, judge]) => judge?.isRound1Judge)
+            .map(([uid, judge]) => ({
+              uid,
+              name: [judge.firstName, judge.lastName].filter(Boolean).join(" ") || uid.slice(0, 8),
+              checkedIn: judge.checkedIn === true,
+            }))
+            .sort((a, b) => Number(b.checkedIn) - Number(a.checkedIn) || a.name.localeCompare(b.name))
+        );
+      })
+      .catch(() => { if (live) setSlots([]); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, []);
+
+  const chosen = slots.find((slot) => String(slot.batch) === String(batch));
+
+  if (loading) return <Alert severity="info">Loading the batches…</Alert>;
+
+  if (!slots.length) {
+    return (
+      <Alert severity="info">
+        No schedule has been generated yet, so there are no batches to slot this team into.
+        Generate the schedule and this team will be included.
+      </Alert>
+    );
+  }
+
+  return (
+    <>
+      <Alert severity="warning">
+        This team submitted after the schedule was generated, so it has no slot. Give it one here
+        rather than regenerating — a regenerate moves every assignment in the event and strands the
+        scores already collected.
+      </Alert>
+
+      <TextField
+        select
+        label="Batch"
+        size="small"
+        value={batch}
+        onChange={(event) => { setBatch(event.target.value); setRoom(""); }}
+      >
+        {slots.map((slot) => (
+          <MenuItem key={slot.batch} value={String(slot.batch)} disabled={!slot.freeRooms.length}>
+            Batch {slot.batch} · {slot.time} ·{" "}
+            {slot.freeRooms.length ? `${slot.freeRooms.length} room(s) free` : "no free rooms"}
+          </MenuItem>
+        ))}
+      </TextField>
+
+      <TextField
+        select
+        label="Room"
+        size="small"
+        value={room}
+        onChange={(event) => setRoom(event.target.value)}
+        disabled={!chosen}
+        helperText={chosen ? "Only rooms free in that batch are listed" : "Pick a batch first"}
+      >
+        {(chosen?.freeRooms ?? []).map((option) => (
+          <MenuItem key={option} value={option}>{option}</MenuItem>
+        ))}
+      </TextField>
+
+      <TextField
+        select
+        label="Judges"
+        size="small"
+        SelectProps={{ multiple: true }}
+        value={picked}
+        onChange={(event) => setPicked(event.target.value)}
+        disabled={!chosen}
+        helperText="Checked-in judges first. A clash in this batch is refused."
+      >
+        {judges.map((judge) => (
+          <MenuItem key={judge.uid} value={judge.uid}>
+            {judge.name}{judge.checkedIn ? "" : " (not checked in)"}
+          </MenuItem>
+        ))}
+      </TextField>
+
+      <Button
+        variant="contained"
+        disabled={saving || !chosen || !room || !picked.length}
+        onClick={() =>
+          run(
+            () => scheduleTeamIntoBatch({
+              teamId,
+              batch: Number(batch),
+              room,
+              time: chosen?.time,
+              judgeUids: picked,
+            }),
+            `Scheduled into ${room} in batch ${batch}`
+          )
+        }
+      >
+        Add to batch {batch || "…"}
       </Button>
     </>
   );
