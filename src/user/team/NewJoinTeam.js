@@ -1,10 +1,8 @@
 import { useState, useEffect, useContext } from "react";
-import { getAuth } from "firebase/auth";
-import { set, ref, get } from "firebase/database";
-import { database } from "../../firebase.js";
 import Layout from "../Layout.js";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { AuthContext } from "../../App";
+import { joinTeam } from "./teamMembership.js";
 import {
   Alert,
   Box,
@@ -30,38 +28,15 @@ function NewJoinTeam() {
   }, [userData, navigate]);
 
   const persistToDB = async (teamId) => {
-    const auth = getAuth();
-    const userCredential = auth.currentUser;
-
-    if (!userCredential || !userCredential.uid) {
-      setError("You must be signed in to join a team.");
+    // membership and teamId travel together; joinTeam also refuses a full team
+    // and one that has already submitted, which the rules enforce as well
+    const result = await joinTeam(teamId);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-
-    try {
-      // only the name is read: someone joining is not a member yet, so the
-      // rules do not let them read the whole team node
-      const nameSnapshot = await get(ref(database, `teams/${teamId}/name`));
-
-      if (!nameSnapshot.exists()) {
-        setError(`No team found with the ID "${teamId}".`);
-        return;
-      }
-
-      // add just this member rather than rewriting the whole list, so joining
-      // cannot drop or reorder anyone else
-      await set(ref(database, `teams/${teamId}/members/${userCredential.uid}`), true);
-
-      // Attach teamId to user's profile
-      await set(ref(database, `competitors/${userCredential.uid}/teamId`), teamId);
-
-      await refreshUserData();
-
-      return navigate("/user/team");
-    } catch (err) {
-      console.error("Error adding user to team:", err);
-      setError("Could not join that team. Please try again.");
-    }
+    await refreshUserData();
+    return navigate("/user/team");
   };
 
   const handleSubmit = async (e) => {

@@ -5,6 +5,7 @@ import { ref, get, set, onValue } from "firebase/database";
 import { auth, database, storage } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { memberIds } from "./teamMembers";
+import { leaveTeam } from "./teamMembership.js";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage";
 import {
@@ -29,7 +30,9 @@ import { Link as RouterLink } from "react-router-dom";
 
 function Team() {
     const navigate = useNavigate();
-    const { userData, userCredential, refreshUserData } = useContext(AuthContext);
+    // leaveTeam reads the signed-in uid itself, so this no longer destructures
+    // userCredential just to build a path out of it
+    const { userData, refreshUserData } = useContext(AuthContext);
     const [teamData, setTeamData] = useState(null);
     const [uploadPitchDeck, setUploadPitchDeck] = useState(null);
     const [pitchDeckName, setPitchDeckName] = useState("");
@@ -129,14 +132,14 @@ function Team() {
     }
 
     const handleLeaveTeam = async () => {
-        const uid = userCredential.user.uid;
-
-        // remove only this member, which is all the rules allow and all that
-        // is needed
-        await set(ref(database, `teams/${teamId}/members/${uid}`), null);
-
-        // Remove teamId from user's profile
-        await set(ref(database, `competitors/${uid}/teamId`), null);
+        // Both halves of the membership go in one update. As two writes, a
+        // failure between them left the person still in members but with no
+        // teamId -- looking teamless while still counting toward the team.
+        const result = await leaveTeam(teamId);
+        if (!result.ok) {
+            setUploadError(result.error);
+            return;
+        }
 
         await refreshUserData();
 

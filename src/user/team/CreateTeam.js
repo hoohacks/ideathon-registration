@@ -1,10 +1,8 @@
 import { useState, useContext, useEffect } from "react";
-import { getAuth } from "firebase/auth";
-import { ref, set, push } from "firebase/database";
-import { database } from "../../firebase.js";
 import Layout from "../Layout.js";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { AuthContext } from "../../App";
+import { createTeam as createTeamRecord } from "./teamMembership.js";
 import {
   Alert,
   Box,
@@ -30,33 +28,15 @@ function CreateTeam() {
   }, [userData, navigate]);
 
   const createTeam = async (teamName) => {
-    const auth = getAuth();
-    const userCredential = auth.currentUser;
-
-    if (!userCredential || !userCredential.uid) {
-      setError("You must be signed in to create a team.");
+    // one multi-path update, so the team and the competitor's teamId cannot
+    // land separately and leave the person on a team the app will not route to
+    const result = await createTeamRecord(teamName);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-
-    try {
-      const teamRef = push(ref(database, "teams/"));
-
-      // members is a keyed set, not an array, so the database rules can
-      // check members.hasChild(auth.uid)
-      await set(teamRef, {
-        name: teamName,
-        createdBy: userCredential.uid,
-        members: { [userCredential.uid]: true },
-      });
-
-      await set(ref(database, `competitors/${userCredential.uid}/teamId`), teamRef.key);
-      await refreshUserData();
-
-      return navigate("/user/team");
-    } catch (err) {
-      console.error("Error creating team:", err);
-      setError("Could not create the team. Please try again.");
-    }
+    await refreshUserData();
+    return navigate("/user/team");
   };
 
   const handleSubmit = async (e) => {
