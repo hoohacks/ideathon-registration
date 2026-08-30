@@ -91,17 +91,28 @@ describe("what an entry may contain", () => {
   });
 });
 
-describe("why score deletes are not undoable", () => {
+describe("a deleted score can be put back", () => {
   /**
-   * enteredBy is pinned to auth.uid — that is where "a judge cannot file under
-   * another judge" lives. So restoring a deleted card is impossible for anyone
-   * but its original author, which is why dangerZone marks score deletes
-   * undoable:false and re-entry goes through PaperScoreDialog instead.
+   * This used to be the opposite test. enteredBy was pinned to auth.uid for
+   * everyone, so no one but a card's original author could write it back, and
+   * dangerZone marked score deletes undoable:false for that reason.
+   *
+   * The pin now exempts admins, so an undo can restore the card exactly as it
+   * was -- original author included -- instead of re-entering it under new
+   * provenance. A judge is still pinned, which is where "a judge cannot file
+   * under another judge" actually lives.
    */
-  test("an admin cannot restore a card another admin entered", async () => {
-    await assertFails(
+  test("an admin can restore a card entered by someone else", async () => {
+    await assertSucceeds(
       set(ref(db("admin"), "scores/first/team2/judge2"),
-        scoreCard({ judgeUid: "judge2", teamId: "team2", enteredBy: "someone-else" }))
+        scoreCard({ judgeUid: "judge2", teamId: "team2", enteredBy: "judge2" }))
+    );
+  });
+
+  test("a judge still cannot", async () => {
+    await assertFails(
+      set(ref(db("judge1"), "scores/first/team2/judge2"),
+        scoreCard({ judgeUid: "judge2", teamId: "team2", enteredBy: "judge2" }))
     );
   });
 });

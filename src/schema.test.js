@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import { assignmentList } from "./user/judge/assignmentList";
 import { memberIds, isMember } from "./user/team/teamMembers";
+import { MAX_TEAM_SIZE } from "./user/team/teamMembership";
 
 const RULES_PATH = path.join(process.cwd(), "database.rules.json");
 const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
@@ -186,8 +187,8 @@ describe("the deployed rules cannot drift from these ones unnoticed", () => {
    * When it fails: republish database.rules.json in the console, bump
    * `// rulesVersion:` at the top of that file, and put the printed digest here.
    */
-  const EXPECTED_VERSION = 3;
-  const EXPECTED_DIGEST = "907277d82c7b9e88e82c52ffa02f1641a9d172107203ec7faab2157c98317b6e";
+  const EXPECTED_VERSION = 5;
+  const EXPECTED_DIGEST = "dd765fbd0888973ff840d813dc4d961e47ec45336fabfceab6524c9a97c16319";
 
   // sorted so a pure reordering of the file is not treated as a rules change
   function sortDeep(value) {
@@ -282,5 +283,36 @@ describe("the audit log pins its author", () => {
     const change = RULES.rules.adminLog.$entryId.changes.$i;
     expect(change.before[".validate"]).toContain("isString");
     expect(change.after[".validate"]).toContain("isString");
+  });
+});
+
+describe("a team cannot grow without bound, or reopen after submitting", () => {
+  /**
+   * Both limits are enforced in the rules, because a check that lives only in
+   * teamMembership.js is a suggestion -- anyone can call set() from the console.
+   * These assert the rule still says what the client believes.
+   */
+  const membersRule = RULES.rules.teams.$teamId.members.$memberUid[".write"];
+
+  test("the size cap is client-side only, and says so", () => {
+    // Realtime Database rules cannot count children -- numChildren() is a
+    // client SDK method and a rule using it fails to LOAD, taking every other
+    // rule with it. So MAX_TEAM_SIZE is advisory. This test exists to stop
+    // anyone reintroducing it into the rules and shipping a file that will not
+    // deploy.
+    expect(membersRule).not.toMatch(/numChildren/);
+    expect(MAX_TEAM_SIZE).toBeGreaterThan(0);
+  });
+
+  test("a submitted team is closed to new members", () => {
+    expect(membersRule).toMatch(/child\('submitted'\)\.val\(\)\s*!==\s*true/);
+  });
+
+  test("leaving is always allowed, so nobody is trapped on a full team", () => {
+    expect(membersRule).toMatch(/!newData\.exists\(\)/);
+  });
+
+  test("you still cannot add anyone but yourself", () => {
+    expect(membersRule).toMatch(/\$memberUid === auth\.uid/);
   });
 });

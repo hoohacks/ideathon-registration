@@ -104,8 +104,17 @@ describe("creating a team", () => {
 });
 
 describe("membership", () => {
-  test("you can add yourself", async () => {
-    await assertSucceeds(set(ref(db("dave"), "teams/team1/members/dave"), true));
+  // both teams in baseWorld have submitted, so a team that is still open has
+  // to be seeded for the joining tests
+  beforeEach(async () => {
+    const world = baseWorld();
+    world.teams.team3 = { name: "Gamma", createdBy: "carol", submitted: false, members: { carol: true } };
+    await testEnv.clearDatabase();
+    await seed(testEnv, world);
+  });
+
+  test("you can add yourself to a team that is still open", async () => {
+    await assertSucceeds(set(ref(db("dave"), "teams/team3/members/dave"), true));
   });
 
   test("and remove yourself", async () => {
@@ -113,11 +122,31 @@ describe("membership", () => {
   });
 
   test("but not add anyone else", async () => {
-    await assertFails(set(ref(db("alice"), "teams/team1/members/dave"), true));
+    await assertFails(set(ref(db("alice"), "teams/team3/members/dave"), true));
   });
 
   test("and not remove anyone else", async () => {
     await assertFails(set(ref(db("alice"), "teams/team1/members/bob"), null));
+  });
+
+  /**
+   * A team that has submitted is closed. Someone joining after the deck is in
+   * did not work on it, and the first-round schedule is built from submitted
+   * teams -- so a late joiner lands on a team that is already scheduled and
+   * already being judged.
+   */
+  test("you cannot join a team that has already submitted", async () => {
+    await assertFails(set(ref(db("dave"), "teams/team1/members/dave"), true));
+  });
+
+  test("but you can still leave one, so nobody is trapped", async () => {
+    await assertSucceeds(set(ref(db("alice"), "teams/team1/members/alice"), null));
+  });
+
+  test("an organiser can still add someone to a submitted team", async () => {
+    // the root admin rule reaches here, which is what makes the closed rule
+    // safe to enforce: there is always a way to fix a real case by hand
+    await assertSucceeds(set(ref(db("admin"), "teams/team1/members/dave"), true));
   });
 });
 

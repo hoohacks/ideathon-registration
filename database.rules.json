@@ -1,5 +1,5 @@
 {
-  // rulesVersion: 3 -- bump this whenever anything below changes, and republish
+  // rulesVersion: 5 -- bump this whenever anything below changes, and republish
   // in the Firebase console. `npm test` fails if the rules change without it,
   // because nothing else in this project can tell you the deployed rules have
   // drifted from the ones in git. See "Publishing the rules" in the README.
@@ -115,7 +115,23 @@
           "$memberUid": {
             // Add or remove yourself, nobody else. Storing members as a keyed
             // set rather than an array is what makes this expressible at all.
-            ".write": "auth != null && $memberUid === auth.uid && root.child('competitors').child(auth.uid).exists()"
+            //
+            // Leaving (!newData.exists()) is always allowed, so nobody is
+            // trapped on a team. Joining a team that has already submitted is
+            // not: the schedule is built from submitted teams, and someone who
+            // joins after the deck is in did not work on it.
+            //
+            // There is deliberately NO team size cap here. Realtime Database
+            // rules cannot count children -- numChildren() is a client SDK
+            // method, and a rule using it fails to load at all. MAX_TEAM_SIZE
+            // in src/user/team/teamMembership.js is therefore advisory: it
+            // stops the ordinary path, and someone determined can bypass it
+            // from the console. Capping it properly would mean routing joins
+            // through an admin or a server, which this project does not have.
+            //
+            // Admins are unaffected by any of this: the root rule grants them
+            // write here, so an organiser can still add someone to a closed team.
+            ".write": "auth != null && $memberUid === auth.uid && root.child('competitors').child(auth.uid).exists() && (!newData.exists() || root.child('teams').child($teamId).child('submitted').val() !== true)"
           }
         },
 
@@ -194,10 +210,25 @@
 
             // Who actually pressed the button. Equal to judgeUid when the judge
             // filed it themselves, an admin uid when it was entered from paper.
-            // This one IS pinned to auth.uid, so it cannot be forged, and it is
+            //
+            // Pinned to auth.uid for everyone EXCEPT an organiser. That is
             // where the "a judge cannot file under another judge" guarantee
-            // now lives.
-            "enteredBy":     { ".validate": "newData.val() === auth.uid" },
+            // lives, and the exemption does not weaken it: the alternative
+            // branch requires being in /admins, which a judge is not.
+            //
+            // The exemption exists because pinning it absolutely made restoring
+            // impossible. A restore point holds cards whose enteredBy is some
+            // judge's uid; an admin writing them back failed this validation,
+            // which rejected the entire multi-path update -- so a restore of
+            // the schedule silently did nothing either. Rewriting enteredBy to
+            // the restoring admin was the other option, and it would have made
+            // every restored card claim the wrong author.
+            //
+            // Admins already hold root write over /scores and can delete any
+            // card, so this grants no capability they did not have; it only
+            // lets them put back what was there. The log is a forensics aid,
+            // not a ledger -- see adminAction.js.
+            "enteredBy":     { ".validate": "newData.val() === auth.uid || root.child('admins').child(auth.uid).exists()" },
 
             // Provenance, so the admin view can tell a paper entry from a
             // migrated one without inferring it from enteredBy.

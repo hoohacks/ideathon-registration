@@ -149,9 +149,12 @@ describe("the admin paper fallback", () => {
     );
   });
 
-  test("but cannot claim someone else entered it", async () => {
-    // enteredBy is the field pinned to auth.uid, so the audit trail is honest
-    await assertFails(
+  test("and may name the original author, which is what makes a restore possible", async () => {
+    // enteredBy is pinned to auth.uid for everyone except an admin. It used to
+    // be pinned absolutely, which meant a restore point holding judges' cards
+    // could never be written back -- and since the restore is one atomic
+    // update, that failure silently took the schedule restore with it.
+    await assertSucceeds(
       set(
         ref(db("admin"), "scores/first/team1/judge2"),
         scoreCard({ judgeUid: "judge2", teamId: "team1", enteredBy: "judge1" })
@@ -295,5 +298,66 @@ describe("an admin can wipe scores to start over", () => {
   test("a competitor cannot delete anything", async () => {
     await assertFails(set(ref(db("alice"), "scores/first/team1/judge1"), null));
     await assertFails(set(ref(db("alice"), "scores"), null));
+  });
+});
+
+describe("an organiser can put back a card they did not write", () => {
+  /**
+   * enteredBy is pinned to auth.uid for everyone except an admin. Without the
+   * exemption a restore point containing judges' cards could not be written
+   * back at all -- and because a multi-path update is atomic, the failure took
+   * the schedule restore down with it, silently.
+   *
+   * The guarantee that exemption must not weaken: a judge still cannot file
+   * under another judge.
+   */
+  test("an admin restores a judge's card with its original author intact", async () => {
+    await assertSucceeds(
+      set(
+        ref(db("admin"), "scores/first/team1/judge1"),
+        scoreCard({ judgeUid: "judge1", teamId: "team1", enteredBy: "judge1", source: "judge" })
+      )
+    );
+  });
+
+  test("a judge still cannot file under another judge", async () => {
+    await assertFails(
+      set(
+        ref(db("judge1"), "scores/first/team1/judge2"),
+        scoreCard({ judgeUid: "judge2", teamId: "team1", enteredBy: "judge2" })
+      )
+    );
+  });
+
+  test("a judge cannot forge enteredBy on their own card either", async () => {
+    await assertFails(
+      set(
+        ref(db("judge1"), "scores/first/team1/judge1"),
+        scoreCard({ judgeUid: "judge1", teamId: "team1", enteredBy: "judge2" })
+      )
+    );
+  });
+
+  test("a competitor cannot write a card at all", async () => {
+    await assertFails(
+      set(
+        ref(db("alice"), "scores/first/team1/judge1"),
+        scoreCard({ judgeUid: "judge1", teamId: "team1", enteredBy: "judge1" })
+      )
+    );
+  });
+
+  test("the whole scores tree can be written back in one update", async () => {
+    // this is the shape restoreSnapshot actually writes
+    await assertSucceeds(
+      set(ref(db("admin"), "scores"), {
+        first: {
+          team1: {
+            judge1: scoreCard({ judgeUid: "judge1", teamId: "team1", enteredBy: "judge1" }),
+            judge2: scoreCard({ judgeUid: "judge2", teamId: "team1", enteredBy: "judge2" }),
+          },
+        },
+      })
+    );
   });
 });
