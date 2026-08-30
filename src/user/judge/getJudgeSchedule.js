@@ -1,8 +1,18 @@
-import { ref, get, update, serverTimestamp } from "firebase/database";
+import { ref, get, update, push, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
 import { assignmentList } from "./assignmentList.js";
 import { FIRST_ROUND } from "./getTeamInfo.js";
+import { guardWith } from "../admin/snapshots.js";
+import { resolveName } from "../admin/adminAction.js";
+import {
+  splitIntoBatches,
+  allocateBatch,
+  describeSupply,
+  BATCH_COUNT,
+  BATCH_TIMES,
+  TARGET_JUDGES_PER_TEAM,
+} from "./schedulePlan.js";
 
 // The judging rooms live at config/judgingRooms and nowhere else. There is
 // deliberately no fallback list here: a hardcoded one silently papers over an
@@ -11,37 +21,10 @@ import { FIRST_ROUND } from "./getTeamInfo.js";
 // rooms in use were the ones they had chosen or the ones the build shipped
 // with. Rooms are venue facts, not code. Add them on the control panel.
 
-export const BATCH_COUNT = 3;
-
-export const BATCH_TIMES = {
-    1: "5:00 PM",
-    2: "5:15 PM",
-    3: "5:30 PM",
-};
-
-// Teams are split into BATCH_COUNT contiguous groups whose sizes differ by at
-// most one, so every batch runs for roughly the same length of time.
-export function splitIntoBatches(items, batchCount = BATCH_COUNT) {
-    const base = Math.floor(items.length / batchCount);
-    const remainder = items.length % batchCount;
-    const batches = [];
-    let cursor = 0;
-    for (let b = 0; b < batchCount; b++) {
-        const size = base + (b < remainder ? 1 : 0);
-        batches.push(items.slice(cursor, cursor + size));
-        cursor += size;
-    }
-    return batches;
-}
-
-// Plain round robin sends judge j to team (j % size) in every batch, which puts
-// the same group of judges in a room together all three times. Rotating by
-// batchIndex * floor(j / size) keeps the split perfectly even -- each complete
-// block of `size` judges still covers every team exactly once -- while
-// reshuffling who shares a room.
-export function teamIndexFor(judgeIndex, batchIndex, batchSize) {
-    return (judgeIndex + batchIndex * Math.floor(judgeIndex / batchSize)) % batchSize;
-}
+// Re-exported so the existing imports across the app keep working; the
+// arithmetic itself now lives in schedulePlan.js, where it can be tested
+// without a database.
+export { splitIntoBatches, BATCH_COUNT, BATCH_TIMES, TARGET_JUDGES_PER_TEAM };
 
 /**
  * The configured rooms, or an empty list.
@@ -67,28 +50,31 @@ async function fetchRooms() {
 }
 
 /**
- * Batch count and times, overridable at config/batchCount and config/batchTimes
- * so the shape of the day can change without a deploy. Same fallback contract
- * as fetchRooms: an absent or malformed node behaves exactly as the built-in
- * constants did, rather than producing an event with zero batches.
+ * Batch count, times and panel size, overridable at config/* so the shape of
+ * the day can change without a deploy. Same fallback contract as fetchRooms: an
+ * absent or malformed node behaves exactly as the built-in constants did,
+ * rather than producing an event with zero batches.
  */
 export async function fetchBatchConfig() {
     try {
-        const [countSnap, timesSnap] = await Promise.all([
+        const [countSnap, timesSnap, targetSnap] = await Promise.all([
             get(ref(database, "config/batchCount")),
             get(ref(database, "config/batchTimes")),
+            get(ref(database, "config/targetJudgesPerTeam")),
         ]);
 
         const count = countSnap.exists() ? Number(countSnap.val()) : BATCH_COUNT;
         const times = timesSnap.exists() ? timesSnap.val() : BATCH_TIMES;
+        const target = targetSnap.exists() ? Number(targetSnap.val()) : TARGET_JUDGES_PER_TEAM;
 
         return {
             batchCount: Number.isInteger(count) && count >= 1 ? count : BATCH_COUNT,
             batchTimes: times && typeof times === "object" ? times : BATCH_TIMES,
+            target: Number.isInteger(target) && target >= 1 ? target : TARGET_JUDGES_PER_TEAM,
         };
     } catch (error) {
         console.warn("Could not read the batch config, using the built-in values:", error);
-        return { batchCount: BATCH_COUNT, batchTimes: BATCH_TIMES };
+        return { batchCount: BATCH_COUNT, batchTimes: BATCH_TIMES, target: TARGET_JUDGES_PER_TEAM };
     }
 }
 
@@ -100,12 +86,13 @@ function displayName(person, fallback) {
 /**
  * Builds the first round judging schedule and writes it to the database.
  *
- * Teams are split into three batches that each present at a different time.
- * Within a batch every team gets its own room, and every judge is sent to
- * exactly one team per batch, so no judge is ever double booked.
+ * Teams are split into batches that each present at a different time. Within a
+ * batch every team gets its own room, and every judge is sent to at most one
+ * team per batch, so no judge is ever double booked.
  *
- * Returns { ok, error, warnings, stats, assignments }. It never throws, and it
- * never writes a partial schedule -- validation runs before anything is saved.
+ * Returns { ok, error, warnings, advice, stats, assignments }. It never throws,
+ * and it never writes a partial schedule -- validation runs before anything is
+ * saved, and a restore point is taken before anything is replaced.
  *
  * `onlyCheckedIn` restricts the pool to judges who have actually arrived.
  * Check-in state used to be ignored entirely, so a judge who never turned up
@@ -114,7 +101,9 @@ function displayName(person, fallback) {
  */
 export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
     const warnings = [];
-    const fail = (error) => ({ ok: false, error, warnings, stats: null, assignments: [] });
+    const fail = (error, advice = []) => ({
+        ok: false, error, warnings, advice, stats: null, assignments: [],
+    });
 
     try {
         // a guard rail, not the boundary: the root rule is what actually stops
@@ -161,46 +150,28 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             );
         }
 
-        if (!teamsList.length) {
-            return fail("No teams have submitted a project yet, so there is nothing to judge.");
-        }
+        // Every supply question -- too few rooms, too few judges, too many
+        // judges for too few teams, batches that do not divide evenly -- is
+        // answered in one place, with numbers the organiser can act on.
+        const supply = describeSupply({
+            teamCount: teamsList.length,
+            judgeCount: judgesList.length,
+            roomCount: rooms.length,
+            batchCount: batchConfig.batchCount,
+            target: batchConfig.target,
+        });
 
-        const batches = splitIntoBatches(teamsList, batchConfig.batchCount).filter((batch) => batch.length > 0);
-        const largestBatch = Math.max(...batches.map((batch) => batch.length));
+        if (!supply.ok) return fail(supply.error, supply.advice);
+        warnings.push(...supply.warnings);
 
-        // Its own case, ahead of the count comparison: "0 rooms are configured"
-        // is a different problem from "not enough of them", and the answer is
-        // not to add a few more.
-        if (!rooms.length) {
-            return fail(
-                "No judging rooms are configured. Add them on the control panel, then generate again."
-            );
-        }
-
-        if (largestBatch > rooms.length) {
-            return fail(
-                `${teamsList.length} teams need ${largestBatch} rooms per batch but only ${rooms.length} are configured. ` +
-                "Add more rooms on the control panel, then generate again."
-            );
-        }
-
-        const judgesPerTeam = Math.floor(judgesList.length / largestBatch);
-        if (judgesPerTeam < 1) {
-            return fail(
-                `Only ${judgesList.length} first round judges for batches of up to ${largestBatch} teams. ` +
-                `At least ${largestBatch} judges are needed so every team is seen.`
-            );
-        }
-        if (judgesPerTeam < 2) {
-            warnings.push(
-                `Some teams will only be seen by one judge. Mark at least ${largestBatch * 2} first round judges to get two per team.`
-            );
-        }
         if (teamsList.some((team) => !team.name)) {
             warnings.push("Some submitted teams have no name and will show up blank on the schedule.");
         }
 
         // ---- build the schedule ----
+
+        const batches = splitIntoBatches(teamsList, batchConfig.batchCount)
+            .filter((batch) => batch.length > 0);
 
         const teamAssignments = {};
         // keyed by team id rather than an array: rules can address a single
@@ -224,14 +195,23 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
                 };
             });
 
-            judgesList.forEach((judge, judgeIndex) => {
-                const seat = teamIndexFor(judgeIndex, batchIndex, batch.length);
+            const panels = allocateBatch({
+                judgeCount: judgesList.length,
+                batchSize: batch.length,
+                batchIndex,
+                target: batchConfig.target,
+            });
+
+            panels.forEach((panel, seat) => {
                 const assignment = teamAssignments[batch[seat].id];
-                assignment.judges.push({
-                    judgeName: displayName(judge, "Unnamed Judge"),
-                    judgeId: judge.id,
+                panel.forEach((judgeIndex) => {
+                    const judge = judgesList[judgeIndex];
+                    assignment.judges.push({
+                        judgeName: displayName(judge, "Unnamed Judge"),
+                        judgeId: judge.id,
+                    });
+                    assignmentsByJudge[judge.id][batch[seat].id] = assignment;
                 });
-                assignmentsByJudge[judge.id][batch[seat].id] = assignment;
             });
         });
 
@@ -243,6 +223,24 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
                 `${unjudged.length} team(s) ended up with no judges (${unjudged
                     .map((a) => a.teamName)
                     .join(", ")}). Nothing was saved.`
+            );
+        }
+
+        // Name the teams an organiser might still want to do something about,
+        // rather than saying "some teams" and leaving them to find out which.
+        const thin = Object.values(teamAssignments).filter((a) => a.judges.length < 2);
+        if (thin.length) {
+            warnings.push(
+                `Seen by one judge only: ${thin.map((a) => a.teamName).join(", ")}. ` +
+                "Add a judge to these from Judging progress."
+            );
+        }
+
+        const spare = judgesList.filter((judge) => !Object.keys(assignmentsByJudge[judge.id]).length);
+        if (spare.length) {
+            warnings.push(
+                `${spare.length} judge(s) have no assignment at all and are spares: ` +
+                `${spare.map((j) => displayName(j, "Unnamed Judge")).join(", ")}.`
             );
         }
 
@@ -259,13 +257,28 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             }
         });
 
+        // ---- restore point, before anything is replaced ----
+        //
+        // Regenerating rewrites every assignment in the event. It used to do so
+        // with a bare update() -- no audit entry, no before-state, no undo --
+        // which made the single most destructive button in the app the only one
+        // with no way back.
+        const guard = await guardWith({
+            label: `Before generating the schedule (${teamsList.length} teams, ${judgesList.length} judges)`,
+            reason: "schedule generation replaces every assignment in the event",
+            paths: ["teams", "judges", "config/scheduleMeta"],
+        });
+        if (!guard.ok) return fail(guard.error);
+
         // ---- write everything in one atomic update ----
 
         const updates = {};
 
         // Judges who are no longer eligible must not keep a stale schedule.
         Object.keys(judgeData).forEach((judgeId) => {
-            updates[`judges/${judgeId}/teamAssignments`] = assignmentsByJudge[judgeId] ?? null;
+            const assignments = assignmentsByJudge[judgeId];
+            updates[`judges/${judgeId}/teamAssignments`] =
+                assignments && Object.keys(assignments).length ? assignments : null;
         });
 
         // Same for teams that withdrew their submission since the last run.
@@ -285,6 +298,22 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             onlyCheckedIn,
         };
 
+        // The audit entry goes out in the SAME update as the schedule, so a
+        // dropped connection cannot land one without the other. Its changes are
+        // omitted deliberately: the before-state is in the restore point above,
+        // which is precisely what the log's size cap could not hold.
+        const entryId = push(ref(database, "adminLog")).key;
+        updates[`adminLog/${entryId}`] = {
+            at: serverTimestamp(),
+            by: admin.uid,
+            byName: await resolveName(admin.uid),
+            action: "schedule.generate",
+            summary:
+                `Generated the judging schedule: ${teamsList.length} teams, ${judgesList.length} judges` +
+                `${onlyCheckedIn ? ", checked-in only" : ""}. Restore point taken first.`,
+            undoable: false,
+        };
+
         await update(ref(database), updates);
 
         const judgeCounts = Object.values(teamAssignments).map((a) => a.judges.length);
@@ -293,13 +322,16 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             ok: true,
             error: null,
             warnings,
+            advice: supply.advice,
+            snapshotId: guard.snapshotId,
             stats: {
                 teams: teamsList.length,
                 judges: judgesList.length,
                 batchSizes: batches.map((batch) => batch.length),
-                roomsUsed: largestBatch,
+                roomsUsed: Math.max(...batches.map((batch) => batch.length)),
                 minJudgesPerTeam: Math.min(...judgeCounts),
                 maxJudgesPerTeam: Math.max(...judgeCounts),
+                spareJudges: spare.length,
                 repeatPairings,
             },
             assignments: judgesList.map((judge) => ({

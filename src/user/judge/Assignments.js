@@ -387,6 +387,14 @@ function Assignments() {
                     {warning}
                   </Alert>
                 ))}
+                {/* What to change, as opposed to what is wrong. A refusal that
+                    says "not enough rooms" without saying how many more is not
+                    something anyone can act on at 4:45. */}
+                {generateResult?.advice?.map((line) => (
+                  <Alert severity="info" key={line}>
+                    {line}
+                  </Alert>
+                ))}
                 {stats && (
                   <Alert severity="success">
                     Scheduled {stats.teams} teams across {stats.judges} judges in batches of{" "}
@@ -395,7 +403,7 @@ function Assignments() {
                     {stats.minJudgesPerTeam === stats.maxJudgesPerTeam
                       ? stats.minJudgesPerTeam
                       : `${stats.minJudgesPerTeam}–${stats.maxJudgesPerTeam}`}{" "}
-                    judges.
+                    judges{stats.spareJudges ? `, with ${stats.spareJudges} held back as spares` : ""}.
                   </Alert>
                 )}
                 {!generateResult && scheduleMeta?.generatedAt && (
