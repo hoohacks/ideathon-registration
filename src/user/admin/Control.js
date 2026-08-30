@@ -10,6 +10,8 @@ import EventSection from "./event/EventSection";
 import AdminsSection from "./organisers/AdminsSection";
 import ActivityFeed from "./activity/ActivityFeed";
 import DangerSection from "./danger/DangerSection";
+import RestorePointsSection from "./danger/RestorePointsSection";
+import ExportSection from "./ExportSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
@@ -70,6 +72,8 @@ function Control() {
         <EventSection config={config} onResult={report} />
         <AdminsSection admins={admins} onResult={report} />
         <ActivityFeed log={log} onResult={report} />
+        <ExportSection onResult={report} />
+        <RestorePointsSection onResult={report} />
         <DangerSection onResult={report} />
       </Stack>
 
