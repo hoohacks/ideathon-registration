@@ -64,7 +64,8 @@ both places.
 
 ```
 /admins/{uid}              true
-/config                    judgingRooms[]  eventStart
+/config                    judgingRooms[]  eventStart  batchCount  batchTimes
+                           finalRoundRoom  targetJudgesPerTeam
                            scheduleMeta           generatedAt generatedBy teams
                                                   judges onlyCheckedIn
 /competitors/{uid}         firstName lastName email major skills learn gender
@@ -92,6 +93,11 @@ both places.
                                                   judgeCount timeslot room
                                                   excludedJudges/{uid}
                            archive/{ts}           a previous standings set
+/adminLog/{entryId}        at by byName action summary undoable
+                           changes[]              path before after   (JSON strings)
+                           undone                 at by
+/snapshotIndex/{id}        at by byName label reason paths[] bytes
+/snapshots/{id}            entries[]              path value          (JSON strings)
 ```
 
 Some things are deliberate:
@@ -125,10 +131,21 @@ read anywhere above `/scores/{round}/{teamId}/{judgeUid}`, so the only ways in
 are your own card and the admin rule at the root.
 
 **`enteredBy` is who pressed the button; `judgeUid` is whose card it is.** They
-differ only when an organiser keys in a score from paper. `judgeUid` is pinned
-to the path key and `enteredBy` to `auth.uid`, so a judge still cannot file
-under another judge, and an admin can no longer be blocked by their own
-validation rule from recording a score on someone's behalf.
+differ when an organiser keys in a score from paper, and when a card is put back
+from a restore point. `judgeUid` is pinned to the path key, so a card always
+belongs to the judge whose key it sits under. `enteredBy` is pinned to
+`auth.uid` for everyone *except* an organiser — that pin is where "a judge
+cannot file under another judge" lives, and the exemption does not weaken it,
+because the alternative branch requires being in `/admins`.
+
+The exemption exists because the absolute pin made restoring impossible. See
+"Restore points" below.
+
+**Restore points are split across two nodes on purpose.** `/snapshotIndex/{id}`
+holds small metadata and `/snapshots/{id}` holds the payload, so listing the
+restore points does not mean downloading every one of them. Both are reachable
+only through the root admin rule, and neither has a `.validate` clause — which
+is why adding them needed no rules change.
 
 Scores are validated by the rules — ranges, types, and no unknown fields.
 `src/schema.test.js` asserts those ranges still match `SCORE_FIELDS` and the
@@ -193,7 +210,7 @@ Two things about Realtime Database rules drive the whole shape of that file:
 | Actor | Can |
 | --- | --- |
 | anyone signed in | read their own `admins`/`judges`/`competitors` record, `config`, `finalRound/active`, `finalRound/activatedAt`, and any team's `name` |
-| competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members; read their own team, including its `finalSlot`; write their own team's `submission` and `submitted` |
+| competitor | read and edit their own record except check-in state; create a team; add or remove *themselves* from a team's members, **unless the team has already submitted**; read their own team, including its `finalSlot`; write their own team's `submission` and `submitted` |
 | judge | read their own record and both assignment lists; read `submission` for teams they are assigned to; write `scores/{round}/{teamId}/{ownUid}` for those teams, and read back only their own |
 | admin | everything, via the root rule |
 
@@ -208,6 +225,23 @@ Notably:
   rule.
 - A competitor cannot check themselves in, seed a `schedule` or `finalSlot` on
   a team they create, or read any score at all.
+- **A team that has submitted is closed to new members.** The first-round
+  schedule is built from submitted teams, so someone joining afterwards lands on
+  a team that is already scheduled and possibly already being judged. Leaving is
+  always allowed, so nobody is trapped, and an organiser can still add someone
+  by hand through the root rule.
+- **There is no team size cap in the rules, and there cannot be.** Realtime
+  Database rules cannot count children: `numChildren()` is a client SDK method,
+  and a rule that calls it does not merely fail — it stops the entire rules file
+  from loading, taking every other rule with it. `MAX_TEAM_SIZE` in
+  `src/user/team/teamMembership.js` is therefore advisory; it stops the ordinary
+  path and someone working from the console can exceed it. `src/schema.test.js`
+  fails if anyone reintroduces `numChildren` into the rules.
+- **An organiser may write a score card naming someone else as `enteredBy`.**
+  This is what makes a restore possible; without it a restore point containing
+  judges' cards could not be written back, and because a restore is one atomic
+  update that failure took the schedule restore down with it silently. A judge
+  is still pinned to their own uid.
 - **Nobody but an admin can read the standings.** `/finalRound` has no `.read`
   at the node itself, because one there would cascade into `finalRound/teams`
   and hand every signed-in account the top four with their average scores before
@@ -221,8 +255,18 @@ and paint an admin page. So they are tested twice over:
 
 | Suite | What it catches | Needs |
 | --- | --- | --- |
-| `src/schema.test.js` | a clause deleted, a range drifting from the code, scores reappearing under `/teams`, `/finalRound` regaining a `.read` | nothing |
+| `src/schema.test.js` | a clause deleted, a range drifting from the code, scores reappearing under `/teams`, `/finalRound` regaining a `.read`, `numChildren` reappearing in the rules | nothing |
 | `test/rules/` | a clause that is *wrong* — it executes the rules against the emulator and actually tries the reads | a JVM |
+
+The other suites worth knowing about:
+
+| File | What it pins |
+| --- | --- |
+| `src/user/judge/schedulePlan.test.js` | the allocator invariants, asserted across every schedulable event rather than a few sizes |
+| `src/user/judge/generateSchedule.test.js` | that a restore point is written *before* the schedule, and that a failure to write one abandons the generation |
+| `src/user/admin/danger/dangerZone.test.js` | that a wipe cannot proceed without a restore point, and that the wipe itself is one atomic update |
+| `src/user/admin/exportData.test.js` | CSV quoting, formula defusing, and that a card from an unassigned judge still appears |
+| `src/user/judge/resilience.test.js` | the judge-side outbox and drafts surviving a reload |
 
 ```
 npm test           # everything under src/, no JVM needed
@@ -272,6 +316,27 @@ For an iterative loop, run `npm run emulators` in one terminal and
 The emulator runs under the project id `demo-ideathon`. The `demo-` prefix
 makes it fully offline, so a misconfigured test can never reach the real
 project.
+
+### Every command
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | the app, against the **live** project |
+| `npm run start:emulator` | the app, against the local emulator |
+| `npm run emulators` | database, auth and storage emulators |
+| `npm run seed` | fill the emulator with a plausible event |
+| `npm test` | unit tests, watch mode |
+| `npm run test:ci` | unit tests once, no watch — what CI runs |
+| `npm run test:rules` | the rules, executed against the emulator |
+| `npm run test:rules:watch` | the same, re-run on change, against a running emulator |
+| `npm run build` | production bundle |
+| `npm run rules:cutover` | generate the transitional rules for the score migration |
+
+`npm run seed` takes `--teams`, `--judges`, `--rooms`, `--batches`,
+`--password`, and the flags `--scores` and `--schedule`. It refuses to run
+against anything but the emulator: the project id is pinned to `demo-ideathon`
+and every write carries the emulator-only `Bearer owner` credential, so there is
+no flag that points it at the live event.
 
 ## Migrating existing teams
 
@@ -365,10 +430,11 @@ were chosen or shipped. With no rooms configured, generation stops and says so.
 
 `/user/admin/control` holds the settings that used to need the Firebase
 console: the judging rooms, the batch count and times, the final round room,
-the event start date, and who counts as an organiser. The Competitors, Judges
-and Teams dashboards gained an **Edit** button per row for the rest.
+the event start date, and who counts as an organiser. It also holds **Export**
+and **Restore points**. The Competitors, Judges and Teams dashboards gained an
+**Edit** button per row for the rest.
 
-Three things there are worth knowing before the day.
+Worth knowing before the day.
 
 **Judging rooms live only in the database.** There is no built-in list. Add the
 rooms the event has booked before generating a schedule, or generation refuses.
@@ -403,16 +469,81 @@ after, and most can be undone from the Recent activity feed. An undo restores
 the recorded value and refuses if anything has moved since, naming the path
 that changed rather than quietly discarding someone else's edit.
 
-Two things it deliberately will not do:
+### Restore points
 
-- **Create or delete competitors, judges and teams.** The client SDK cannot
-  delete a Firebase Auth account, so a "delete" could only remove the database
-  record and would leave a working login that resolves to no role.
-A deleted score **can** now be undone from the activity feed, which was not
-true before rules version 5: `enteredBy` was pinned to `auth.uid` for everyone,
-so no one but a card's author could write it back. The paper score dialog still
-offers the deleted values, for the different case where the card itself was
-wrong and a corrected one is being entered.
+Two recovery mechanisms, and the difference between them is the point.
+
+| | Activity feed undo | Restore points |
+| --- | --- | --- |
+| Holds | one field's before-state, inside the log entry | whole subtrees, out of line at `/snapshots` |
+| Good for | a wrong room, a wrong name, a mis-set flag | a regeneration, a wipe, an activation |
+| Limit | drops the before-state past `UNDO_SIZE_CAP` (50 KB) | none that matters at event scale |
+| Refuses on drift | yes, naming the path | no — it overwrites |
+
+The feed's size cap is what made restore points necessary. It is the right
+design for a field edit and hopeless for a bulk one: the payload for "clear the
+schedule and every score" crosses 50 KB at around 25 teams, so the undo was
+present on every event small enough to test with and absent on the real one.
+Whether a mistake was recoverable depended on how much judges had typed into
+`notes`, which is not something anyone can reason about at 5pm.
+
+A restore point is taken automatically before:
+
+- generating or regenerating the schedule
+- activating the final round
+- anything in the danger zone
+
+and the action is **abandoned** if the restore point cannot be written. There is
+also a button to take one by hand before doing something manual and risky.
+
+Restoring saves the current state as a new restore point first, so you can undo
+an undo. Fifteen are kept; older ones are pruned as new ones arrive, in the same
+atomic update that writes the new one.
+
+Two things to know:
+
+- **Restoring overwrites.** Anything written since that point is replaced,
+  including scores judges submitted in the meantime. It is not a merge.
+- **It needs rules version 5 or later.** Before that, `enteredBy` was pinned to
+  `auth.uid` for everyone, so an organiser could not write back a card a judge
+  had filed — and because a restore is one atomic update, that rejection took
+  the schedule restore with it and changed nothing. Publish the rules.
+
+### Export
+
+Everything, as files, from **Control panel -> Export**:
+
+| Download | What it is |
+| --- | --- |
+| Schedule | one row per team: batch, time, room, judges, members. The one to print |
+| Scores, first round | one row per card, with the judge, the total, and who entered it |
+| Scores, final round | the same, for the final |
+| Standings | ranked by average, with judge counts and fundable votes |
+| Judges | who is assigned what, and what they still owe |
+| Everything (JSON) | the raw teams, judges, scores and config — the backup |
+
+Print the schedule before doors open and download the scores before touching
+anything in the danger zone. A file on a laptop is the only part of this that
+keeps working when nothing else does.
+
+Two details that are not obvious. A cell beginning `=`, `+`, `-` or `@` is
+prefixed with a tab, because judges type free text into `notes` and Excel
+executes such a cell as a formula on open. And the CSV carries a byte order
+mark, because Excel on Windows reads a BOM-less UTF-8 file as the system
+codepage and mangles every accented name in it.
+
+One thing it deliberately will not do: **create or delete competitors, judges
+and teams.** The client SDK cannot delete a Firebase Auth account, so a "delete"
+could only remove the database record and would leave a working login that
+resolves to no role.
+
+**A deleted score can be undone**, from rules version 5 onward. It could not
+before: `enteredBy` was pinned to `auth.uid` for everyone, so nobody but a
+card's original author could write it back, and the delete was marked
+not-undoable for that reason. The paper score dialog still offers the deleted
+values, for the different case — where the card itself was wrong and a corrected
+one is being entered under fresh provenance, rather than a delete being
+reversed.
 
 The log is a coordination and forensics aid, not a ledger: admins hold root
 write and deletes skip validation, so entries can be erased by anyone who can
@@ -462,6 +593,48 @@ all, 36 for a panel of three everywhere.
 first-round judges, or raise the batch count so fewer teams present at once.
 **Too many judges** is not a problem: panels cap at three and the rest become
 spares.
+
+### How the allocator works
+
+`src/user/judge/schedulePlan.js` holds the arithmetic and has no Firebase in it,
+so the whole shape of an event can be worked out before anything is written.
+`getJudgeSchedule.js` is the shell that reads, decides and writes.
+
+Two ideas drive it.
+
+**A judge visits at most one team per batch.** That constraint, not the
+assignment code, is what fixes how many judges a team can get: a team in a batch
+of `s` teams draws from `judges / s`. No cleverness in the allocator can change
+that, which is why the advice is about batch shape rather than about the
+algorithm.
+
+**More judges is not automatically better.** Panels cap at
+`TARGET_JUDGES_PER_TEAM` (3) and the surplus is held back. The old allocator sent
+every judge to a team in every batch, so 40 judges and 4 teams put 20 people in
+one room and 40 in another. Past a useful number an extra judge adds nothing and
+costs a seat, and a spare is worth far more standing in the corridor when
+somebody does not turn up.
+
+`allocateBatch` guarantees, for every schedulable event:
+
+- a judge appears at most once, so nobody is sent to two rooms at once
+- panels within a batch differ in size by at most one
+- no team exceeds the target while another is still below it
+- nobody is idle while a team is still below the target
+- the surplus rotates, so a different group sits out each batch
+- judges are reshuffled between batches, so the same people do not tour the
+  building together
+
+That last one is subtler than it looks. Filling seats as `position % batchSize`
+puts judges into fixed residue classes and sends the same three people round all
+three rooms as a group; the seat is therefore also shifted by the fill-round,
+which breaks those classes apart. `schedulePlan.test.js` asserts all of the
+above across 1-60 teams x 1-40 judges x 2/3/4/5 batches rather than at a few
+hand-picked sizes.
+
+Two things are reported rather than silently absorbed: **teams that will be seen
+by one judge only are named**, so you know who to send someone to, and **judges
+with no assignment at all are named** as spares.
 
 **Batches that do not divide evenly are the one thing worth avoiding.** A judge
 visits at most one team per batch, so a team in a batch of 6 draws from a
@@ -531,6 +704,12 @@ during the event when something has to go out now.
 2. If `database.rules.json` changed, publish it in the Firebase console.
    `npm test` will have already forced you to bump `// rulesVersion:`, so the
    diff tells you whether it did.
+
+   **For this release that means publishing version 5.** Two clauses changed: a
+   submitted team is closed to new members, and `enteredBy` is no longer pinned
+   to `auth.uid` for organisers. Until the second one is published, restoring a
+   restore point that contains scores fails and changes nothing — the restore is
+   one atomic update, so the schedule restore goes down with it.
 3. If `storage.rules` changed, publish that too. Nothing checks this one, and
    forgetting it silently breaks resume and pitch deck uploads.
 4. Publish a release. The Deploy workflow does the rest.
