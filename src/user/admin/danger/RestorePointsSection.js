@@ -4,7 +4,6 @@ import {
   DialogContentText, DialogTitle, Stack, Typography,
 } from "@mui/material";
 import { subscribeToSnapshots, restoreSnapshot, captureSnapshot, JUDGING_PATHS } from "../snapshots";
-import RegisteredAtDisplay from "../../../RegisteredAtDisplay";
 
 /**
  * The way back from a bulk mistake.
@@ -24,6 +23,18 @@ function bytes(value) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Date as well as time, unlike the activity feed.
+ *
+ * The feed is read during the event, where everything happened today and the
+ * hour is enough. A restore point can be the one taken before last year's
+ * schedule, so the day matters.
+ */
+function when(value) {
+  if (!Number.isFinite(value)) return "";
+  return new Date(value).toLocaleString();
 }
 
 export default function RestorePointsSection({ onResult }) {
@@ -104,8 +115,7 @@ export default function RestorePointsSection({ onResult }) {
                       {point.label ?? point.id}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" component="div">
-                      <RegisteredAtDisplay value={point.at} /> · {point.byName ?? point.by} ·{" "}
-                      {bytes(point.bytes)}
+                      {when(point.at)} · {point.byName ?? point.by} · {bytes(point.bytes)}
                     </Typography>
                     <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
                       {(point.paths ?? []).map((path) => (
