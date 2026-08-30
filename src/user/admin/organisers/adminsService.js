@@ -39,41 +39,6 @@ export async function listAdmins() {
   return snap.exists() ? Object.keys(snap.val() ?? {}) : [];
 }
 
-/**
- * Find a person to promote. Granting takes someone picked from the roster
- * rather than a pasted uid, because a typo in a uid creates an admin entry that
- * belongs to nobody -- it can never be used, and worse, it still counts toward
- * the last-organiser check that stops a lockout.
- */
-export async function findPeopleByEmail(query) {
-  const needle = String(query ?? "").trim().toLowerCase();
-  if (needle.length < 2) return [];
-
-  const [judgesSnap, competitorsSnap] = await Promise.all([
-    get(ref(database, "judges")),
-    get(ref(database, "competitors")),
-  ]);
-
-  const found = new Map();
-  for (const [role, snap] of [["judge", judgesSnap], ["competitor", competitorsSnap]]) {
-    for (const [uid, person] of Object.entries(snap.exists() ? snap.val() ?? {} : {})) {
-      const email = String(person?.email ?? "");
-      const name = [person?.firstName, person?.lastName].filter(Boolean).join(" ").trim();
-      if (!email.toLowerCase().includes(needle) && !name.toLowerCase().includes(needle)) continue;
-
-      const existing = found.get(uid);
-      found.set(uid, {
-        uid,
-        name: name || email || uid,
-        email,
-        roles: [...(existing?.roles ?? []), role],
-      });
-    }
-  }
-
-  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export async function grantAdmin({ uid, name }) {
   if (!uid) return { ok: false, error: "Pick a person first." };
 
