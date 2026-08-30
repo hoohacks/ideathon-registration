@@ -194,6 +194,36 @@ describe("pages render without crashing", () => {
     expect(await screen.findByRole("heading", { name: "Control panel" })).toBeInTheDocument();
   });
 
+  /**
+   * The order is the point, not just the presence.
+   *
+   * The panel is read top to bottom on the day, so the sections you reach for
+   * while things are going well come first and the ones you reach for when they
+   * are not come last. Recent activity sits near the bottom, above the danger
+   * zone. Asserting the whole sequence is what stops a later import being
+   * dropped into the middle of the list by accident.
+   */
+  test("control panel sections read in the intended order", async () => {
+    renderPage(Control, { userTypes: ["admin"] });
+    await screen.findByRole("heading", { name: "Control panel" });
+
+    const sections = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent);
+
+    expect(sections).toEqual([
+      "Judging rooms",
+      "Judging schedule",
+      "Event",
+      "People and roles",
+      "Export",
+      "Restore points",
+      "Advanced",
+      "Recent activity",
+      "Danger zone",
+    ]);
+  });
+
   test("metrics with no registrations invites rather than showing empty axes", async () => {
     renderPage(Metrics, { userTypes: ["admin"] });
     expect(await screen.findByText(/No registrations yet/)).toBeInTheDocument();

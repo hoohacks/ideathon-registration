@@ -72,10 +72,10 @@ function Control() {
         <ScheduleSection config={config} onResult={report} />
         <EventSection config={config} onResult={report} />
         <PeopleSection onResult={report} />
-        <ActivityFeed log={log} onResult={report} />
         <ExportSection onResult={report} />
         <RestorePointsSection onResult={report} />
         <AdvancedSection config={config} onResult={report} />
+        <ActivityFeed log={log} onResult={report} />
         <DangerSection onResult={report} />
       </Stack>
 

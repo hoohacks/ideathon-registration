@@ -112,10 +112,10 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 | Judging schedule | batch count, batch times, final round room |
 | Event | event start date |
 | People and roles | grant/revoke any role, create accounts, reset passwords, bulk check-in, delete people |
-| Recent activity | what changed, with undo |
 | Export | schedule, scores, standings, judges, full JSON backup |
 | Restore points | recover from a bad regenerate or wipe |
 | Advanced | create an empty team, write any config key |
+| Recent activity | what changed, with undo |
 | Danger zone | clear the schedule, optionally with every score |
 
 Per-record editing lives on the Competitors, Judges and Teams dashboards
