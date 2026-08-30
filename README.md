@@ -148,10 +148,24 @@ git and never republishing them — is caught by a digest check in
 That failure is the reminder to republish. Do it before the release goes out,
 not after.
 
-The current version is **3**, which added validation for `/adminLog`. That
-block only pins the shape of a log entry — the root admin rule already covered
-read and write there — so until the rules are republished the control panel
-still works and its entries are simply unvalidated. Republish anyway.
+The current version is **5**. Two changes since 3, and both must be published
+before the event:
+
+- **A team that has submitted is closed to new members.** Joining one is refused
+  by the rules, not just by the form. Leaving is always allowed, and an admin can
+  still add someone by hand. There is deliberately no team *size* cap in the
+  rules: Realtime Database cannot count children, and `numChildren()` is a client
+  SDK method whose presence stops the whole file loading. `MAX_TEAM_SIZE` in
+  `src/user/team/teamMembership.js` is therefore advisory.
+- **`enteredBy` is no longer pinned to `auth.uid` for organisers.** It still is
+  for everyone else, which is where "a judge cannot file under another judge"
+  lives. The exemption is what makes a restore possible at all: a restore point
+  holds cards whose `enteredBy` is some judge's uid, and until this change an
+  admin writing them back failed validation — which, because a restore is one
+  atomic update, silently took the schedule restore down with it.
+
+**Until version 5 is published, restoring a restore point that contains scores
+will fail and change nothing.** The schedule and rooms still work.
 
 `storage.rules` has no equivalent guard, so it is on the release checklist
 below. Forgetting it silently breaks resume and pitch deck uploads.
@@ -214,6 +228,41 @@ and paint an admin page. So they are tested twice over:
 npm test           # everything under src/, no JVM needed
 npm run test:rules # executes database.rules.json against the emulator
 ```
+
+### Rehearsing the whole day locally
+
+The suites cover the rules and the arithmetic. They cannot cover a person
+clicking through judging day, and until recently nothing could: `npm start`
+always talked to the live project, so every rehearsal wrote to the real event.
+
+```
+npm run emulators        # terminal 1: database, auth and storage
+npm run seed             # terminal 2: a plausible event
+npm run start:emulator   # terminal 3: the app, pointed at the emulator
+```
+
+Sign in as `admin@example.com` / `testtest`. Judges are `judge1@example.com`
+upward, competitors `competitor1@example.com` upward, same password.
+
+```
+npm run seed -- --teams=30 --judges=24 --rooms=12   # a bigger event
+npm run seed -- --scores                            # already mid-judging
+```
+
+Two things to know:
+
+- **Seeding recreates every account**, so a tab that was signed in is holding a
+  credential for a uid that no longer exists. Sign in again after seeding.
+- **Seed at least 8 teams** if you want to exercise the final round. Below about
+  six, every judge sees every team in round one, so all of them are excluded
+  from the final and activation produces no assignments. That is a property of
+  small data, not a bug — activation now says so rather than reporting success.
+
+The emulator namespace is `demo-ideathon`, pinned in `src/firebase.js`,
+`scripts/seed-event.mjs` and `test/rules/helpers.mjs`. It has to match in all
+three: `connectDatabaseEmulator` would otherwise keep the namespace from the
+production `databaseURL` and connect to a real but empty database on the
+emulator, where every read succeeds and returns nothing.
 
 The Realtime Database emulator is a Java jar, so `npm run test:rules` needs a
 JDK 17+ on the PATH; `npx firebase setup:emulators:database` pre-downloads it.
@@ -296,6 +345,7 @@ Optional database nodes that change behaviour without a deploy:
 | `config/judgingRooms` | room names for the first round. **Required — there is no fallback list in the code.** Edit it on the control panel, not by hand. A batch cannot have more teams than there are rooms |
 | `config/batchCount` | how many batches teams are split into; falls back to `BATCH_COUNT` |
 | `config/batchTimes` | the time each batch presents; falls back to `BATCH_TIMES` |
+| `config/targetJudgesPerTeam` | panel size cap; falls back to `TARGET_JUDGES_PER_TEAM` (3). Surplus judges become spares |
 | `config/finalRoundRoom` | falls back to `FINAL_ROUND_ROOM` |
 | `config/eventStart` | ISO timestamp the home page counts down to |
 | `config/scheduleMeta` | written by schedule generation, not by hand. It is what makes the "you are about to replace every assignment" confirmation survive a page reload |
@@ -337,7 +387,16 @@ reset, with its own confirmation phrase so a click-through cannot carry into it.
 That clears both `/scores` and the pre-migration copies at `teams/{id}/scores`,
 which are still read while `READ_LEGACY_SCORE_PATH` is true; clearing only the
 first would leave cards showing in the dashboard and counting toward the
-averages the final round is picked from. It cannot be undone.
+averages the final round is picked from.
+
+**It can be undone, from Restore points.** A restore point is taken before the
+wipe, and the wipe is abandoned if one cannot be written. This is not the same
+mechanism as the activity feed's undo, and the difference matters: the feed
+stores a before-state inside the log entry and drops it past `UNDO_SIZE_CAP`
+(50 KB), which the payload for a full wipe crosses at around 25 teams. That made
+recoverability depend on how big the event was — present on every test event,
+absent on the real one. Restore points hold the before-state out of line at
+`/snapshots`, so size stops deciding.
 
 **Every change made here is recorded at `/adminLog`** with the value before and
 after, and most can be undone from the Recent activity feed. An undo restores
@@ -349,11 +408,11 @@ Two things it deliberately will not do:
 - **Create or delete competitors, judges and teams.** The client SDK cannot
   delete a Firebase Auth account, so a "delete" could only remove the database
   record and would leave a working login that resolves to no role.
-- **Undo a deleted score.** `enteredBy` is pinned to `auth.uid` by the rules —
-  that pin is what stops a judge filing a card under another judge — so nobody
-  but the original author could write a card back. Deleting one offers its
-  values back for re-entry through the paper score dialog instead, which stamps
-  correct new provenance rather than forging the old.
+A deleted score **can** now be undone from the activity feed, which was not
+true before rules version 5: `enteredBy` was pinned to `auth.uid` for everyone,
+so no one but a card's author could write it back. The paper score dialog still
+offers the deleted values, for the different case where the card itself was
+wrong and a corrected one is being entered.
 
 The log is a coordination and forensics aid, not a ledger: admins hold root
 write and deletes skip validation, so entries can be erased by anyone who can
@@ -368,15 +427,49 @@ a dashboard row is an override, and that is recorded.
 1. Mark first-round judges on **Judge Search**. Only judges flagged
    `isRound1Judge` are given assignments.
 2. Press **Generate Schedule** on the Judging page. Teams that submitted are
-   split into three batches; each team in a batch gets its own room, and every
-   judge visits exactly one team per batch. Generation validates room and judge
-   supply first and writes nothing if it cannot produce a complete schedule.
-   Tick **only schedule judges who have checked in** to leave no-shows out.
+   split into batches; each team in a batch gets its own room, and every judge
+   visits at most one team per batch. Generation validates room and judge supply
+   first and writes nothing if it cannot produce a complete schedule, and it
+   takes a restore point before replacing anything. Tick **only schedule judges
+   who have checked in** to leave no-shows out.
+
+   **Panels are capped at three judges** (`config/targetJudgesPerTeam`). Judges
+   beyond what the teams need are held back as spares rather than crowded into
+   rooms — 40 judges and 4 teams used to put 20 people in one room and 40 in
+   another. A spare has no assignment card; add one to a team from Judging
+   progress when someone does not turn up.
 3. Judges score from their assignment cards, which also carry the team's idea,
    problem statement and pitch deck. Scores are keyed by team id.
 4. Watch **Judging progress** (Admin -> Judging progress) while the round runs.
 5. **Activate Final Round** takes the top four and excludes the judges who
    already saw them in round one.
+
+### How many judges, and how many rooms
+
+Two limits, both derived from the batch split. The largest batch is
+`ceil(teams / batches)`, and that number is what everything else follows from:
+
+| | |
+| --- | --- |
+| Maximum teams | `rooms × batches` |
+| Minimum judges | `ceil(teams / batches)` — below this, generation refuses |
+| Judges for a full panel | `3 × ceil(teams / batches)` |
+
+With 12 rooms and 3 batches: 36 teams maximum, at least 12 judges to schedule at
+all, 36 for a panel of three everywhere.
+
+**Too few judges** is refused with the two ways out spelled out — mark more
+first-round judges, or raise the batch count so fewer teams present at once.
+**Too many judges** is not a problem: panels cap at three and the rest become
+spares.
+
+**Batches that do not divide evenly are the one thing worth avoiding.** A judge
+visits at most one team per batch, so a team in a batch of 6 draws from a
+different pool than one in a batch of 7. With 20 teams over 3 batches (7/7/6)
+and few judges, teams in the smaller batch get more attention than the others.
+Generation says so and names a batch count that divides evenly. That is a
+supply-and-shape fact, not something the allocator can fix — within a batch it
+already balances panels to within one judge.
 
 Scoring is out of 40: problem, innovation and impact are worth 10 each,
 viability and pitch quality 5 each. `fundable` is recorded as a tally, not
@@ -394,7 +487,10 @@ no scores sort to the top in red.
 | A judge has not turned up | **Judges** on the affected team row -> add or swap. This rewrites one team's assignment, not the whole schedule. Regenerating would move every assignment in the event and strand the scores already collected. |
 | A judge's phone died, or they scored on paper | **Record score** on the team row. The card is filed under that judge and stamped with your account in `enteredBy`. |
 | A judge says they submitted but nothing shows | Ask whether their page says "saved on this device". Scores that could not reach the database queue on the judge's phone and send themselves on reconnect — the page must stay open. There is a **Retry now** button. |
-| A team has no scores and time is running out | Assign a checked-in judge from another room, or record the score yourself. |
+| A team has no scores and time is running out | Assign a checked-in judge from another room, or record the score yourself. Spare judges are the ones to reach for first. |
+| A team submitted after the schedule was generated | Open the team on the Teams dashboard. With no schedule entry it offers **batch, room and judges** directly — only rooms free in that batch are listed. Do not regenerate: that moves every assignment in the event and strands the scores already collected. |
+| Something was cleared or regenerated by mistake | **Control panel → Restore points.** One is taken automatically before every generation, activation and danger-zone action. Restoring also saves the current state first, so you can undo the undo. |
+| You want a copy of everything | **Control panel → Export.** Schedule, scores, standings and judges as CSV, plus a full JSON backup. Print the schedule before doors open. |
 | Scores appear from a judge who is not assigned | Expected after a regenerate: scores are keyed by team and judge, so moving an assignment does not move them. Judging progress lists these explicitly, because they still count toward the average. |
 
 Judges do not need to be told any of this. Their side degrades on its own: every
