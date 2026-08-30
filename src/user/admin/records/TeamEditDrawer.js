@@ -5,6 +5,7 @@ import { renameTeam } from "./recordEdits";
 import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../danger/dangerZone";
 import { listRooms } from "../rooms/roomsService";
 import { findOpenSlots, scheduleTeamIntoBatch } from "../../judge/assignmentEdits";
+import { deleteTeam } from "../people/peopleService";
 import { ref, get } from "firebase/database";
 import { database } from "../../../firebase";
 
@@ -123,6 +124,9 @@ export default function TeamEditDrawer({ team, teamId, onClose, onResult }) {
       <Typography variant="body2" sx={{ fontWeight: 600 }}>Final round</Typography>
 
       <FinalRoundControls team={team} teamId={teamId} name={name} saving={saving} run={run} />
+
+      <Divider />
+      <DeleteTeam team={team} teamId={teamId} name={name} saving={saving} run={run} onClose={onClose} />
     </EditDrawer>
   );
 }
@@ -296,6 +300,55 @@ function ScheduleIntoBatch({ teamId, run, saving }) {
         }
       >
         Add to batch {batch || "…"}
+      </Button>
+    </>
+  );
+}
+
+/**
+ * Deleting a team.
+ *
+ * Not just the team node: every member's `teamId` and every judge's copy of the
+ * assignment have to go with it, or a competitor is left pointing at a team
+ * that does not exist and a judge keeps a card for a room nobody will present
+ * in. deleteTeam writes all of it in one update.
+ */
+function DeleteTeam({ team, teamId, name, saving, run, onClose }) {
+  const [confirming, setConfirming] = useState(false);
+  const memberCount = Object.keys(team.members ?? {}).length;
+
+  if (!confirming) {
+    return (
+      <>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>Delete</Typography>
+        <Button color="error" variant="outlined" disabled={saving} onClick={() => setConfirming(true)}>
+          Delete this team
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>Delete</Typography>
+      <Alert severity="error">
+        Deleting {name || "this team"} also clears {memberCount} member
+        {memberCount === 1 ? "'s" : "s'"} team, its schedule entry, and every judge's copy of the
+        assignment. Their scores are kept, and will show against a team that no longer exists.
+      </Alert>
+      <Button
+        color="error"
+        variant="contained"
+        disabled={saving}
+        onClick={async () => {
+          const ok = await run(() => deleteTeam({ teamId, teamName: name }), `Deleted ${name || teamId}`);
+          if (ok) onClose();
+        }}
+      >
+        Yes, delete {name || "this team"}
+      </Button>
+      <Button variant="text" disabled={saving} onClick={() => setConfirming(false)}>
+        Cancel
       </Button>
     </>
   );

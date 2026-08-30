@@ -7,7 +7,8 @@ import { PageHeader } from "./adminUi";
 import RoomsSection from "./rooms/RoomsSection";
 import ScheduleSection from "./event/ScheduleSection";
 import EventSection from "./event/EventSection";
-import AdminsSection from "./organisers/AdminsSection";
+import PeopleSection from "./people/PeopleSection";
+import AdvancedSection from "./AdvancedSection";
 import ActivityFeed from "./activity/ActivityFeed";
 import DangerSection from "./danger/DangerSection";
 import RestorePointsSection from "./danger/RestorePointsSection";
@@ -70,10 +71,11 @@ function Control() {
         />
         <ScheduleSection config={config} onResult={report} />
         <EventSection config={config} onResult={report} />
-        <AdminsSection admins={admins} onResult={report} />
+        <PeopleSection onResult={report} />
         <ActivityFeed log={log} onResult={report} />
         <ExportSection onResult={report} />
         <RestorePointsSection onResult={report} />
+        <AdvancedSection config={config} onResult={report} />
         <DangerSection onResult={report} />
       </Stack>
 
