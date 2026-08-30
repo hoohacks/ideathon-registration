@@ -3,6 +3,7 @@ import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
 import { READ_LEGACY_SCORE_PATH, FIRST_ROUND } from "./getTeamInfo.js";
 import { compareForRanking, rankingEntry } from "./scoreRubric.js";
+import { guardWith } from "../admin/snapshots.js";
 
 export const FINAL_ROUND_ROOM = "Rice 011";
 
@@ -145,10 +146,33 @@ export async function activateFinalRound({ limit = 4, requireSubmitted = true } 
     if (!(teamId in teamsPayload)) updates[`teams/${teamId}/finalSlot`] = null;
   }
 
-  // every judge gets exactly the finalists they are not excluded from. The
-  // filtering used to happen in the browser, which only worked because judges
-  // could read excludedJudges — that is, because the standings leaked.
+  // Only judges who are actually working the round get assignments.
+  //
+  // This used to iterate every registered judge, so somebody who signed up in
+  // October and never turned up still received finalAssignments -- and that
+  // node is what the rules treat as proof of assignment for writing a final
+  // score. A checked-in first-round judge is the right pool; if nobody is
+  // checked in we fall back to first-round judges rather than assigning nobody.
+  const workingJudges = Object.entries(judgesData)
+    .filter(([, judge]) => judge?.isRound1Judge === true && judge?.checkedIn === true)
+    .map(([uid]) => uid);
+  const eligiblePool = workingJudges.length
+    ? workingJudges
+    : Object.entries(judgesData)
+        .filter(([, judge]) => judge?.isRound1Judge === true)
+        .map(([uid]) => uid);
+
+  if (!eligiblePool.length) {
+    warnings.push(
+      "No judges are marked as first-round judges, so nobody has been given a final-round assignment."
+    );
+  }
+
   for (const judgeUid of Object.keys(judgesData)) {
+    if (!eligiblePool.includes(judgeUid)) {
+      updates[`judges/${judgeUid}/finalAssignments`] = null;
+      continue;
+    }
     const assignments = {};
     for (const [teamId, details] of Object.entries(teamsPayload)) {
       if (details.excludedJudges[judgeUid]) continue;
@@ -163,6 +187,28 @@ export async function activateFinalRound({ limit = 4, requireSubmitted = true } 
       ? assignments
       : null;
   }
+
+  // A finalist every judge already saw in round one excludes all of them, and
+  // ends up with nobody to present to. Reachable at small events -- with six
+  // teams or fewer every judge sees every team -- and previously silent:
+  // activation reported success while writing no assignments at all.
+  const orphaned = Object.entries(teamsPayload)
+    .filter(([teamId]) => !eligiblePool.some((uid) => !teamsPayload[teamId].excludedJudges[uid]))
+    .map(([, details]) => details.name);
+  if (orphaned.length) {
+    warnings.push(
+      `${orphaned.join(", ")} reached the final round with no eligible judge — every ` +
+        `available judge already scored them in round one. Add a judge who did not, or ` +
+        `clear an exclusion, or they present to an empty room.`
+    );
+  }
+
+  const guard = await guardWith({
+    label: `Before activating the final round (top ${finalists.length})`,
+    reason: "activation rewrites every judge's final assignments and the standings",
+    paths: ["teams", "judges", "finalRound"],
+  });
+  if (!guard.ok) throw new Error(guard.error);
 
   updates["finalRound/active"] = true;
   updates["finalRound/activatedAt"] = serverTimestamp();

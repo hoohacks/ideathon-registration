@@ -102,10 +102,15 @@ describe("deleting a score", () => {
     expect(mockUpdate.mock.calls[0][1]["scores/first/t1/j1"]).toBeNull();
   });
 
-  test("is marked not undoable, because enteredBy is pinned to auth.uid", async () => {
-    mockGet.mockResolvedValue({ exists: () => true, val: () => card });
-    await deleteScore({ round: "first", teamId: "t1", judgeUid: "j1" });
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].undoable).toBe(false);
+  test("is undoable, because an admin may write back the original author", async () => {
+    // This assertion used to be the opposite. enteredBy was pinned to auth.uid
+    // for everyone, so nobody but a card's author could put it back. The pin
+    // now exempts admins, so the feed can genuinely reverse a delete instead of
+    // offering re-entry under new provenance.
+    mockGet.mockResolvedValue({ exists: () => true, val: () => ({ problem: 8, enteredBy: "judge-1" }) });
+    await deleteScore({ round: "first", teamId: "t1", judgeUid: "judge-1" });
+
+    expect(mockUpdate.mock.calls.at(-1)[1]["adminLog/entry-1"].undoable).toBe(true);
   });
 
   test("the whole card is kept in the entry so it can be re-typed", async () => {
@@ -152,7 +157,7 @@ describe("clearing the schedule", () => {
     const result = await clearSchedule();
     expect(result.ok).toBe(true);
 
-    const payload = mockUpdate.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls.at(-1)[1];
     expect(payload["teams/t1/schedule"]).toBeNull();
     expect(payload["judges/j1/teamAssignments"]).toBeNull();
     expect(payload["config/scheduleMeta"]).toBeNull();
@@ -193,7 +198,7 @@ describe("clearing scores as well, to start from scratch", () => {
     mockGet.mockImplementation(world());
     await clearSchedule();
 
-    const payload = mockUpdate.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls.at(-1)[1];
     expect(payload["scores"]).toBeUndefined();
     expect(payload["teams/t1/scores"]).toBeUndefined();
     expect(payload["teams/t1/schedule"]).toBeNull();
@@ -203,14 +208,14 @@ describe("clearing scores as well, to start from scratch", () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
 
-    expect(mockUpdate.mock.calls[0][1]["scores"]).toBeNull();
+    expect(mockUpdate.mock.calls.at(-1)[1]["scores"]).toBeNull();
   });
 
   test("and the pre-migration copies on the team nodes", async () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
 
-    const payload = mockUpdate.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls.at(-1)[1];
     expect(payload["teams/t1/scores"]).toBeNull();
     expect(payload["teams/t2/finalScores"]).toBeNull();
   });
@@ -219,7 +224,7 @@ describe("clearing scores as well, to start from scratch", () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
 
-    const payload = mockUpdate.mock.calls[0][1];
+    const payload = mockUpdate.mock.calls.at(-1)[1];
     expect("teams/t2/scores" in payload).toBe(false);
     expect("teams/t1/finalScores" in payload).toBe(false);
   });
@@ -227,6 +232,43 @@ describe("clearing scores as well, to start from scratch", () => {
   test("the schedule and the scores go in one atomic update", async () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
+
+    // The restore point is written first, as its own update -- it has to land
+    // BEFORE the wipe or it is not a restore point. The wipe itself is still
+    // one update, which is the property that matters: it cannot half-apply.
+    const payload = mockUpdate.mock.calls.at(-1)[1];
+    expect(payload["scores"]).toBeNull();
+    expect(payload["teams/t1/schedule"]).toBeNull();
+    expect(payload["judges/j1/teamAssignments"]).toBeNull();
+  });
+
+  test("a restore point is taken before anything is deleted", async () => {
+    mockGet.mockImplementation(world());
+    const result = await clearSchedule({ includeScores: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.snapshotId).toBeTruthy();
+
+    // first write is the restore point, and it carries the scores it is about
+    // to destroy rather than a pointer to them
+    const [snapshotPayload] = mockUpdate.mock.calls[0].slice(1);
+    const stored = snapshotPayload["snapshots/entry-1"];
+    expect(stored.entries.map((e) => e.path)).toEqual(
+      expect.arrayContaining(["teams", "judges", "scores"])
+    );
+    expect(JSON.parse(stored.entries.find((e) => e.path === "scores").value))
+      .toEqual({ first: { t1: { j1: { problem: 8 } } }, final: {} });
+  });
+
+  test("nothing is deleted when the restore point cannot be written", async () => {
+    mockGet.mockImplementation(world());
+    // the restore point is the first write; fail it and the wipe must not run
+    mockUpdate.mockRejectedValueOnce(new Error("network down"));
+
+    const result = await clearSchedule({ includeScores: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/restore point/i);
     expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 
@@ -242,7 +284,7 @@ describe("clearing scores as well, to start from scratch", () => {
 
     const result = await clearSchedule({ includeScores: true });
     expect(result.ok).toBe(true);
-    expect(mockUpdate.mock.calls[0][1]["scores"]).toBeNull();
+    expect(mockUpdate.mock.calls.at(-1)[1]["scores"]).toBeNull();
   });
 
   test("refuses when there is genuinely nothing to clear", async () => {
@@ -255,6 +297,6 @@ describe("clearing scores as well, to start from scratch", () => {
   test("the summary says scores went, so the feed is not misleading", async () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].summary).toMatch(/score/i);
+    expect(mockUpdate.mock.calls.at(-1)[1]["adminLog/entry-1"].summary).toMatch(/score/i);
   });
 });

@@ -10,13 +10,14 @@ import { readScheduleMeta } from "../../judge/getJudgeSchedule";
 const CONFIRM_WORD = "clear";
 
 /**
- * Collapsed by default, and the one irreversible action asks you to type a word.
+ * Collapsed by default, and the destructive action asks you to type a word.
  *
- * Clearing the schedule captures every team slot and every judge's assignments
- * -- of the order of 100 KB -- which is past the size at which the audit log
- * keeps a full before-state, so it is recorded as counts only and cannot be
- * undone. Regenerating rebuilds it; the typed confirmation is what stands in
- * for the undo.
+ * Clearing the schedule captures every team slot and every judge's assignments,
+ * which is past the size at which the audit log keeps a full before-state -- so
+ * the feed records counts only and cannot undo it. A restore point is taken
+ * first instead, and the action refuses outright if that restore point cannot
+ * be written. The typed confirmation stops the click; the restore point is what
+ * makes the click survivable.
  */
 export default function DangerSection({ onResult }) {
   const [meta, setMeta] = useState(null);

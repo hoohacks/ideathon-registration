@@ -60,7 +60,7 @@ export async function captureBefore(paths) {
 }
 
 /** Best-effort display name for the acting admin; the uid is the fallback. */
-async function resolveName(uid) {
+export async function resolveName(uid) {
   for (const role of ["judges", "competitors"]) {
     try {
       const snap = await get(ref(database, `${role}/${uid}`));
@@ -76,7 +76,20 @@ async function resolveName(uid) {
   return `admin ${uid.slice(0, 8)}`;
 }
 
-export async function applyAdminAction({ action, summary, changes = [], undoable = true }) {
+/**
+ * `hasRestorePoint` changes only what the entry says when the before-state was
+ * too big to inline. That distinction matters: "too large to undo" used to be
+ * the whole story, and it was read as "this is gone". With a restore point
+ * taken beforehand the data is recoverable, and the log has to say so or nobody
+ * will look.
+ */
+export async function applyAdminAction({
+  action,
+  summary,
+  changes = [],
+  undoable = true,
+  hasRestorePoint = false,
+}) {
   let admin;
   try {
     admin = await requireAdmin(action);
@@ -88,12 +101,16 @@ export async function applyAdminAction({ action, summary, changes = [], undoable
     const encoded = encodeChanges(changes);
     const tooBig = JSON.stringify(encoded).length > UNDO_SIZE_CAP;
 
+    const oversizeNote = hasRestorePoint
+      ? `${summary} (${changes.length} paths — undo from Restore points)`
+      : `${summary} (${changes.length} paths, too large to undo)`;
+
     const entry = {
       at: serverTimestamp(),
       by: admin.uid,
       byName: await resolveName(admin.uid),
       action,
-      summary: tooBig ? `${summary} (${changes.length} paths, too large to undo)` : summary,
+      summary: (tooBig ? oversizeNote : summary).slice(0, 500),
       undoable: undoable && !tooBig,
     };
     if (!tooBig) entry.changes = encoded;

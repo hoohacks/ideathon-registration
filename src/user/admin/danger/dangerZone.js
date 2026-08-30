@@ -1,19 +1,22 @@
 import { ref, get } from "firebase/database";
 import { database } from "../../../firebase.js";
 import { applyAdminAction, captureBefore } from "../adminAction.js";
+import { guardWith } from "../snapshots.js";
 import { FIRST_ROUND, FINAL_ROUND } from "../../judge/getTeamInfo.js";
 
 /**
  * Break-glass tooling: the things you reach for when something has already
  * gone wrong.
  *
- * deleteScore is the one that needs explaining. A card cannot be put back:
- * enteredBy is pinned to auth.uid by the rules, and that pin is where the
- * "a judge cannot file under another judge" guarantee lives. Restoring one as a
- * different admin would fail validation, and weakening the rule to allow it
- * would cost more than the undo is worth. So the delete is marked not-undoable
- * and the card is handed back, for the caller to re-enter through the paper
- * score dialog -- which stamps the correct new provenance.
+ * Everything destructive here takes a restore point first and refuses if one
+ * cannot be written. That matters because the audit log cannot carry a bulk
+ * before-state: past UNDO_SIZE_CAP it keeps counts only, so recoverability used
+ * to depend on how big the event was.
+ *
+ * deleteScore returns the card as well as deleting it. The delete is undoable
+ * from the activity feed; the returned values are for the other case, where the
+ * card was wrong rather than the deletion, and a corrected one is re-entered
+ * through the paper score dialog.
  */
 
 /** Every path holding this team's room and time. Pure. */
@@ -85,9 +88,13 @@ export async function deleteScore({ round, teamId, judgeUid, teamName, judgeName
     action: "score.delete",
     summary: `Deleted the ${round} round card for ${teamName || teamId} from ${judgeName || judgeUid}`,
     changes: [{ path, before: card, after: null }],
-    // enteredBy is pinned to auth.uid, so nobody but the original author could
-    // write this card back. Re-entry goes through PaperScoreDialog instead.
-    undoable: false,
+    // Undoable now. enteredBy used to be pinned to auth.uid for everyone, so
+    // nobody but the original author could write a card back and this had to be
+    // undoable:false, with re-entry through PaperScoreDialog stamping new
+    // provenance. The pin now exempts admins, so an undo restores the card
+    // exactly as the judge filed it. The dialog is still offered, because
+    // re-entering from paper is a different thing from undoing a mistake.
+    undoable: true,
   });
 
   return { ...result, card };
@@ -197,7 +204,32 @@ export async function clearSchedule({ includeScores = false } = {}) {
     ? `Cleared the schedule and every score: ${assignmentCount} assignment records, ${scoreCount} score locations`
     : `Cleared the schedule: ${assignmentCount} assignment records`;
 
-  return applyAdminAction({ action: "schedule.clear", summary, changes });
+  // A restore point BEFORE the wipe, and a refusal if it cannot be taken.
+  //
+  // The audit log alone was not enough here and the reason is worth stating:
+  // applyAdminAction inlines the before-state, and drops it past
+  // UNDO_SIZE_CAP. The payload for this action crosses that cap somewhere
+  // around 25 teams, so clearing every score was undoable on a small test
+  // event and permanent on a real one -- the safety net was present exactly
+  // where it was not needed and absent where it was.
+  const guard = await guardWith({
+    label: summary,
+    reason: includeScores
+      ? "clearing every score cannot be undone from the activity feed"
+      : "clearing the schedule replaces every assignment in the event",
+    paths: includeScores
+      ? ["teams", "judges", "scores", "config/scheduleMeta"]
+      : ["teams", "judges", "config/scheduleMeta"],
+  });
+  if (!guard.ok) return { ok: false, error: guard.error };
+
+  const result = await applyAdminAction({
+    action: "schedule.clear",
+    summary,
+    changes,
+    hasRestorePoint: true,
+  });
+  return { ...result, snapshotId: guard.snapshotId };
 }
 
 /**
