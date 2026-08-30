@@ -16,7 +16,7 @@ import {
 
 // The judging rooms live at config/judgingRooms and nowhere else. There is
 // deliberately no fallback list here: a hardcoded one silently papers over an
-// empty config, so an organiser who removed a room on the control panel would
+// empty config, so an organizer who removed a room on the control panel would
 // see it come back at the next generation, and nobody could tell whether the
 // rooms in use were the ones they had chosen or the ones the build shipped
 // with. Rooms are venue facts, not code. Add them on the control panel.
@@ -152,7 +152,7 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
 
         // Every supply question -- too few rooms, too few judges, too many
         // judges for too few teams, batches that do not divide evenly -- is
-        // answered in one place, with numbers the organiser can act on.
+        // answered in one place, with numbers the organizer can act on.
         const supply = describeSupply({
             teamCount: teamsList.length,
             judgeCount: judgesList.length,
@@ -226,7 +226,7 @@ export async function getJudgeSchedule({ onlyCheckedIn = false } = {}) {
             );
         }
 
-        // Name the teams an organiser might still want to do something about,
+        // Name the teams an organizer might still want to do something about,
         // rather than saying "some teams" and leaving them to find out which.
         const thin = Object.values(teamAssignments).filter((a) => a.judges.length < 2);
         if (thin.length) {

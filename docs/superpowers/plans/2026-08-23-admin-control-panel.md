@@ -101,7 +101,7 @@ const db = (uid) => (uid ? testEnv.authenticatedContext(uid) : testEnv.unauthent
 const entry = (overrides = {}) => ({
   at: Date.now() - 1000,
   by: "admin",
-  byName: "An Organiser",
+  byName: "An Organizer",
   action: "room.remove",
   summary: "Removed Rice 110",
   undoable: true,
@@ -425,10 +425,10 @@ describe("failure is returned, never thrown", () => {
 
   test("a non-admin caller comes back as { ok: false }", async () => {
     const { requireAdmin } = require("../../roles.js");
-    requireAdmin.mockRejectedValueOnce(new Error("Only an organiser can x"));
+    requireAdmin.mockRejectedValueOnce(new Error("Only an organizer can x"));
     const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Only an organiser");
+    expect(result.error).toContain("Only an organizer");
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
@@ -1441,7 +1441,7 @@ Create `src/user/admin/adminsService.test.js`:
 
 ```js
 /**
- * Who is an organiser.
+ * Who is an organizer.
  *
  * /admins is only writable by an admin, so nothing in the app can create the
  * first one — the README documents the bootstrap by hand in the Firebase
@@ -1503,7 +1503,7 @@ describe("the two revokes that must never go through", () => {
 
   test("revoking someone who is not an admin is refused", () => {
     expect(revokeGuard({ uid: "nobody", currentUid: "a1", adminUids: ["a1", "a2"] }))
-      .toMatch(/not an organiser/i);
+      .toMatch(/not an organizer/i);
   });
 });
 
@@ -1570,7 +1570,7 @@ import { database } from "../../firebase.js";
 import { applyAdminAction } from "./adminAction.js";
 
 /**
- * Who is an organiser.
+ * Who is an organizer.
  *
  * The rules give root access only to uids under /admins, and writing to
  * /admins requires being an admin already. Nothing in the app can break that
@@ -1585,17 +1585,17 @@ import { applyAdminAction } from "./adminAction.js";
 /** The reason this revoke must not happen, or null if it may. Pure. */
 export function revokeGuard({ uid, currentUid, adminUids }) {
   if (!adminUids.includes(uid)) {
-    return "That person is not an organiser.";
+    return "That person is not an organizer.";
   }
   if (adminUids.length <= 1) {
     return (
-      "That is the last organiser. Removing them would lock everyone out — " +
+      "That is the last organizer. Removing them would lock everyone out — " +
       "/admins can only be written by an admin, so nothing in the app could add one back. " +
       "Grant someone else first."
     );
   }
   if (uid === currentUid) {
-    return "You cannot remove your own organiser access. Ask another organiser to do it.";
+    return "You cannot remove your own organizer access. Ask another organizer to do it.";
   }
   return null;
 }
@@ -1645,12 +1645,12 @@ export async function grantAdmin({ uid, name }) {
 
   const adminUids = await listAdmins();
   if (adminUids.includes(uid)) {
-    return { ok: false, error: `${name || uid} is already an organiser.` };
+    return { ok: false, error: `${name || uid} is already an organizer.` };
   }
 
   return applyAdminAction({
     action: "admin.grant",
-    summary: `Made ${name || uid} an organiser`,
+    summary: `Made ${name || uid} an organizer`,
     changes: [{ path: `admins/${uid}`, before: null, after: true }],
   });
 }
@@ -1666,7 +1666,7 @@ export async function revokeAdmin(uid, { name } = {}) {
 
   return applyAdminAction({
     action: "admin.revoke",
-    summary: `Removed organiser access from ${name || uid}`,
+    summary: `Removed organizer access from ${name || uid}`,
     changes: [{ path: `admins/${uid}`, before: true, after: null }],
   });
 }
@@ -1681,7 +1681,7 @@ Expected: PASS.
 
 ```bash
 git add src/user/admin/adminsService.js src/user/admin/adminsService.test.js
-git commit -m "Manage organisers without letting anyone lock everyone out"
+git commit -m "Manage organizers without letting anyone lock everyone out"
 ```
 
 ---
@@ -2572,7 +2572,7 @@ import { PageHeader } from "./adminUi";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
- * event date, who counts as an organiser, and the actions you reach for when
+ * event date, who counts as an organizer, and the actions you reach for when
  * something has gone wrong.
  *
  * One subscription lives here and the data goes down as props. Sections call
@@ -2612,7 +2612,7 @@ function Control() {
         title="Control panel"
         stats={[
           { label: "rooms", value: (config.judgingRooms ?? []).length },
-          { label: "organisers", value: admins.length },
+          { label: "organizers", value: admins.length },
           { label: "recent changes", value: log.length },
         ]}
       />
@@ -3190,7 +3190,7 @@ git commit -m "Edit the batch shape, final round room and event date in the app"
 
 ---
 
-### Task 12: Organisers section
+### Task 12: Organizers section
 
 **Files:**
 - Create: `src/user/admin/control/AdminsSection.js`
@@ -3212,11 +3212,11 @@ import { useAuth } from "../../../App";
 import { findPeopleByEmail, grantAdmin, revokeAdmin, revokeGuard } from "../adminsService";
 
 /**
- * Who is an organiser.
+ * Who is an organizer.
  *
  * Granting takes a person found by email rather than a pasted uid: a mistyped
  * uid creates an admin entry belonging to nobody, which cannot be used and
- * still counts toward the last-organiser check that stops a lockout.
+ * still counts toward the last-organizer check that stops a lockout.
  *
  * The guard is enforced in the service too. This only decides what to grey out.
  */
@@ -3254,11 +3254,11 @@ export default function AdminsSection({ admins, onResult }) {
 
   return (
     <section>
-      <Typography variant="h2" sx={{ fontSize: "1.1rem", mb: 1 }}>Organisers</Typography>
+      <Typography variant="h2" sx={{ fontSize: "1.1rem", mb: 1 }}>Organizers</Typography>
 
       <Alert severity="warning" sx={{ mb: 2 }}>
-        Only an organiser can write to /admins, so nothing in the app can create the
-        first one. Removing the last organiser would lock everyone out permanently —
+        Only an organizer can write to /admins, so nothing in the app can create the
+        first one. Removing the last organizer would lock everyone out permanently —
         it can only be undone in the Firebase console.
       </Alert>
 
@@ -3290,10 +3290,10 @@ export default function AdminsSection({ admins, onResult }) {
                     disabled={busy}
                     onClick={() => run(
                       () => grantAdmin({ uid: person.uid, name: person.name }),
-                      `${person.name} is now an organiser`
+                      `${person.name} is now an organizer`
                     )}
                   >
-                    Make organiser
+                    Make organizer
                   </Button>
                 </Stack>
               </Row>
@@ -3302,10 +3302,10 @@ export default function AdminsSection({ admins, onResult }) {
       )}
 
       <Typography variant="body2" sx={{ mt: 2, mb: 1 }}>
-        {admins.length} organiser{admins.length === 1 ? "" : "s"}
+        {admins.length} organizer{admins.length === 1 ? "" : "s"}
       </Typography>
 
-      <RowList empty="No organisers. This should be impossible.">
+      <RowList empty="No organizers. This should be impossible.">
         {admins.map((uid) => {
           const refusal = revokeGuard({ uid, currentUid, adminUids: admins });
 
@@ -3324,7 +3324,7 @@ export default function AdminsSection({ admins, onResult }) {
                   color="error"
                   disabled={busy || Boolean(refusal)}
                   title={refusal ?? undefined}
-                  onClick={() => run(() => revokeAdmin(uid), "Organiser access removed")}
+                  onClick={() => run(() => revokeAdmin(uid), "Organizer access removed")}
                 >
                   Remove
                 </Button>
@@ -3355,7 +3355,7 @@ Expected: PASS. `useAuth` resolves against the fake auth context `renderPage` al
 
 ```bash
 git add src/user/admin/control/AdminsSection.js src/user/admin/Control.js
-git commit -m "Grant and revoke organiser access without risking a lockout"
+git commit -m "Grant and revoke organizer access without risking a lockout"
 ```
 
 ---
@@ -4309,7 +4309,7 @@ import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../dang
 import { listRooms } from "../roomsService";
 
 /**
- * Everything about one team an organiser may need to change on the day.
+ * Everything about one team an organizer may need to change on the day.
  *
  * Each control is its own write, because each has a different fan-out: a rename
  * touches every judge's copy of the name, a slot override touches every
@@ -4526,7 +4526,7 @@ Add to `README.md`, after the setup section that explains the first-admin bootst
 
 `/user/admin/control` holds the settings that used to need the Firebase
 console: the judging room list, the batch count and times, the final round
-room, the event start date, and who counts as an organiser.
+room, the event start date, and who counts as an organizer.
 
 Two things there are worth knowing before you use them on the day.
 

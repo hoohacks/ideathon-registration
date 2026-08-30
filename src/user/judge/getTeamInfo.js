@@ -97,7 +97,7 @@ export async function submitScore({ round, teamId, teamName, score }) {
     if (!enqueue(entry)) {
       throw new Error(
         "Could not reach the database, and this device will not let the score be " +
-          "saved locally either. Write the scores down and give them to an organiser."
+          "saved locally either. Write the scores down and give them to an organizer."
       );
     }
     return { status: "queued", reason: error?.message ?? String(error) };

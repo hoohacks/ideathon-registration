@@ -1,7 +1,7 @@
 /**
  * The scheduling maths.
  *
- * These are the invariants an organiser is entitled to assume when they press
+ * These are the invariants an organizer is entitled to assume when they press
  * Generate Schedule, so they are asserted across the whole plausible range of
  * events rather than at a couple of hand-picked sizes. Every one of them was
  * either broken or unenforced at some point:
@@ -195,7 +195,7 @@ describe("describeSupply refuses with an actionable reason", () => {
   });
 });
 
-describe("describeSupply warns about what the organiser can still fix", () => {
+describe("describeSupply warns about what the organizer can still fix", () => {
   test("a one-judge team is called out, with the number of judges to add", () => {
     const result = describeSupply({ teamCount: 20, judgeCount: 8, roomCount: 10, batchCount: 3 });
     expect(result.ok).toBe(true);

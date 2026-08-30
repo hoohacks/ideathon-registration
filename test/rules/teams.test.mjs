@@ -143,7 +143,7 @@ describe("membership", () => {
     await assertSucceeds(set(ref(db("alice"), "teams/team1/members/alice"), null));
   });
 
-  test("an organiser can still add someone to a submitted team", async () => {
+  test("an organizer can still add someone to a submitted team", async () => {
     // the root admin rule reaches here, which is what makes the closed rule
     // safe to enforce: there is always a way to fix a real case by hand
     await assertSucceeds(set(ref(db("admin"), "teams/team1/members/dave"), true));

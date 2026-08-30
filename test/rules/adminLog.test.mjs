@@ -25,7 +25,7 @@ const db = (uid) => (uid ? testEnv.authenticatedContext(uid) : testEnv.unauthent
 const entry = (overrides = {}) => ({
   at: Date.now() - 1000,
   by: "admin",
-  byName: "An Organiser",
+  byName: "An Organizer",
   action: "room.remove",
   summary: "Removed Rice 110",
   undoable: true,

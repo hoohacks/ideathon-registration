@@ -147,7 +147,7 @@ export async function listSnapshots() {
  * Put every path in a restore point back to the value it held.
  *
  * Takes a restore point of the CURRENT state first, so restoring is itself
- * reversible -- an organiser who restores the wrong one has somewhere to go.
+ * reversible -- an organizer who restores the wrong one has somewhere to go.
  * The whole thing is one atomic update, so a restore cannot half-apply.
  */
 export async function restoreSnapshot(id) {

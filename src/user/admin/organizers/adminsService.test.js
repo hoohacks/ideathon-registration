@@ -1,5 +1,5 @@
 /**
- * Who is an organiser.
+ * Who is an organizer.
  *
  * /admins is only writable by an admin, so nothing in the app can create the
  * first one -- the README documents the bootstrap by hand in the Firebase
@@ -60,7 +60,7 @@ describe("the two revokes that must never go through", () => {
 
   test("revoking someone who is not an admin is refused", () => {
     expect(revokeGuard({ uid: "nobody", currentUid: "a1", adminUids: ["a1", "a2"] }))
-      .toMatch(/not an organiser/i);
+      .toMatch(/not an organizer/i);
   });
 });
 

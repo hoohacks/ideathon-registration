@@ -70,7 +70,7 @@ Everything below is in the app. You should not need the Firebase console.
 | Add the rooms you booked | Control panel → Judging rooms |
 | Set batch count, times, final round room | Control panel → Judging schedule |
 | Set the event date | Control panel → Event |
-| Add organisers, judges, competitors | Control panel → People and roles |
+| Add organizers, judges, competitors | Control panel → People and roles |
 | Mark first-round judges | People and roles, or Judge Search |
 
 Judging rooms have **no built-in list**. Add them or generation refuses.
@@ -141,7 +141,7 @@ Revoking a judge also removes them from every team's schedule card and from the
 final round exclusions — a name left on a card is otherwise unexplainable, and a
 stale exclusion can leave a finalist with nobody eligible to judge it.
 
-Deleting the last organiser is refused. Nothing in the app could add one back.
+Deleting the last organizer is refused. Nothing in the app could add one back.
 
 ### Restore points
 
@@ -236,7 +236,7 @@ the judges' notes.
 
 **`judgeUid` is whose card it is; `enteredBy` is who typed it.** `judgeUid` is
 pinned to the path key. `enteredBy` is pinned to `auth.uid` for everyone except
-organisers, which is what lets a restore put a card back with its original
+organizers, which is what lets a restore put a card back with its original
 author.
 
 ---
@@ -251,7 +251,7 @@ failure is the reminder to republish. Do it before the release, not after.
 
 **Current version: 5. Publish it before the event.** Two clauses changed since
 version 3: a submitted team is closed to new members, and `enteredBy` is no
-longer pinned for organisers. Until the second is published, **restoring a
+longer pinned for organizers. Until the second is published, **restoring a
 restore point that contains scores fails and changes nothing.**
 
 ### Who can do what

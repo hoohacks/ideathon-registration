@@ -123,10 +123,10 @@ describe("failure is returned, never thrown", () => {
   });
 
   test("a non-admin caller comes back as { ok: false }", async () => {
-    requireAdmin.mockRejectedValueOnce(new Error("Only an organiser can x"));
+    requireAdmin.mockRejectedValueOnce(new Error("Only an organizer can x"));
     const result = await applyAdminAction({ action: "x", summary: "y", changes: [] });
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("Only an organiser");
+    expect(result.error).toContain("Only an organizer");
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

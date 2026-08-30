@@ -365,7 +365,7 @@ async function main() {
   // ---- report ----
   console.log("  database written\n");
   console.log("  Sign in with any of these (password: " + PASSWORD + ")");
-  console.log("    admin@example.com          organiser, listed in /admins");
+  console.log("    admin@example.com          organizer, listed in /admins");
   console.log(`    judge1@example.com  …  judge${JUDGES}@example.com`);
   console.log(`    competitor1@example.com  …  competitor${TEAMS * MEMBERS_PER_TEAM}@example.com`);
   console.log("\n  State:");

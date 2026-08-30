@@ -9,7 +9,7 @@ export const FINAL_ROUND_ROOM = "Rice 011";
 
 /**
  * Below this, an average is not really a ranking — it is one person's opinion.
- * Teams under it are still ranked, but activation reports them so an organiser
+ * Teams under it are still ranked, but activation reports them so an organizer
  * can send a judge round before the cut is made rather than discovering it
  * afterwards.
  */
@@ -104,7 +104,7 @@ export async function activateFinalRound({ limit = 4, requireSubmitted = true } 
     );
   }
 
-  // a tie straddling the cut line is the one an organiser has to know about
+  // a tie straddling the cut line is the one an organizer has to know about
   const firstOut = ranked[limit];
   if (firstOut && finalists.length === limit) {
     const lastIn = finalists[limit - 1];

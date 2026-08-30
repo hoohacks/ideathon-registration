@@ -10,7 +10,7 @@ import {
 import { database, auth, USING_EMULATOR } from "../../../firebase.js";
 import { firebaseConfig } from "../../../firebaseConfig.js";
 import { applyAdminAction } from "../adminAction.js";
-import { grantAdmin, revokeAdmin, revokeGuard } from "../organisers/adminsService.js";
+import { grantAdmin, revokeAdmin, revokeGuard } from "../organizers/adminsService.js";
 
 /**
  * Everything about a person that used to need the Firebase console.
@@ -32,7 +32,7 @@ import { grantAdmin, revokeAdmin, revokeGuard } from "../organisers/adminsServic
  *     sent as an email to them; nobody here can set it directly.
  *
  * Creating an account IS possible, via a second Firebase app instance. Calling
- * createUserWithEmailAndPassword on the main one would sign the organiser out
+ * createUserWithEmailAndPassword on the main one would sign the organizer out
  * and in as the person they just created, which is a memorable way to lose a
  * schedule generation halfway through.
  */
@@ -78,7 +78,7 @@ export function blankCompetitor({ firstName = "", lastName = "", email = "" } = 
  *
  * /admins holds only `true`, so an admin who is neither judge nor competitor
  * has no name anywhere. They still have to be listed, or the one person you
- * most need to find -- the organiser you are about to revoke -- is invisible.
+ * most need to find -- the organizer you are about to revoke -- is invisible.
  */
 export async function listPeople() {
   const [adminsSnap, judgesSnap, competitorsSnap] = await Promise.all([
@@ -305,12 +305,12 @@ export async function deletePerson({ uid, name, includeScores = false }) {
  *
  * The account is created on a SECOND Firebase app, because
  * createUserWithEmailAndPassword signs the new user in on whichever app it is
- * called against -- doing that on the main one would sign the organiser out
+ * called against -- doing that on the main one would sign the organizer out
  * mid-task and leave them acting as the person they just created.
  */
 export async function createPerson({ role, firstName, lastName, email, password, company = "" }) {
   if (!ROLE_NODES[role] || role === "admin") {
-    return { ok: false, error: "Create a judge or a competitor; organiser is a flag on top." };
+    return { ok: false, error: "Create a judge or a competitor; organizer is a flag on top." };
   }
   if (!String(email ?? "").includes("@")) return { ok: false, error: "Enter a valid email address." };
   if (String(password ?? "").length < 6) {

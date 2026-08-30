@@ -156,7 +156,7 @@ describe("pages render without crashing", () => {
   test("judging progress", async () => {
     renderPage(JudgingProgress, { userTypes: ["admin"] });
     expect(await screen.findByRole("heading", { name: "Judging progress" })).toBeInTheDocument();
-    // the two things an organiser is actually watching during the event
+    // the two things an organizer is actually watching during the event
     expect(await screen.findByText(/scores in/)).toBeInTheDocument();
     expect(await screen.findByText(/no scores/)).toBeInTheDocument();
   });

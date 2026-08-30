@@ -301,7 +301,7 @@ describe("an admin can wipe scores to start over", () => {
   });
 });
 
-describe("an organiser can put back a card they did not write", () => {
+describe("an organizer can put back a card they did not write", () => {
   /**
    * enteredBy is pinned to auth.uid for everyone except an admin. Without the
    * exemption a restore point containing judges' cards could not be written

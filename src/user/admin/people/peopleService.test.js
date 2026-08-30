@@ -135,7 +135,7 @@ describe("listing people", () => {
     expect(ada.roles).toEqual(["judge"]);
   });
 
-  test("an organiser with no profile is still listed", async () => {
+  test("an organizer with no profile is still listed", async () => {
     // /admins holds only `true`, so this person has no name anywhere -- and
     // they are exactly who you need to find to revoke
     const people = await listPeople();
@@ -199,14 +199,14 @@ describe("granting and revoking roles", () => {
     expect(payload()["competitors/c1"]).toBeUndefined();
   });
 
-  test("the last organiser cannot be revoked", async () => {
+  test("the last organizer cannot be revoked", async () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
     const result = await setRole({ uid: "admin-9", role: "admin", enabled: false });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/last organiser/);
+    expect(result.error).toMatch(/last organizer/);
   });
 
-  test("you cannot revoke your own organiser access", async () => {
+  test("you cannot revoke your own organizer access", async () => {
     const result = await setRole({ uid: "admin-1", role: "admin", enabled: false });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/your own/);
@@ -225,17 +225,17 @@ describe("deleting a person", () => {
     expect(payload()["judges/j1"]).toBeNull();
   });
 
-  test("refuses to delete the signed-in organiser", async () => {
+  test("refuses to delete the signed-in organizer", async () => {
     const result = await deletePerson({ uid: "admin-1" });
     expect(result.ok).toBe(false);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  test("refuses when it would remove the last organiser", async () => {
+  test("refuses when it would remove the last organizer", async () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true }, judges: { "admin-9": {} } }));
     const result = await deletePerson({ uid: "admin-9" });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/last organiser/);
+    expect(result.error).toMatch(/last organizer/);
   });
 
   test("somebody with nothing recorded is reported, not silently written", async () => {

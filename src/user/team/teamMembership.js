@@ -122,7 +122,7 @@ export async function joinTeam(teamId) {
     if (submittedSnap.val() === true) {
       return {
         ok: false,
-        error: `${nameSnap.val()} has already submitted its project, so it is closed to new members. Ask an organiser if you need to be added.`,
+        error: `${nameSnap.val()} has already submitted its project, so it is closed to new members. Ask an organizer if you need to be added.`,
       };
     }
 
@@ -130,7 +130,7 @@ export async function joinTeam(teamId) {
     if (size >= MAX_TEAM_SIZE) {
       return {
         ok: false,
-        error: `${nameSnap.val()} already has ${MAX_TEAM_SIZE} members, which is the maximum. An organiser can add you from the Competitors dashboard if the team is meant to be larger.`,
+        error: `${nameSnap.val()} already has ${MAX_TEAM_SIZE} members, which is the maximum. An organizer can add you from the Competitors dashboard if the team is meant to be larger.`,
       };
     }
 

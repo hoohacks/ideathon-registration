@@ -4,7 +4,7 @@ import { database } from "../../../firebase.js";
 import { applyAdminAction } from "../adminAction.js";
 
 /**
- * Who is an organiser.
+ * Who is an organizer.
  *
  * The rules give root access only to uids under /admins, and writing to
  * /admins requires being an admin already. Nothing in the app can break that
@@ -19,17 +19,17 @@ import { applyAdminAction } from "../adminAction.js";
 /** The reason this revoke must not happen, or null if it may. Pure. */
 export function revokeGuard({ uid, currentUid, adminUids }) {
   if (!adminUids.includes(uid)) {
-    return "That person is not an organiser.";
+    return "That person is not an organizer.";
   }
   if (adminUids.length <= 1) {
     return (
-      "That is the last organiser. Removing them would lock everyone out -- " +
+      "That is the last organizer. Removing them would lock everyone out -- " +
       "/admins can only be written by an admin, so nothing in the app could add one back. " +
       "Grant someone else first."
     );
   }
   if (uid === currentUid) {
-    return "You cannot remove your own organiser access. Ask another organiser to do it.";
+    return "You cannot remove your own organizer access. Ask another organizer to do it.";
   }
   return null;
 }
@@ -44,12 +44,12 @@ export async function grantAdmin({ uid, name }) {
 
   const adminUids = await listAdmins();
   if (adminUids.includes(uid)) {
-    return { ok: false, error: `${name || uid} is already an organiser.` };
+    return { ok: false, error: `${name || uid} is already an organizer.` };
   }
 
   return applyAdminAction({
     action: "admin.grant",
-    summary: `Made ${name || uid} an organiser`,
+    summary: `Made ${name || uid} an organizer`,
     changes: [{ path: `admins/${uid}`, before: null, after: true }],
   });
 }
@@ -63,7 +63,7 @@ export async function revokeAdmin(uid, { name } = {}) {
 
   return applyAdminAction({
     action: "admin.revoke",
-    summary: `Removed organiser access from ${name || uid}`,
+    summary: `Removed organizer access from ${name || uid}`,
     changes: [{ path: `admins/${uid}`, before: true, after: null }],
   });
 }

@@ -130,7 +130,7 @@
             // through an admin or a server, which this project does not have.
             //
             // Admins are unaffected by any of this: the root rule grants them
-            // write here, so an organiser can still add someone to a closed team.
+            // write here, so an organizer can still add someone to a closed team.
             ".write": "auth != null && $memberUid === auth.uid && root.child('competitors').child(auth.uid).exists() && (!newData.exists() || root.child('teams').child($teamId).child('submitted').val() !== true)"
           }
         },
@@ -211,7 +211,7 @@
             // Who actually pressed the button. Equal to judgeUid when the judge
             // filed it themselves, an admin uid when it was entered from paper.
             //
-            // Pinned to auth.uid for everyone EXCEPT an organiser. That is
+            // Pinned to auth.uid for everyone EXCEPT an organizer. That is
             // where the "a judge cannot file under another judge" guarantee
             // lives, and the exemption does not weaken it: the alternative
             // branch requires being in /admins, which a judge is not.

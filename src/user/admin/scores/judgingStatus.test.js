@@ -1,5 +1,5 @@
 /**
- * The organiser's view of the event while it is running.
+ * The organizer's view of the event while it is running.
  *
  * Every number here answers a question that previously had no answer until the
  * results were tallied: which team is about to go unjudged, and which judge has
@@ -100,7 +100,7 @@ describe("teams in trouble surface first", () => {
 
   test("the judge's own record wins over the name cached on the roster", () => {
     // the roster caches the name at generation time; if a judge later corrects
-    // it, the organiser should be chasing the corrected one
+    // it, the organizer should be chasing the corrected one
     const data = fixture();
     data.judges.j2.firstName = "Robert";
     const { teamRows } = buildProgress(data);

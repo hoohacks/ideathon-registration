@@ -16,7 +16,7 @@ import ExportSection from "./ExportSection";
 
 /**
  * Everything that had no home before: the judging rooms, the batch shape, the
- * event date, who counts as an organiser, and the actions you reach for when
+ * event date, who counts as an organizer, and the actions you reach for when
  * something has gone wrong.
  *
  * One subscription lives here and the data goes down as props. Sections call
@@ -58,7 +58,7 @@ function Control() {
         title="Control panel"
         stats={[
           { label: "rooms", value: (config.judgingRooms ?? []).length },
-          { label: "organisers", value: admins.length },
+          { label: "organizers", value: admins.length },
           { label: "recent changes", value: log.length },
         ]}
       />

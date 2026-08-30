@@ -10,7 +10,7 @@ import { ref, get } from "firebase/database";
 import { database } from "../../../firebase";
 
 /**
- * Everything about one team an organiser may need to change on the day.
+ * Everything about one team an organizer may need to change on the day.
  *
  * Each control is its own write, because each has a different fan-out: a rename
  * touches every judge's copy of the name, a slot override touches every

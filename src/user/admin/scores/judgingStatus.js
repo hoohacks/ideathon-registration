@@ -2,7 +2,7 @@ import { assignmentList } from "../../judge/assignmentList";
 import { calculateAverageScore, countFundableVotes, scoredJudgeCount } from "../../judge/scoreRubric";
 
 /**
- * Turns the raw judging nodes into the two questions an organiser actually has
+ * Turns the raw judging nodes into the two questions an organizer actually has
  * during the event: which team is about to go unjudged, and which judge has
  * stopped submitting.
  *

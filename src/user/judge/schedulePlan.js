@@ -106,7 +106,7 @@ export function allocateBatch({ judgeCount, batchSize, batchIndex = 0, target = 
 }
 
 /**
- * Can this event be scheduled at all, and what should the organiser change?
+ * Can this event be scheduled at all, and what should the organizer change?
  *
  * This is the function that answers "too few judges" and "too many judges for
  * too few teams". It returns advice with real numbers in it rather than a bare

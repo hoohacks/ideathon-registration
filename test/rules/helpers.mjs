@@ -86,7 +86,7 @@ export function finalAssignment(teamId) {
 /**
  * The standard cast.
  *
- *   admin              an organiser
+ *   admin              an organizer
  *   judge1 / judge2    round-one judges; judge1 is assigned to team1
  *   alice / bob        competitors on team1
  *   carol              a competitor on team2

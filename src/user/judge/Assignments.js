@@ -97,7 +97,7 @@ function Assignments() {
     } catch (err) {
       console.error("Error fetching personal schedule:", err);
       // silently showing "no assignments yet" for what is really a failed read
-      // sends a judge to find an organiser for a problem that is not theirs
+      // sends a judge to find an organizer for a problem that is not theirs
       setToast({
         severity: "error",
         message: "Could not load your assignments. Check your connection and reload.",

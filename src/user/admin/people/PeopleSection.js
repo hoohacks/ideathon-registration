@@ -15,7 +15,7 @@ import {
  * Before this, /admins was the only role reachable from the app: making someone
  * a judge after they had registered as a competitor meant opening the Firebase
  * console and hand-writing a record. Roles are additive here because they are
- * additive in the database — one account can be an organiser, a judge and a
+ * additive in the database — one account can be an organizer, a judge and a
  * competitor at once, and the app reads all three.
  *
  * The two things this cannot do are stated in the UI rather than hidden, because
@@ -23,7 +23,7 @@ import {
  * cannot set someone's password.
  */
 
-const ROLE_LABELS = { admin: "Organiser", judge: "Judge", competitor: "Competitor" };
+const ROLE_LABELS = { admin: "Organizer", judge: "Judge", competitor: "Competitor" };
 const ROLE_COLORS = { admin: "error", judge: "primary", competitor: "default" };
 
 export default function PeopleSection({ onResult }) {
@@ -107,7 +107,7 @@ export default function PeopleSection({ onResult }) {
               sx={{ minWidth: 160 }}
             >
               <MenuItem value="all">All ({people.length})</MenuItem>
-              <MenuItem value="admin">Organisers ({counts.admin})</MenuItem>
+              <MenuItem value="admin">Organizers ({counts.admin})</MenuItem>
               <MenuItem value="judge">Judges ({counts.judge})</MenuItem>
               <MenuItem value="competitor">Competitors ({counts.competitor})</MenuItem>
             </TextField>
@@ -247,7 +247,7 @@ export default function PeopleSection({ onResult }) {
         <DialogContent>
           <DialogContentText component="div">
             <p>
-              This removes their organiser, judge and competitor records, takes them off every
+              This removes their organizer, judge and competitor records, takes them off every
               team roster and schedule card, and clears them from the final round exclusions.
             </p>
             <Alert severity="warning" sx={{ my: 1 }}>
