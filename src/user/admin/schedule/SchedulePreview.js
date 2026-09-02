@@ -130,7 +130,18 @@ export default function SchedulePreview() {
 
   async function handleRepair(repair) {
     if (repair.type === "dropTeam") {
-      const next = { ...plan, assignments: { ...plan.assignments } };
+      const next = {
+        ...plan,
+        assignments: { ...plan.assignments },
+        // Also drop it from basis.teamIds, or computeStats.unscheduledTeamIds
+        // (which derives from that list) reports the just-withdrawn team as
+        // unscheduled the instant this saves -- putting a **Place** button in
+        // front of the organizer for a team that no longer exists.
+        basis: {
+          ...plan.basis,
+          teamIds: (plan.basis?.teamIds ?? []).filter((id) => id !== repair.teamId),
+        },
+      };
       delete next.assignments[repair.teamId];
       const saved = await saveDraft(next);
       if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }

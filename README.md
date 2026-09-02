@@ -228,7 +228,9 @@ first, naming how many you would lose.
 
 Every hand edit is recorded on the plan and, once published, listed in its
 audit log entry, so a schedule that does not match what a fresh build would
-have produced is not a mystery later.
+have produced is not a mystery later — except a drift-repaired **Drop**,
+which deletes the assignment directly rather than going through the edit log
+by design, and so will not appear in that summary.
 
 Publishing requires typing a confirmation phrase whenever a schedule might
 already exist — including when the check for one fails, which asks rather

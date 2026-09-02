@@ -92,6 +92,7 @@ jest.mock("../../judge/scheduleConfig.js", () => ({
 const SchedulePreview = require("./SchedulePreview").default;
 const DriftPanel = require("./DriftPanel").default;
 const { readScheduleMeta } = require("../../judge/scheduleConfig.js");
+const { publishPlan } = require("../../judge/publishPlan.js");
 const { get: mockGet } = require("firebase/database");
 
 // ---- Helpers ---------------------------------------------------------------
@@ -315,4 +316,38 @@ test("the Drop repair opens a confirmation instead of dropping immediately", () 
 
   userEvent.click(screen.getByRole("button", { name: "Drop the team" }));
   expect(onRepair).toHaveBeenCalledWith({ type: "dropTeam", teamId: "t2" });
+});
+
+// ---- Finding 5: a dropped team stops being reported as unscheduled --------
+// computeStats.unscheduledTeamIds derives from basis.teamIds. A dropTeam
+// repair deletes the assignment directly (it bypasses applyEdit by design),
+// so if it does not also drop the team from basis.teamIds, the team
+// reappears instantly in PlanGrid's "Unscheduled teams" panel with a Place
+// button -- inviting the organizer to re-place a team that just withdrew.
+
+test("dropping a team through drift repair also removes it from basis.teamIds", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan()); return () => {}; });
+  const drift = {
+    blocking: [{
+      kind: "teamWithdrew",
+      message: "Borealis withdrew its submission since this plan was built.",
+      repair: { type: "dropTeam", teamId: "t2" },
+    }],
+    advisory: [],
+  };
+  publishPlan.mockResolvedValue({ ok: false, drift });
+
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+
+  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
+  userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+
+  userEvent.click(await screen.findByRole("button", { name: "Drop" }));
+  userEvent.click(await screen.findByRole("button", { name: "Drop the team" }));
+
+  await waitFor(() => expect(mockSaveDraft).toHaveBeenCalled());
+  const [savedPlan] = mockSaveDraft.mock.calls[0];
+  expect(savedPlan.assignments.t2).toBeUndefined();
+  expect(savedPlan.basis.teamIds).not.toContain("t2");
 });
