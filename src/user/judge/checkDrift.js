@@ -28,17 +28,43 @@ import { fetchRooms, fetchBatchConfig, displayName } from "./scheduleConfig.js";
  * just two places naming things differently.
  */
 
+/** A batch+room pair, as a single comparable key. */
+function slotKey(batch, room) {
+  return `${batch}::${room}`;
+}
+
+/**
+ * Whether two batchTimes maps carry the same pairs, regardless of key order.
+ * `JSON.stringify` compares in enumeration order, so a config re-saved with
+ * its keys in a different order -- nothing about the times themselves
+ * changed -- would otherwise read as drift.
+ */
+function sameBatchTimes(a, b) {
+  const aEntries = Object.entries(a ?? {});
+  const bMap = b ?? {};
+  if (aEntries.length !== Object.keys(bMap).length) return false;
+  return aEntries.every(([batch, time]) => bMap[batch] === time);
+}
+
 /**
  * The first open room in the emptiest batch, for placing a team that showed
  * up after the plan was built. `null` means the event is full: every batch,
  * in every configured room, is already spoken for.
+ *
+ * `claimed` is every batch+room pair a repair generated EARLIER in this same
+ * `checkDrift` call has already proposed. Without it, two teams that both
+ * need placing would be evaluated independently against the plan's stale
+ * assignments and could be handed the identical "free" room -- a repair an
+ * organizer presses that dead-ends on the room already being taken by the
+ * repair they just applied. Checking `claimed` as well is what keeps every
+ * repair generated in one pass free of the others.
  */
-function freeSlot(plan, live) {
+function freeSlot(plan, live, claimed = new Set()) {
   for (let batch = 1; batch <= live.batchCount; batch++) {
     const taken = new Set(
       Object.values(plan.assignments).filter((a) => a.batch === batch).map((a) => a.room)
     );
-    const room = live.rooms.find((r) => !taken.has(r));
+    const room = live.rooms.find((r) => !taken.has(r) && !claimed.has(slotKey(batch, r)));
     if (room) return { batch, room };
   }
   return null;
@@ -58,12 +84,19 @@ export function checkDrift(basis, live, plan) {
   const liveTeamIds = new Set(live.teamIds);
   const liveJudgeIds = new Set(live.judgeIds);
 
+  // Every batch+room pair a repair has already claimed in this call, shared
+  // across the "teams appeared" and "rooms removed" sections below, so the
+  // two kinds of room repair can never point two organizer actions at the
+  // same slot.
+  const claimedSlots = new Set();
+
   // ---- teams that submitted since the plan was built ----
   const appeared = live.teamIds.filter((id) => !basisTeamIds.has(id)).sort();
   for (const teamId of appeared) {
     const teamName = live.teamNames?.[teamId] ?? teamId;
-    const slot = freeSlot(plan, live);
+    const slot = freeSlot(plan, live, claimedSlots);
     if (slot) {
+      claimedSlots.add(slotKey(slot.batch, slot.room));
       blocking.push({
         kind: "teamAppeared",
         message: `${teamName} submitted after this plan was built and has no slot.`,
@@ -126,6 +159,12 @@ export function checkDrift(basis, live, plan) {
   // offered a free room in the SAME batch it is already in, keeping its time
   // and its panel intact. Only when that batch has no room left free does the
   // repair fall back to a rebuild.
+  //
+  // When two assignments in the SAME batch both lose their room, the second
+  // one's search has to exclude whatever the first one was just given --
+  // otherwise both "taken" sets are computed independently against the
+  // plan's stale rooms and can agree on the identical replacement, hence
+  // `claimedSlots` (shared with the "teams appeared" section above).
   const liveRoomsSet = new Set(live.rooms);
   const affectedByRoom = Object.values(plan.assignments)
     .filter((a) => !liveRoomsSet.has(a.room))
@@ -137,9 +176,12 @@ export function checkDrift(basis, live, plan) {
         .filter((a) => a.batch === assignment.batch && a.id !== assignment.id)
         .map((a) => a.room)
     );
-    const freeRoom = live.rooms.find((r) => !takenInBatch.has(r));
+    const freeRoom = live.rooms.find(
+      (r) => !takenInBatch.has(r) && !claimedSlots.has(slotKey(assignment.batch, r))
+    );
 
     if (freeRoom) {
+      claimedSlots.add(slotKey(assignment.batch, freeRoom));
       blocking.push({
         kind: "roomRemoved",
         message: `${assignment.room} is no longer a configured room, but ` +
@@ -178,7 +220,7 @@ export function checkDrift(basis, live, plan) {
   }
 
   // ---- advisory: a label, not a fact the plan depends on ----
-  if (JSON.stringify(basis.batchTimes) !== JSON.stringify(live.batchTimes)) {
+  if (!sameBatchTimes(basis.batchTimes, live.batchTimes)) {
     advisory.push({
       kind: "batchTimesChanged",
       message: "Batch times changed since this plan was built. The new times will be " +

@@ -141,6 +141,117 @@ test("a room removed falls back to rebuild when its batch has no free room", () 
   expect(blocking[0].repair).toEqual({ type: "rebuild" });
 });
 
+// ---- room repairs generated in the same call never collide ----
+// A "taken" set computed only from the plan's own (stale) assignments is not
+// enough once more than one repair is being generated in a single call: two
+// teams that both need a new room could independently be handed the same
+// "free" one, since neither search knows about the other's pending repair.
+// These pin that a running claim of already-proposed batch+room pairs keeps
+// every repair from one `checkDrift` call clear of the others.
+
+test("two teams in the same batch that both lose their room get different repair rooms", () => {
+  const sameBatchBasis = {
+    teamIds: ["t1", "t2", "t3"], judgeIds: ["j0"],
+    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, target: 1,
+  };
+  const sameBatchPlan = {
+    assignments: {
+      t1: { id: "t1", teamName: "A", batch: 1, room: "R4", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+      t2: { id: "t2", teamName: "B", batch: 1, room: "R5", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+      t3: { id: "t3", teamName: "C", batch: 1, room: "R1", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+    },
+    basis: sameBatchBasis, judgeNames: { j0: "Ada" }, teamNames: { t1: "A", t2: "B", t3: "C" },
+  };
+  // R1 stays configured (t3 keeps it); R4 and R5 -- t1's and t2's rooms -- do not.
+  const liveThreeRooms = {
+    ...sameBatchBasis, rooms: ["R1", "R2", "R3"],
+    teamNames: { t1: "A", t2: "B", t3: "C" }, judgeNames: { j0: "Ada" },
+  };
+
+  const { blocking } = checkDrift(sameBatchBasis, liveThreeRooms, sameBatchPlan);
+
+  const forT1 = blocking.find((b) => b.repair.teamId === "t1");
+  const forT2 = blocking.find((b) => b.repair.teamId === "t2");
+  expect(forT1.repair.type).toBe("moveTeam");
+  expect(forT2.repair.type).toBe("moveTeam");
+  expect(forT1.repair.room).not.toBe(forT2.repair.room);
+  expect(liveThreeRooms.rooms).toContain(forT1.repair.room);
+  expect(liveThreeRooms.rooms).toContain(forT2.repair.room);
+  // neither replacement collides with t3's untouched room in the same batch
+  expect(forT1.repair.room).not.toBe("R1");
+  expect(forT2.repair.room).not.toBe("R1");
+});
+
+test("a same-batch room-removed case exhausts the free rooms, and the last one falls back to rebuild", () => {
+  const sameBatchBasis = {
+    teamIds: ["t1", "t2", "t3"], judgeIds: ["j0"],
+    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, target: 1,
+  };
+  const sameBatchPlan = {
+    assignments: {
+      t1: { id: "t1", teamName: "A", batch: 1, room: "R4", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+      t2: { id: "t2", teamName: "B", batch: 1, room: "R5", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+      t3: { id: "t3", teamName: "C", batch: 1, room: "R1", time: "5:00 PM",
+            judges: [{ judgeId: "j0", judgeName: "Ada" }] },
+    },
+    basis: sameBatchBasis, judgeNames: { j0: "Ada" }, teamNames: { t1: "A", t2: "B", t3: "C" },
+  };
+  // Only one room is left besides t3's -- enough for t1's repair to claim it,
+  // not enough for t2's too.
+  const liveTwoRooms = {
+    ...sameBatchBasis, rooms: ["R1", "R2"],
+    teamNames: { t1: "A", t2: "B", t3: "C" }, judgeNames: { j0: "Ada" },
+  };
+
+  const { blocking } = checkDrift(sameBatchBasis, liveTwoRooms, sameBatchPlan);
+
+  // a fallback repair carries no teamId, so t2's item has to be found by
+  // which room it names rather than by repair.teamId
+  const forT1 = blocking.find((b) => b.message.includes("R4"));
+  const forT2 = blocking.find((b) => b.message.includes("R5"));
+  expect(forT1.repair).toEqual({ type: "moveTeam", teamId: "t1", batch: 1, room: "R2" });
+  // t2's only apparently-free room (R2) was already claimed by t1's repair
+  expect(forT2.repair).toEqual({ type: "rebuild" });
+});
+
+test("two teams that submitted since the plan was built do not collide on the same batch and room", () => {
+  const { blocking } = checkDrift(basis, live({
+    teamIds: ["t1", "t2", "t3", "t4"],
+    teamNames: { t1: "A", t2: "B", t3: "Vireo", t4: "Wren" },
+  }), plan);
+
+  const forT3 = blocking.find((b) => b.repair.teamId === "t3");
+  const forT4 = blocking.find((b) => b.repair.teamId === "t4");
+  expect(forT3.repair.type).toBe("moveTeam");
+  expect(forT4.repair.type).toBe("moveTeam");
+  expect(`${forT3.repair.batch}::${forT3.repair.room}`)
+    .not.toBe(`${forT4.repair.batch}::${forT4.repair.room}`);
+});
+
+// ---- batchTimes comparison is order-insensitive ----
+// A config re-saved with its keys in a different order carries the same
+// times and must not read as drift. Ordinary small-integer batch keys (1, 2,
+// 3, ...) are always enumerated in ascending order by the JS engine itself
+// regardless of how they were inserted, so genuinely proving order-
+// insensitivity needs keys the engine does NOT auto-sort -- non-canonical
+// numeric strings like "01"/"02" keep whatever order they were inserted in.
+
+test("batch times with the same pairs in a different key order produce no advisory", () => {
+  const paddedBasis = { ...basis, batchTimes: { "01": "5:00 PM", "02": "5:15 PM" } };
+  const reordered = { "02": "5:15 PM", "01": "5:00 PM" };
+
+  const { blocking, advisory } = checkDrift(
+    paddedBasis, live({ batchTimes: reordered }), plan
+  );
+  expect(blocking).toEqual([]);
+  expect(advisory).toEqual([]);
+});
+
 // ---- readLiveBasis: the database-reading half ----
 //
 // checkDrift above never touches the database. readLiveBasis is the one
