@@ -19,7 +19,15 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../../../theme";
-import RestorePointsSection from "./RestorePointsSection";
+
+jest.mock("../../../firebase", () => ({ database: {} }));
+const mockGet = jest.fn();
+jest.mock("firebase/database", () => ({
+  ref: (_db, path) => ({ path: path ?? "" }),
+  get: (...args) => mockGet(...args),
+}));
+
+const RestorePointsSection = require("./RestorePointsSection").default;
 
 const mockPoint = {
   id: "snap-1",
@@ -72,6 +80,8 @@ beforeEach(() => {
   previewSnapshot.mockResolvedValue(mockPreviewResult());
   readJudgeNames.mockReset();
   readJudgeNames.mockResolvedValue({ ok: true, names: { j1: "Judge Smith" } });
+  mockGet.mockReset();
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
 });
 
 function renderSection(onResult = jest.fn()) {
@@ -165,7 +175,13 @@ describe("the preview dialog", () => {
     ).toBeInTheDocument();
   });
 
-  test("restoring requires typing the restore point's label, then calls restoreSnapshot", async () => {
+  // ---- Finding 3: the typed confirmation is never the restore point's own
+  // label. A label like "Manual restore point — 9/2/2026, 4:17:00 PM" cannot
+  // be retyped on autopilot, on the one path used when something has already
+  // gone wrong -- so this now follows the same rule as SchedulePreview's
+  // publish confirmation: config/eventName when set, otherwise a short count.
+
+  test("with no event name configured, restoring requires typing a short count -- typing the label does not work", async () => {
     const onResult = jest.fn();
     renderSection(onResult);
     userEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -174,13 +190,17 @@ describe("the preview dialog", () => {
     userEvent.click(screen.getByRole("button", { name: "Restore…" }));
 
     const confirmButton = await screen.findByRole("button", { name: "Restore" });
-    const typedField = screen.getByLabelText('Type "Before the schedule was generated" to confirm');
+    // mockPreviewResult's `entries` cover two paths (teams, scores), and no
+    // config/eventName is stubbed to exist -- so the phrase falls back to "2".
+    const typedField = screen.getByLabelText('Type "2" to confirm');
 
-    userEvent.type(typedField, "not it");
+    // The restore point's own label -- what this used to require -- must no
+    // longer work.
+    userEvent.type(typedField, "Before the schedule was generated");
     expect(confirmButton).toBeDisabled();
 
     userEvent.clear(typedField);
-    userEvent.type(typedField, "Before the schedule was generated");
+    userEvent.type(typedField, "2");
     expect(confirmButton).toBeEnabled();
 
     userEvent.click(confirmButton);
@@ -191,5 +211,24 @@ describe("the preview dialog", () => {
       { ok: true, restored: 3 },
       expect.stringContaining("Restored 3 path(s)")
     );
+  });
+
+  test("with an event name configured, restoring requires typing it instead of the count", async () => {
+    mockGet.mockResolvedValue({ exists: () => true, val: () => "HooHacks Ideathon" });
+    renderSection();
+    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByText(/score card will be destroyed/);
+
+    userEvent.click(screen.getByRole("button", { name: "Restore…" }));
+
+    const confirmButton = await screen.findByRole("button", { name: "Restore" });
+    const typedField = screen.getByLabelText('Type "HooHacks Ideathon" to confirm');
+
+    userEvent.type(typedField, "2");
+    expect(confirmButton).toBeDisabled();
+
+    userEvent.clear(typedField);
+    userEvent.type(typedField, "HooHacks Ideathon");
+    expect(confirmButton).toBeEnabled();
   });
 });

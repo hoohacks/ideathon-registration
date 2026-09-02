@@ -3,6 +3,8 @@ import {
   Alert, Box, Button, Card, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogContentText, DialogTitle, Stack, Typography,
 } from "@mui/material";
+import { ref, get } from "firebase/database";
+import { database } from "../../../firebase.js";
 import {
   subscribeToSnapshots, restoreSnapshot, captureSnapshot, previewSnapshot, readJudgeNames,
   JUDGING_PATHS,
@@ -95,6 +97,12 @@ export default function RestorePointsSection({ onResult }) {
   const [teamNames, setTeamNames] = useState({});
   const [judgeNames, setJudgeNames] = useState({});
   const [confirmingRestore, setConfirmingRestore] = useState(false);
+  // The typed-confirmation phrase, same rule as SchedulePreview's publish
+  // confirmation: config/eventName when it is set, a short count otherwise --
+  // NEVER the restore point's own label. A label like "Manual restore point —
+  // 9/2/2026, 4:17:00 PM" cannot be retyped on a phone by someone who is
+  // already dealing with something having gone wrong.
+  const [eventName, setEventName] = useState(null);
 
   // live, so a restore point taken by the danger zone or by a generation shows
   // up here without a reload
@@ -116,15 +124,18 @@ export default function RestorePointsSection({ onResult }) {
     setDiff(null);
     setTeamNames({});
     setJudgeNames({});
+    setEventName(null);
 
     (async () => {
-      const [snap, judges] = await Promise.all([
+      const [snap, judges, eventNameSnap] = await Promise.all([
         previewSnapshot(previewing.id),
         readJudgeNames(),
+        get(ref(database, "config/eventName")).catch(() => null),
       ]);
       if (cancelled) return;
 
       setJudgeNames(judges.names ?? {});
+      setEventName(eventNameSnap && eventNameSnap.exists() ? eventNameSnap.val() : null);
 
       if (!snap.ok) {
         setPreviewError(snap.error || "Could not read that restore point.");
@@ -184,6 +195,13 @@ export default function RestorePointsSection({ onResult }) {
         ...(lostLine ? [lostLine] : []),
       ]
     : [];
+  // Same rule as SchedulePreview's publish confirmation: the configured event
+  // name if there is one, otherwise a short count -- the number of paths this
+  // restore touches, always available the moment the diff loads. Never the
+  // restore point's own label: a locale timestamp is exactly the phrase
+  // nobody can retype on autopilot, on the one path used when something has
+  // already gone wrong.
+  const confirmPhrase = eventName || String(diff?.byPath?.length ?? 0);
 
   return (
     <section>
@@ -300,7 +318,7 @@ export default function RestorePointsSection({ onResult }) {
         open={confirmingRestore}
         title={`Restore “${previewing?.label ?? previewing?.id}”?`}
         consequences={consequences}
-        typeToConfirm={previewing?.label ?? previewing?.id}
+        typeToConfirm={confirmPhrase}
         confirmLabel="Restore"
         onConfirm={restore}
         onCancel={() => setConfirmingRestore(false)}
