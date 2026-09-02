@@ -1,4 +1,4 @@
-import { ref, get, update, push, serverTimestamp } from "firebase/database";
+import { ref, update, push, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
 import { guardWith } from "../admin/snapshots.js";
@@ -78,26 +78,22 @@ export async function publishPlan(plan) {
         // with a bare update() -- no audit entry, no before-state, no undo --
         // which made the single most destructive button in the app the only one
         // with no way back.
-        //
-        // The raw teams/judges reads run alongside the guard: they are needed
-        // to clear stale schedule data for anyone NOT in this plan -- a team
-        // that withdrew, a judge who is no longer eligible -- which is a wider
-        // set than `live`'s filtered roster the plan was checked against.
-        const [guard, teamSnapshot, judgeSnapshot] = await Promise.all([
-            guardWith({
-                label: `Before publishing the schedule (${live.teamIds.length} teams, ${live.judgeIds.length} judges)`,
-                reason: "publishing replaces every assignment in the event",
-                paths: ["teams", "judges", "config/scheduleMeta"],
-            }),
-            get(ref(database, "teams")),
-            get(ref(database, "judges")),
-        ]);
+        const guard = await guardWith({
+            label: `Before publishing the schedule (${live.teamIds.length} teams, ${live.judgeIds.length} judges)`,
+            reason: "publishing replaces every assignment in the event",
+            paths: ["teams", "judges", "config/scheduleMeta"],
+        });
         if (!guard.ok) return { ok: false, error: guard.error };
 
-        const teamData = teamSnapshot.exists() ? teamSnapshot.val() : {};
-        const judgeData = judgeSnapshot.exists() ? judgeSnapshot.val() : {};
-
         // ---- write everything in one atomic update ----
+        //
+        // `live.allTeamIds`/`live.allJudgeIds` -- the unfiltered id sets
+        // `readLiveBasis` already read, underneath its filtered `teamIds`/
+        // `judgeIds` -- are used here rather than a second raw read of the same
+        // two nodes. They are needed to clear stale schedule data for anyone
+        // NOT in this plan -- a team that withdrew, a judge who is no longer
+        // eligible -- which is a wider set than the filtered roster the plan
+        // was checked against.
 
         const byJudge = {};
         for (const assignment of assignments) {
@@ -111,7 +107,7 @@ export async function publishPlan(plan) {
         // Every judge id currently in the database: their derived copy, or
         // null to clear a stale one for a judge this plan did not assign --
         // including one no longer eligible at all.
-        Object.keys(judgeData).forEach((judgeId) => {
+        live.allJudgeIds.forEach((judgeId) => {
             const assigned = byJudge[judgeId];
             updates[`judges/${judgeId}/teamAssignments`] =
                 assigned && Object.keys(assigned).length ? assigned : null;
@@ -120,7 +116,7 @@ export async function publishPlan(plan) {
         // Every team id currently in the database: its assignment, or null to
         // clear a stale one for a team this plan did not place -- including
         // one that withdrew its submission since the plan was built.
-        Object.keys(teamData).forEach((teamId) => {
+        live.allTeamIds.forEach((teamId) => {
             updates[`teams/${teamId}/schedule`] = plan.assignments[teamId] ?? null;
         });
 

@@ -154,6 +154,28 @@ describe("what gets written", () => {
     expect(schedulePayload()["teams/t11/schedule"]).toBeNull();
   });
 
+  test("a judge who is no longer eligible has their stale assignment cleared", async () => {
+    // "stale" is registered but not a round-one judge, so planSchedule never
+    // sees them and live.judgeIds (the filtered set) excludes them too --
+    // only the raw roster (live.allJudgeIds) still has their id. They carry
+    // a teamAssignments entry left over from a previous publish, which is
+    // what judges/{uid}/teamAssignments proves for score-writing: publish
+    // must clear it, or the judge keeps write access to a team's scores.
+    mockGet.mockImplementation(async (r) => {
+      const base = await world({ teams: 12, judges: 12 })(r);
+      if (r.path !== "judges") return base;
+      const judges = { ...base.val() };
+      judges.stale = {
+        firstName: "Stale", lastName: "Judge", isRound1Judge: false,
+        teamAssignments: { t0: { id: "t0" } },
+      };
+      return { exists: () => true, val: () => judges };
+    });
+    const plan = await built();
+    await publishPlan(plan);
+    expect(schedulePayload()["judges/stale/teamAssignments"]).toBeNull();
+  });
+
   test("the draft is cleared in the same update as the schedule", async () => {
     await publishPlan(await built());
     expect(schedulePayload().scheduleDraft).toBeNull();
@@ -171,7 +193,17 @@ describe("what gets written", () => {
     await publishPlan(plan);
     const entry = schedulePayload()["adminLog/generated-id"];
     expect(entry.action).toBe("schedule.publish");
+    expect(entry.by).toBe("admin-1");
     expect(entry.summary).toMatch(/Added Di to B/);
+    expect(entry.undoable).toBe(false);
+  });
+
+  test("the audit entry still records who published and that a restore point came first, with no edits", async () => {
+    await publishPlan(await built());
+    const entry = schedulePayload()["adminLog/generated-id"];
+    expect(entry.action).toBe("schedule.publish");
+    expect(entry.by).toBe("admin-1");
+    expect(entry.summary).toMatch(/Restore point taken first/);
     expect(entry.undoable).toBe(false);
   });
 });

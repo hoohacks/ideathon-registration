@@ -324,6 +324,34 @@ describe("readLiveBasis", () => {
     expect(liveBasis.judgeIds).not.toContain("notRoundOne");
   });
 
+  test("allTeamIds and allJudgeIds carry the ids the filtered sets exclude", async () => {
+    // ghost never submitted; notRoundOne is registered but not a round-one
+    // judge. Neither belongs in the filtered teamIds/judgeIds -- checkDrift
+    // would fire spurious drift on either -- but a caller clearing stale
+    // data (e.g. publishPlan) needs both still findable.
+    mockGet.mockImplementation(async (r) => {
+      const base = await world({ teams: 3, judges: 3 })(r);
+      if (r.path === "teams") {
+        return { exists: () => true, val: () => ({ ...base.val(), ghost: { submitted: false } }) };
+      }
+      if (r.path === "judges") {
+        return {
+          exists: () => true,
+          val: () => ({ ...base.val(), notRoundOne: { isRound1Judge: false } }),
+        };
+      }
+      return base;
+    });
+
+    const liveBasis = await readLiveBasis(false);
+    expect(liveBasis.teamIds).not.toContain("ghost");
+    expect(liveBasis.judgeIds).not.toContain("notRoundOne");
+    expect(liveBasis.allTeamIds).toEqual(expect.arrayContaining(["t0", "t1", "t2", "ghost"]));
+    expect(liveBasis.allJudgeIds).toEqual(
+      expect.arrayContaining(["j0", "j1", "j2", "notRoundOne"])
+    );
+  });
+
   test("onlyCheckedIn excludes a round-one judge who has not checked in", async () => {
     mockGet.mockImplementation(async (r) => {
       const base = await world({ judges: 3 })(r);

@@ -258,6 +258,14 @@ export function checkDrift(basis, live, plan) {
  * different notion of "submitted" or "eligible", drift would fire on every
  * publish for a difference that was never real -- the two readers just
  * disagreeing about what counts.
+ *
+ * `allTeamIds`/`allJudgeIds` are the unfiltered id sets underneath `teamIds`/
+ * `judgeIds` -- every team and judge node currently in the database, submitted
+ * or not, eligible or not. A caller clearing stale data (a withdrawn team's
+ * old slot, an ineligible judge's old `teamAssignments`) needs that wider set,
+ * not the filtered one drift is checked against. Returning both here means a
+ * caller needing the wider set is not forced into its own extra read of the
+ * same two nodes.
  */
 export async function readLiveBasis(onlyCheckedIn) {
   const [judgeSnapshot, teamSnapshot, rooms, batchConfig] = await Promise.all([
@@ -292,6 +300,8 @@ export async function readLiveBasis(onlyCheckedIn) {
   return {
     teamIds: teamsList.map((t) => t.id).sort(),
     judgeIds: judgesList.map((j) => j.id).sort(),
+    allTeamIds: Object.keys(teamData).sort(),
+    allJudgeIds: Object.keys(judgeData).sort(),
     rooms,
     batchCount: batchConfig.batchCount,
     batchTimes: batchConfig.batchTimes,
