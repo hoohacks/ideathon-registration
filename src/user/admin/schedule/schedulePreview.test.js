@@ -351,3 +351,83 @@ test("dropping a team through drift repair also removes it from basis.teamIds", 
   expect(savedPlan.assignments.t2).toBeUndefined();
   expect(savedPlan.basis.teamIds).not.toContain("t2");
 });
+
+// ---- Finding 6: sequential edits do not get told another organizer moved
+// the draft --------------------------------------------------------------
+// handleRepair used to build every op from the `plan` captured at the last
+// render, relying on the subscription echo to advance `version` before the
+// next op ran. Two repairs applied back to back -- normal when working
+// through a drift list -- would both be built from the SAME stale plan if
+// the echo had not landed yet, and the second saveDraft would either be
+// refused as stale or (as this test proves) silently discard the first edit.
+
+test("applying two repairs in a row builds the second on top of the first, not the stale render-time plan", async () => {
+  const basis = {
+    // t3 and t4 submitted AFTER this plan was built -- they are deliberately
+    // absent from basis.teamIds (the world at plan-build time), so PlanGrid's
+    // "Unscheduled teams" sidebar does not ALSO render a "Place" button for
+    // them alongside DriftPanel's, which would make the two indistinguishable
+    // by accessible name below.
+    teamIds: ["t1", "t2"], judgeIds: ["j0", "j1", "j2", "j3"],
+    rooms: ["R1", "R2", "R3", "R4"], batchCount: 1,
+    batchTimes: { 1: "5:00 PM" }, target: 2,
+  };
+  const initialPlan = makePlan({
+    basis,
+    teamNames: { t1: "Aurora", t2: "Borealis", t3: "Vireo", t4: "Wren" },
+  });
+
+  mockSubscribeDraft.mockImplementation((cb) => { cb(initialPlan); return () => {}; });
+  mockSaveDraft.mockImplementation(async (savedPlan) => ({
+    ok: true, version: (savedPlan.version ?? 0) + 1,
+  }));
+
+  const drift = {
+    blocking: [
+      {
+        kind: "teamAppeared",
+        message: "Vireo submitted after this plan was built and has no slot.",
+        repair: { type: "moveTeam", teamId: "t3", batch: 1, room: "R3", teamName: "Vireo" },
+      },
+      {
+        kind: "teamAppeared",
+        message: "Wren submitted after this plan was built and has no slot.",
+        repair: { type: "moveTeam", teamId: "t4", batch: 1, room: "R4", teamName: "Wren" },
+      },
+    ],
+    advisory: [],
+  };
+  publishPlan.mockResolvedValue({ ok: false, drift });
+
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+
+  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
+  userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+
+  const firstPlace = await screen.findAllByRole("button", { name: "Place" });
+  expect(firstPlace).toHaveLength(2);
+  userEvent.click(firstPlace[0]);
+
+  // Wait for the DOM, not just the mock call count -- `mockSaveDraft`'s call
+  // count ticks up the instant it is INVOKED, before its promise resolves and
+  // before the repaired item is filtered out of the drift panel. Waiting on
+  // the panel itself (down to one "Place" button) guarantees the first
+  // repair's state update has actually landed before the second click fires.
+  await waitFor(() => {
+    expect(screen.getAllByRole("button", { name: "Place" })).toHaveLength(1);
+  });
+  const secondPlace = screen.getAllByRole("button", { name: "Place" });
+  userEvent.click(secondPlace[0]);
+  await waitFor(() => expect(mockSaveDraft).toHaveBeenCalledTimes(2));
+
+  const [firstCallPlan] = mockSaveDraft.mock.calls[0];
+  const [secondCallPlan] = mockSaveDraft.mock.calls[1];
+
+  // Under the bug, both saves are built from the same render-time `plan`
+  // (version 1): the second call's version would equal the first's, and its
+  // assignments would carry only t4, not both t3 and t4.
+  expect(secondCallPlan.version).toBe(firstCallPlan.version + 1);
+  expect(secondCallPlan.assignments.t3).toBeDefined();
+  expect(secondCallPlan.assignments.t4).toBeDefined();
+});

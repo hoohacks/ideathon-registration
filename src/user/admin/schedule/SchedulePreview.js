@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import {
@@ -80,14 +80,33 @@ export default function SchedulePreview() {
   const [scheduleMetaFailed, setScheduleMetaFailed] = useState(false);
   const [eventName, setEventName] = useState(null);
 
-  useEffect(() => subscribeDraft(setPlan), []);
+  // The latest plan this tab knows about, updated the instant the
+  // subscription delivers a value AND the instant a save of ours succeeds --
+  // ahead of the echo that save triggers. Every handler below builds its op
+  // from this, not from the `plan` state variable: `plan` only updates on the
+  // next render, so an organizer applying two edits in a row (clicking
+  // through a list of drift repairs is the normal case) could otherwise have
+  // the second one built from the same stale plan the first one was, either
+  // getting refused as stale or -- worse -- silently discarding the first
+  // edit. See Finding 6.
+  const planRef = useRef(undefined);
+
+  useEffect(
+    () =>
+      subscribeDraft((next) => {
+        planRef.current = next;
+        setPlan(next);
+      }),
+    []
+  );
 
   const stats = plan ? computeStats(plan) : null;
 
   // ---- editing a team's slot or judges ----
 
   async function handleEdit(op) {
-    const result = applyEdit(plan, op);
+    const base = planRef.current ?? plan;
+    const result = applyEdit(base, op);
     if (!result.ok) return result;
 
     const saved = await saveDraft(result.plan);
@@ -99,14 +118,17 @@ export default function SchedulePreview() {
       setToast({ severity: "error", message: saved.error });
       return { ok: false, error: saved.error };
     }
+    planRef.current = { ...result.plan, version: saved.version };
     return { ok: true };
   }
 
   async function handleUndo() {
-    const result = undoEdit(plan);
+    const base = planRef.current ?? plan;
+    const result = undoEdit(base);
     if (!result.ok) return;
     const saved = await saveDraft(result.plan);
-    if (!saved.ok) setToast({ severity: "error", message: saved.error });
+    if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+    planRef.current = { ...result.plan, version: saved.version };
   }
 
   // ---- building the first plan ----
@@ -118,8 +140,10 @@ export default function SchedulePreview() {
     setBuildResult(result);
     if (!result.ok) return;
 
-    const saved = await saveDraft({ ...result.plan, edits: [], version: 0 });
-    if (!saved.ok) setToast({ severity: "error", message: saved.error });
+    const draft = { ...result.plan, edits: [], version: 0 };
+    const saved = await saveDraft(draft);
+    if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+    planRef.current = { ...draft, version: saved.version };
   }
 
   // ---- drift repair ----
@@ -129,27 +153,33 @@ export default function SchedulePreview() {
   }
 
   async function handleRepair(repair) {
+    const base = planRef.current ?? plan;
+    let nextPlan;
+
     if (repair.type === "dropTeam") {
-      const next = {
-        ...plan,
-        assignments: { ...plan.assignments },
+      nextPlan = {
+        ...base,
+        assignments: { ...base.assignments },
         // Also drop it from basis.teamIds, or computeStats.unscheduledTeamIds
         // (which derives from that list) reports the just-withdrawn team as
         // unscheduled the instant this saves -- putting a **Place** button in
         // front of the organizer for a team that no longer exists.
         basis: {
-          ...plan.basis,
-          teamIds: (plan.basis?.teamIds ?? []).filter((id) => id !== repair.teamId),
+          ...base.basis,
+          teamIds: (base.basis?.teamIds ?? []).filter((id) => id !== repair.teamId),
         },
       };
-      delete next.assignments[repair.teamId];
-      const saved = await saveDraft(next);
+      delete nextPlan.assignments[repair.teamId];
+      const saved = await saveDraft(nextPlan);
       if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+      planRef.current = { ...nextPlan, version: saved.version };
     } else {
-      const result = applyEdit(plan, repair);
+      const result = applyEdit(base, repair);
       if (!result.ok) { setToast({ severity: "error", message: result.error }); return; }
-      const saved = await saveDraft(result.plan);
+      nextPlan = result.plan;
+      const saved = await saveDraft(nextPlan);
       if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+      planRef.current = { ...nextPlan, version: saved.version };
     }
 
     // The repaired item is stale now -- drop it from the panel rather than
@@ -171,12 +201,15 @@ export default function SchedulePreview() {
   async function confirmRebuild() {
     setConfirmRebuildOpen(false);
     setRebuilding(true);
-    const result = await planSchedule({ onlyCheckedIn: plan?.onlyCheckedIn ?? onlyCheckedIn });
+    const base = planRef.current ?? plan;
+    const result = await planSchedule({ onlyCheckedIn: base?.onlyCheckedIn ?? onlyCheckedIn });
     setRebuilding(false);
     if (!result.ok) { setToast({ severity: "error", message: result.error }); return; }
 
-    const saved = await saveDraft({ ...result.plan, edits: [], version: plan.version });
+    const draft = { ...result.plan, edits: [], version: base.version };
+    const saved = await saveDraft(draft);
     if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+    planRef.current = { ...draft, version: saved.version };
     setDrift(null);
     setBuildResult(result);
   }
@@ -214,7 +247,7 @@ export default function SchedulePreview() {
   async function confirmPublish() {
     setConfirmPublishOpen(false);
     setPublishing(true);
-    const result = await publishPlan(plan);
+    const result = await publishPlan(planRef.current ?? plan);
     setPublishing(false);
 
     if (result.ok) {
