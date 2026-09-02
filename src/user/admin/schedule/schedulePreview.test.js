@@ -1,0 +1,240 @@
+/**
+ * task-9-context.md's controller ruling: no browser to drive by hand, so this
+ * exercises the page against a stubbed Firebase and a fake auth context,
+ * copying the pattern from src/pages.smoke.test.js -- `App.js` (which
+ * `AuthContext` comes from) transitively imports nearly every page in the
+ * app, so the same full mock set that file uses is copied here rather than
+ * a trimmed-down guess at what SchedulePreview alone needs.
+ *
+ * `draftStore` is mocked directly rather than through the generic Firebase
+ * stub, so each test controls exactly what the draft subscription delivers
+ * without fighting draftStore's own optimistic-concurrency version check.
+ * `applyEdit` and `computeStats` are left real -- both are pure, and a real
+ * refusal from `applyEdit` is exactly what the "refused edit" case needs.
+ */
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { ThemeProvider } from "@mui/material/styles";
+import theme from "../../../theme";
+import { AuthContext } from "../../../App";
+
+// ---- Firebase stubs, copied from src/pages.smoke.test.js -----------------
+
+jest.mock("../../../firebase", () => ({
+  database: {},
+  storage: {},
+  auth: { currentUser: { uid: "admin-1", email: "admin@example.com" } },
+}));
+
+jest.mock("firebase/database", () => ({
+  ref: (_db, path) => ({ path }),
+  get: jest.fn(async () => ({ exists: () => false, val: () => null })),
+  set: jest.fn(async () => {}),
+  update: jest.fn(async () => {}),
+  push: jest.fn(() => ({ key: "new-id" })),
+  onValue: (_ref, cb) => {
+    cb({ exists: () => false, val: () => null });
+    return () => {};
+  },
+  query: (r) => r,
+  orderByChild: jest.fn(),
+  equalTo: jest.fn(),
+  limitToLast: jest.fn(),
+  serverTimestamp: () => 0,
+}));
+
+jest.mock("firebase/auth", () => ({
+  getAuth: () => ({ currentUser: { uid: "admin-1", email: "admin@example.com" } }),
+  sendPasswordResetEmail: jest.fn(async () => {}),
+  signInWithEmailAndPassword: jest.fn(async () => ({ user: { uid: "u1" } })),
+  createUserWithEmailAndPassword: jest.fn(async () => ({ user: { uid: "u1" } })),
+  onAuthStateChanged: () => () => {},
+  browserLocalPersistence: {},
+}));
+
+jest.mock("firebase/storage", () => ({
+  getStorage: () => ({}),
+  ref: jest.fn(),
+  uploadBytesResumable: jest.fn(),
+  getDownloadURL: jest.fn(async () => "https://example.com/deck.pdf"),
+}));
+
+jest.mock("react-zxing", () => ({ useZxing: () => ({ ref: { current: null } }) }));
+jest.mock("react-chartjs-2", () => ({ Line: () => null, Bar: () => null }));
+
+// roles.js (hasRole, requireAdmin, ...) is left real -- hasRole is pure and
+// Nav (rendered by Layout) needs it to work, and requireAdmin is never
+// reached here since draftStore/planSchedule/publishPlan/scheduleConfig are
+// all mocked below.
+
+// ---- The modules this page owns its actions through -----------------------
+
+const mockSubscribeDraft = jest.fn();
+const mockSaveDraft = jest.fn();
+const mockClearDraft = jest.fn();
+const mockReadDraft = jest.fn();
+
+jest.mock("../../judge/draftStore.js", () => ({
+  subscribeDraft: (...args) => mockSubscribeDraft(...args),
+  saveDraft: (...args) => mockSaveDraft(...args),
+  clearDraft: (...args) => mockClearDraft(...args),
+  readDraft: (...args) => mockReadDraft(...args),
+}));
+
+jest.mock("../../judge/planSchedule.js", () => ({ planSchedule: jest.fn() }));
+jest.mock("../../judge/publishPlan.js", () => ({ publishPlan: jest.fn() }));
+jest.mock("../../judge/scheduleConfig.js", () => ({
+  readScheduleMeta: jest.fn(async () => null),
+}));
+
+const SchedulePreview = require("./SchedulePreview").default;
+const DriftPanel = require("./DriftPanel").default;
+
+// ---- Helpers ---------------------------------------------------------------
+
+function renderPage(ui) {
+  return render(
+    <ThemeProvider theme={theme}>
+      <AuthContext.Provider value={{ userTypes: ["admin"] }}>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </AuthContext.Provider>
+    </ThemeProvider>
+  );
+}
+
+function makePlan(overrides = {}) {
+  return {
+    assignments: {
+      t1: {
+        id: "t1", teamName: "Aurora", room: "R1", time: "5:00 PM", batch: 1,
+        judges: [
+          { judgeId: "j0", judgeName: "Ada Lovelace" },
+          { judgeId: "j1", judgeName: "Bo Diaz" },
+        ],
+      },
+      t2: {
+        id: "t2", teamName: "Borealis", room: "R2", time: "5:00 PM", batch: 1,
+        judges: [{ judgeId: "j2", judgeName: "Cy Young" }],
+      },
+    },
+    basis: {
+      teamIds: ["t1", "t2"], judgeIds: ["j0", "j1", "j2", "j3"],
+      rooms: ["R1", "R2", "R3"], batchCount: 1,
+      batchTimes: { 1: "5:00 PM" }, target: 2,
+    },
+    onlyCheckedIn: false,
+    judgeNames: { j0: "Ada Lovelace", j1: "Bo Diaz", j2: "Cy Young", j3: "Di Prince" },
+    teamNames: { t1: "Aurora", t2: "Borealis" },
+    edits: [],
+    version: 1,
+    createdAt: 1700000000000,
+    createdByName: "Sam Organizer",
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  mockSaveDraft.mockResolvedValue({ ok: true, version: 2 });
+  mockClearDraft.mockResolvedValue({ ok: true });
+  mockReadDraft.mockResolvedValue(null);
+});
+
+// ---- 1. No draft ------------------------------------------------------------
+
+test("with no draft, the build control renders and the page does not crash", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(null); return () => {}; });
+  renderPage(<SchedulePreview />);
+  expect(await screen.findByRole("button", { name: "Build a plan" })).toBeInTheDocument();
+});
+
+// ---- 2. A draft's teams and judges render -----------------------------------
+
+test("a draft's teams and judges render in the grid", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan()); return () => {}; });
+  renderPage(<SchedulePreview />);
+
+  expect(await screen.findByText("Aurora")).toBeInTheDocument();
+  expect(screen.getByText("Borealis")).toBeInTheDocument();
+  expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+  expect(screen.getByText("Bo Diaz")).toBeInTheDocument();
+  expect(screen.getByText("Cy Young")).toBeInTheDocument();
+});
+
+// ---- 3. A refused edit surfaces its error ------------------------------------
+
+test("a refused edit surfaces its error message in the drawer", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan()); return () => {}; });
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Borealis");
+
+  // Borealis (t2) has exactly one judge -- applyEdit refuses to remove the
+  // only judge on a team, for real, with no mocking needed to force it.
+  userEvent.click(screen.getByRole("button", { name: "Open Borealis" }));
+  userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+  expect(await screen.findByText(/only judge assigned/i)).toBeInTheDocument();
+  expect(mockSaveDraft).not.toHaveBeenCalled();
+});
+
+// ---- 4. Undo is disabled with no edits, enabled with some --------------------
+
+test("undo is disabled when there are no edits", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan({ edits: [] })); return () => {}; });
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+  expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+});
+
+test("undo is enabled and labelled with the newest edit once there are some", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => {
+    cb(makePlan({
+      edits: [{
+        op: { type: "addJudge", teamId: "t2", judgeUid: "j3" },
+        summary: "Added Di Prince to Borealis",
+        before: null,
+      }],
+    }));
+    return () => {};
+  });
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+  expect(
+    screen.getByRole("button", { name: 'Undo "Added Di Prince to Borealis"' })
+  ).toBeEnabled();
+});
+
+// ---- 5. DriftPanel renders each blocking item individually -------------------
+
+test("DriftPanel renders a separate repair control for each blocking item on the same removed room", () => {
+  const drift = {
+    blocking: [
+      {
+        kind: "roomRemoved",
+        message: "R1 is no longer a configured room, but Aurora is using it in batch 1.",
+        repair: { type: "moveTeam", teamId: "t1", batch: 1, room: "R3" },
+      },
+      {
+        kind: "roomRemoved",
+        message: "R1 is no longer a configured room, but Borealis is using it in batch 1.",
+        repair: { type: "moveTeam", teamId: "t2", batch: 1, room: "R4" },
+      },
+    ],
+    advisory: [],
+  };
+  const onRepair = jest.fn();
+  const onRebuild = jest.fn();
+
+  renderPage(<DriftPanel drift={drift} onRepair={onRepair} onRebuild={onRebuild} />);
+
+  const buttons = screen.getAllByRole("button", { name: "Place" });
+  expect(buttons).toHaveLength(2);
+
+  userEvent.click(buttons[0]);
+  userEvent.click(buttons[1]);
+
+  expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t1", batch: 1, room: "R3" });
+  expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t2", batch: 1, room: "R4" });
+  expect(onRebuild).not.toHaveBeenCalled();
+});
