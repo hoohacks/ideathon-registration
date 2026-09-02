@@ -62,11 +62,23 @@ function pathLine({ path, added, changed, removed }) {
   return `${path}: ${added} added, ${changed} changed, ${removed} removed`;
 }
 
-/** "<n> score card(s) will be destroyed: <team> by <judge>, ..." or null. */
+/**
+ * "<n> score card(s) will be destroyed: <team> by <judge>, ..." or null.
+ *
+ * A `round` on an entry means the same team+judge pair lost more than one
+ * card -- the bare "scores" path lets that happen (a first-round judge not
+ * excluded from that team in the final, scored in both). Without the round
+ * in the line, two distinct destroyed cards for "Aurora by Judge Smith"
+ * would render as the same text twice, reading as a duplicate or a single
+ * card rather than the two that are actually going.
+ */
 function lostScoresLine(lostScores, teamNames, judgeNames) {
   if (!lostScores.length) return null;
   const who = lostScores
-    .map(({ teamId, judgeUid }) => `${teamNames[teamId] ?? teamId} by ${judgeNames[judgeUid] ?? judgeUid}`)
+    .map(({ teamId, judgeUid, round }) => {
+      const named = `${teamNames[teamId] ?? teamId} by ${judgeNames[judgeUid] ?? judgeUid}`;
+      return round ? `${named} (${round})` : named;
+    })
     .join(", ");
   return `${lostScores.length} score card${lostScores.length === 1 ? "" : "s"} will be destroyed: ${who}`;
 }

@@ -115,13 +115,43 @@ describe("the preview dialog", () => {
 
     expect(previewSnapshot).toHaveBeenCalledWith("snap-1");
     expect(
-      await screen.findByText("1 score card will be destroyed: Aurora by Judge Smith")
+      await screen.findByText("1 score card will be destroyed: Aurora by Judge Smith (first)")
     ).toBeInTheDocument();
 
     // the per-path counts are shown too -- scoped to the diff line's <strong>,
     // since "teams" also appears in the row's path Chip
     const teamsLine = screen.getByText("teams", { selector: "strong" }).closest("p");
     expect(teamsLine).toHaveTextContent("teams — 0 added, 0 changed, 1 removed");
+  });
+
+  test("names both cards distinguishably when the same team+judge loses a card in two different rounds", async () => {
+    // The bare "scores" path lets one team+judge pair carry a card in more
+    // than one round -- a first-round judge not excluded from that team in
+    // the final, scored in both. Without the round in the line, two
+    // distinct destroyed cards for "Aurora by Judge Smith" would render as
+    // the same text twice.
+    previewSnapshot.mockResolvedValue({
+      ok: true,
+      entries: [
+        { path: "teams", value: JSON.stringify({ t1: { name: "Aurora" } }) },
+        { path: "scores", value: JSON.stringify({}) },
+      ],
+      live: {
+        teams: { t1: { name: "Aurora" } },
+        scores: {
+          first: { t1: { j1: { total: 30 } } },
+          final: { t1: { j1: { total: 45 } } },
+        },
+      },
+    });
+    renderSection();
+    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(
+      await screen.findByText(
+        "2 score cards will be destroyed: Aurora by Judge Smith (first), Aurora by Judge Smith (final)"
+      )
+    ).toBeInTheDocument();
   });
 
   test("falls back to the judge's uid when the one-shot judges read fails", async () => {
@@ -131,7 +161,7 @@ describe("the preview dialog", () => {
 
     // the dialog still opens and still names the team -- only the judge falls back
     expect(
-      await screen.findByText("1 score card will be destroyed: Aurora by j1")
+      await screen.findByText("1 score card will be destroyed: Aurora by j1 (first)")
     ).toBeInTheDocument();
   });
 
