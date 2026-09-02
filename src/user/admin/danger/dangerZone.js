@@ -120,7 +120,7 @@ export async function setTeamSubmitted({ teamId, teamName, submitted }) {
  *
  * By default scores are left alone. They are keyed by team and judge, so they
  * survive a regeneration and re-attach if the same pairing comes back -- the
- * same reason publishPlan warns about stranding rather than deleting.
+ * same reason republishing a schedule warns about stranding rather than deleting.
  * Losing them because you wanted to redo the rooms would be a bad trade.
  *
  * `includeScores` is the deliberate, louder choice: a real start from scratch.
