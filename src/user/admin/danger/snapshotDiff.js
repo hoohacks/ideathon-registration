@@ -63,6 +63,10 @@ function pairKey(teamId, judgeUid) {
   return `${teamId} ${judgeUid}`;
 }
 
+function roundPairKey(round, teamId, judgeUid) {
+  return `${round} ${teamId} ${judgeUid}`;
+}
+
 /**
  * `{ teamId: { judgeUid: card } }` -> pairKey -> `{ teamId, judgeUid, card }`.
  * The card itself rides along so callers can tell a changed card from an
@@ -83,12 +87,23 @@ function teamJudgeCards(value) {
 /**
  * The same map, for a path's raw value. The bare "scores" path -- what
  * `JUDGING_PATHS` actually snapshots -- is `{ round: { team: { judge: card } } }`,
- * one level deeper than a round ("first"/"final") before it gets to team and
- * judge, so that level is flattened away here rather than counted as a team.
- * A round-scoped path (e.g. "scores/first") is already team-first and is
- * walked directly. Every round is walked, not just the first one found --
- * a card lost from "final" is exactly as real a loss as one lost from
- * "first".
+ * one level deeper than a round-scoped path, so each round's cards are
+ * collected here and re-keyed by round+team+judge before merging.
+ *
+ * The round has to be part of the key: a team+judge pair can appear in more
+ * than one round -- a first-round judge who is not excluded from that team
+ * in the final is the ordinary case, not an edge case. Keying by team+judge
+ * alone (fine for a round-scoped path, which only ever has one round) would
+ * let the second round processed silently overwrite the first round's entry
+ * for that same pair, independently in both the snapshot map and the live
+ * map -- so a card genuinely destroyed in one round could hide behind an
+ * unrelated, unchanged card surviving in the other.
+ *
+ * A round-scoped path (e.g. "scores/first") is already team-first, has no
+ * round to collide across, and is walked directly with `teamJudgeCards` --
+ * its entries stay exactly `{ teamId, judgeUid }`, the shape the tests above
+ * pin. Only the bare "scores" path's entries carry `round`, because only
+ * there can two different cards share the same team+judge.
  */
 function scoreCardMap(path, value) {
   if (path !== SCORES_ROOT) return teamJudgeCards(value);
@@ -96,8 +111,8 @@ function scoreCardMap(path, value) {
   const cards = new Map();
   const rounds = asObject(value);
   for (const round of Object.keys(rounds)) {
-    for (const [key, entry] of teamJudgeCards(rounds[round])) {
-      cards.set(key, entry);
+    for (const { teamId, judgeUid, card } of teamJudgeCards(rounds[round]).values()) {
+      cards.set(roundPairKey(round, teamId, judgeUid), { teamId, judgeUid, round, card });
     }
   }
   return cards;
@@ -166,7 +181,16 @@ export function diffSnapshot(entries, live) {
       const liveCards = scoreCardMap(path, liveValue);
       byPath.push({ path, ...diffScoreCards(snapshotCards, liveCards) });
       for (const [key, entry] of liveCards) {
-        if (!snapshotCards.has(key)) lostScores.push({ teamId: entry.teamId, judgeUid: entry.judgeUid });
+        if (snapshotCards.has(key)) continue;
+        // round-scoped entries have no `round` field -- keep them exactly
+        // `{ teamId, judgeUid }`, the shape pinned above. Only the bare
+        // "scores" path's entries carry it, since only there can two
+        // different cards share the same team+judge.
+        lostScores.push(
+          "round" in entry
+            ? { teamId: entry.teamId, judgeUid: entry.judgeUid, round: entry.round }
+            : { teamId: entry.teamId, judgeUid: entry.judgeUid }
+        );
       }
     } else {
       byPath.push({ path, ...diffKeys(snapshotValue, liveValue) });
