@@ -39,3 +39,7 @@ database.rules.cutover.json
 
 # migration backups contain judges' free-text notes
 scripts/backups/
+
+# agent scratch: worktrees and subagent-driven-development ledgers
+.claude/worktrees/
+.superpowers/
