@@ -116,6 +116,19 @@ describe("moveTeam", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/not a configured room/i);
   });
+
+  // ---- Finding 2: a drift-placed team gets its real name, not "that team" ----
+  // A team that submitted after the plan was built is not in plan.teamNames --
+  // that map was built at plan time. checkDrift's repair carries the name
+  // instead, and moveTeam must prefer it over the (necessarily unaware) map.
+  test("placing a team unknown to teamNames uses op.teamName, not \"that team\"", () => {
+    const { ok, plan } = applyEdit(base(), {
+      type: "moveTeam", teamId: "t5", batch: 2, room: "R2", teamName: "Vireo",
+    });
+    expect(ok).toBe(true);
+    expect(plan.assignments.t5).toMatchObject({ teamName: "Vireo" });
+    expect(plan.edits.at(-1).summary).toBe("Placed Vireo in R2, batch 2");
+  });
 });
 
 describe("the edit log", () => {

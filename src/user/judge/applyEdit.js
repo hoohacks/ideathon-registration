@@ -45,7 +45,11 @@ export function applyEdit(plan, op) {
   const next = clone(plan);
   const current = next.assignments[op.teamId];
   const before = current ? { ...current, judges: [...current.judges] } : null;
-  const teamName = next.teamNames[op.teamId] ?? current?.teamName ?? "that team";
+  // `op.teamName` -- carried on a drift repair for a team that appeared after
+  // the plan was built -- takes priority over `next.teamNames`, which by
+  // definition cannot know about that team yet. Ordinary hand-edit ops never
+  // set `op.teamName`, so this changes nothing for them.
+  const teamName = op.teamName ?? next.teamNames[op.teamId] ?? current?.teamName ?? "that team";
 
   switch (op.type) {
     case "addJudge": {

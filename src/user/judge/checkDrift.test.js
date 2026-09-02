@@ -49,6 +49,19 @@ test("a team submitted since, and can be placed", () => {
   expect(blocking[0].repair).toMatchObject({ type: "moveTeam", teamId: "t3" });
 });
 
+// ---- Finding 2: the repair carries the appeared team's real name ----
+// `plan.teamNames` was built at plan time, before this team submitted, so it
+// cannot resolve it. Without the name riding on the repair itself, applyEdit
+// falls back to "that team" -- which then gets published to the team's own
+// schedule and fanned out to the judge's card.
+
+test("the moveTeam repair for a team that appeared carries its real name", () => {
+  const { blocking } = checkDrift(basis, live({
+    teamIds: ["t1", "t2", "t3"], teamNames: { t1: "A", t2: "B", t3: "Vireo" },
+  }), plan);
+  expect(blocking[0].repair).toMatchObject({ teamId: "t3", teamName: "Vireo" });
+});
+
 test("a team withdrew, and is dropped", () => {
   const { blocking } = checkDrift(basis, live({ teamIds: ["t1"] }), plan);
   expect(blocking[0].message).toMatch(/B withdrew/);

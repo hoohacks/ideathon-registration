@@ -100,7 +100,13 @@ export function checkDrift(basis, live, plan) {
       blocking.push({
         kind: "teamAppeared",
         message: `${teamName} submitted after this plan was built and has no slot.`,
-        repair: { type: "moveTeam", teamId, batch: slot.batch, room: slot.room },
+        // `teamName` rides along on the repair itself: `plan.teamNames` was
+        // built by planSchedule from teams that existed AT PLAN TIME, which
+        // by definition excludes a team that appeared afterward. Without it,
+        // applyEdit's moveTeam has no source for this team's name and falls
+        // back to "that team" -- which then gets published to the team's own
+        // schedule and fanned out to the judge's card.
+        repair: { type: "moveTeam", teamId, batch: slot.batch, room: slot.room, teamName },
       });
     } else {
       blocking.push({
