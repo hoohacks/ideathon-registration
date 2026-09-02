@@ -313,7 +313,7 @@ const plan = () => ({
   judgeNames: {}, teamNames: {}, onlyCheckedIn: false,
 });
 
-test("counts teams and judges from the basis, not the assignments", () => {
+test("counts scheduled teams from the assignments and judges from the basis", () => {
   const stats = computeStats(plan());
   expect(stats.teams).toBe(3);
   expect(stats.judges).toBe(4);
@@ -913,7 +913,8 @@ test("batch count changed, so the shape of the day changed", () => {
 });
 
 test("target changed, so the shape of the day changed", () => {
-  const { blocking } = checkDrift(basis, live({ target: 2 }), { ...plan, basis: { ...basis, target: 3 } });
+  // the basis was built when target was 3; config now says 2
+  const { blocking } = checkDrift({ ...basis, target: 3 }, live({ target: 2 }), plan);
   expect(blocking.some((b) => b.repair.type === "rebuild")).toBe(true);
 });
 
@@ -1107,7 +1108,7 @@ git commit -m "keep a schedule draft where a reload cannot lose it"
 - Delete: `src/user/judge/generateSchedule.test.js`
 
 **Interfaces:**
-- Consumes: `checkDrift`, `readLiveBasis` (Task 5); `clearDraft` (Task 6); `guardWith` from `../admin/snapshots.js`; `resolveName` from `../admin/adminAction.js`
+- Consumes: `checkDrift`, `readLiveBasis` (Task 5); `guardWith` from `../admin/snapshots.js`; `resolveName` from `../admin/adminAction.js`. **Not** `clearDraft` — the draft is cleared by writing `scheduleDraft: null` inside the single atomic update, because a separate clearing call could leave a published schedule with a live draft if the second write failed.
 - Produces: `publishPlan(plan): Promise<{ ok, error?, drift?, snapshotId?, stats? }>`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1524,7 +1525,7 @@ git commit -m "route the judging page through the schedule preview"
 **Interfaces:**
 - Produces:
   - `planFinalRound({ limit = 4, requireSubmitted = true }): Promise<{ ok, error?, finalists, ranked, warnings, basis: { cardCounts: { [teamId]: number } } }>`
-  - `publishFinalRound({ finalists, basis }): Promise<{ ok, error?, drift?, warnings, snapshotId }>`
+  - `publishFinalRound({ finalists, basis }): Promise<{ ok, error?, staleScores?, warnings, snapshotId }>` — `staleScores` is a message string, deliberately not named `drift`: the schedule's `drift` is a structured { blocking, advisory } classification and the two must not be mistaken for one another
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1557,7 +1558,7 @@ test("publishing refuses when a card arrived since the ranking", async () => {
   plan.basis.cardCounts[plan.finalists[0].teamId] -= 1;
   const result = await publishFinalRound(plan);
   expect(result.ok).toBe(false);
-  expect(result.drift).toMatch(/scored since/i);
+  expect(result.staleScores).toMatch(/scored since/i);
   expect(mockUpdate).not.toHaveBeenCalled();
 });
 ```
@@ -1579,7 +1580,7 @@ Cut `activateFinalRound` at the `guardWith` call (`finalRoundService.js:207`). E
 
 A dialog opened from the Judging page's Activate button. A table of `ranked`: rank, team, average, fundable votes, judge count. A horizontal rule after `limit`. A checkbox per row to include or exclude, seeded from `finalists`. Warnings in an `Alert severity="warning"` above. Confirm through `ConfirmDialog`, consequences: `"A restore point will be taken first."`, `"Every judge's final assignments are replaced."`
 
-On a `drift` result, an `Alert severity="error"` with a Re-rank button that calls `planFinalRound` again.
+On a `staleScores` result, an `Alert severity="error"` carrying that message, with a Re-rank button that calls `planFinalRound` again.
 
 - [ ] **Step 5: Run and commit**
 
@@ -1650,7 +1651,7 @@ Expected: FAIL — module not found
 
 `diffSnapshot` parses each entry's JSON, compares top-level child keys against `live[path]`, and counts. `lostScores` walks `scores/*` two levels deep — team then judge — for cards live now and absent in the snapshot.
 
-In `RestorePointsSection.js`, a Preview button per row reads `snapshots/{id}` and the live values for that snapshot's `paths`, then shows the diff in a dialog. The Restore button moves inside that dialog and goes through `ConfirmDialog`, with consequences: the per-path counts, and when `lostScores` is non-empty, `"<n> score card(s) will be destroyed: <team> by <judge>, …"` naming them from the teams and judges data already subscribed in `Control.js`.
+In `RestorePointsSection.js`, a Preview button per row reads `snapshots/{id}` and the live values for that snapshot's `paths`, then shows the diff in a dialog. The Restore button moves inside that dialog and goes through `ConfirmDialog`, with consequences: the per-path counts, and when `lostScores` is non-empty, `"<n> score card(s) will be destroyed: <team> by <judge>, …"` naming teams from the snapshot payload the dialog already loaded, and judges from a one-shot `get(ref(database, "judges"))` issued when the dialog opens. Do NOT add a `/judges` subscription to `Control.js` for this — it subscribes to config, admins, teams and adminLog only, and a permanently open subscription is the wrong price for a rarely opened dialog. If that read fails, fall back to rendering the uid.
 
 - [ ] **Step 4: Run and commit**
 
