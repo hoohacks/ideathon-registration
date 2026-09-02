@@ -34,7 +34,10 @@ import { resolveName } from "../admin/adminAction.js";
  * `saveDraft` is optimistic-concurrency: two organizers can have the preview
  * open at once, and the second save should not silently clobber the first.
  * It reads the stored version, refuses if it does not match the version the
- * caller last read, and names who moved it.
+ * caller last read, and names who moved it. The same check covers a draft
+ * that was cleared out from under an editor: a plan carrying a version above
+ * 0 with nothing currently stored did not just start existing, so that save
+ * is refused rather than treated as a fresh first save.
  */
 
 const DRAFT_PATH = "scheduleDraft";
@@ -66,11 +69,13 @@ function decodeDraft(raw) {
 
 /**
  * The current draft, or null if nobody has saved one (or it was cleared).
- * Never throws -- a read failure is reported the same way as "no draft yet",
- * since callers use this to decide whether to offer "resume your draft".
+ * Never throws -- a read failure (including "not an admin") is reported the
+ * same way as "no draft yet", since callers use this to decide whether to
+ * offer "resume your draft".
  */
 export async function readDraft() {
   try {
+    await requireAdmin("read the schedule draft");
     const snap = await get(ref(database, DRAFT_PATH));
     return snap.exists() ? decodeDraft(snap.val()) : null;
   } catch (error) {
@@ -96,6 +101,20 @@ export async function saveDraft(plan) {
   try {
     const snap = await get(ref(database, DRAFT_PATH));
     const stored = snap.exists() ? snap.val() : null;
+
+    // A plan.version above 0 means the caller last read an existing draft.
+    // Nothing being stored now means that draft was discarded out from under
+    // them -- not that this is a first save -- so this must refuse rather
+    // than let the save resurrect a draft someone deliberately cleared. A
+    // genuine first save always carries version 0, which this leaves alone.
+    if (!stored && plan.version > 0) {
+      return {
+        ok: false,
+        error:
+          "This draft was discarded while you were editing it. Build a new plan " +
+          "-- your edits cannot be re-applied to a draft that no longer exists.",
+      };
+    }
 
     if (stored && stored.version !== plan.version) {
       return {
