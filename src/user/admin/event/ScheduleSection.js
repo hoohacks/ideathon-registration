@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Stack, TextField, Typography } from "@mui/material";
 import { setBatchCount, setBatchTimes, setFinalRoundRoom } from "./eventConfig";
-import { BATCH_COUNT, BATCH_TIMES } from "../../judge/getJudgeSchedule";
+import { BATCH_COUNT, BATCH_TIMES } from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService";
 
 /**

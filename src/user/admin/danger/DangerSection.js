@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import { IoChevronDown } from "react-icons/io5";
 import { clearSchedule } from "./dangerZone";
-import { readScheduleMeta } from "../../judge/getJudgeSchedule";
+import { readScheduleMeta } from "../../judge/scheduleConfig";
 
 const CONFIRM_WORD = "clear";
 

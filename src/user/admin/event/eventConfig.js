@@ -1,7 +1,7 @@
 import { ref, get } from "firebase/database";
 import { database } from "../../../firebase.js";
 import { applyAdminAction } from "../adminAction.js";
-import { BATCH_COUNT, BATCH_TIMES } from "../../judge/getJudgeSchedule.js";
+import { BATCH_COUNT, BATCH_TIMES } from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService.js";
 import { EVENT_START } from "../../../eventInfo.js";
 

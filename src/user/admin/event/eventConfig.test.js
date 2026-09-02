@@ -22,7 +22,7 @@ jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid
 
 const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom } =
   require("./eventConfig");
-const { BATCH_COUNT, BATCH_TIMES } = require("../../judge/getJudgeSchedule");
+const { BATCH_COUNT, BATCH_TIMES } = require("../../judge/schedulePlan");
 const { requireAdmin } = require("../../../roles.js");
 
 /**
