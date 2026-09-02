@@ -222,6 +222,63 @@ export async function restoreSnapshot(id) {
 }
 
 /**
+ * The payload and current live values for a restore point, read once when a
+ * preview dialog opens -- never subscribed to, so looking at a restore point
+ * does not leave a connection open behind it.
+ *
+ * Returns `{ ok, entries, live, error }`. `entries` and `live` are exactly
+ * the shapes `diffSnapshot` (./danger/snapshotDiff.js) expects, so the
+ * caller can hand them straight over.
+ */
+export async function previewSnapshot(id) {
+  try {
+    const payloadSnap = await get(ref(database, `snapshots/${id}`));
+    if (!payloadSnap.exists()) return { ok: false, error: "That restore point no longer exists." };
+
+    const payload = payloadSnap.val();
+    const entries = Array.isArray(payload?.entries)
+      ? payload.entries
+      : Object.values(payload?.entries ?? {});
+    if (!entries.length) return { ok: false, error: "That restore point is empty." };
+
+    const liveSnaps = await Promise.all(entries.map((entry) => get(ref(database, entry.path))));
+    const live = {};
+    entries.forEach((entry, index) => {
+      live[entry.path] = liveSnaps[index].exists() ? liveSnaps[index].val() : null;
+    });
+
+    return { ok: true, entries, live };
+  } catch (error) {
+    return { ok: false, error: error.message || "Could not read that restore point." };
+  }
+}
+
+/**
+ * Judge display names, read once when a preview dialog opens rather than
+ * kept subscribed in Control.js -- a permanently open /judges listener is
+ * the wrong price for a dialog almost nobody opens.
+ *
+ * Always returns `names` (empty on failure), so a caller can use it directly
+ * as a lookup with no branch on `ok`: a uid missing from the map, whether
+ * because the read failed or the judge record does not exist, falls back to
+ * rendering the uid.
+ */
+export async function readJudgeNames() {
+  try {
+    const snap = await get(ref(database, "judges"));
+    const value = snap.val() ?? {};
+    const names = {};
+    for (const [uid, judge] of Object.entries(value)) {
+      const name = [judge?.firstName, judge?.lastName].filter(Boolean).join(" ").trim();
+      names[uid] = name || uid;
+    }
+    return { ok: true, names };
+  } catch (error) {
+    return { ok: false, error: error.message || "Could not load judges.", names: {} };
+  }
+}
+
+/**
  * Take a restore point, and refuse to continue if it could not be taken.
  *
  * Every destructive bulk action funnels through this, so "we wiped it and there

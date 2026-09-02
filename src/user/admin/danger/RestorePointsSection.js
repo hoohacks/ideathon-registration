@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Card, Chip, Dialog, DialogActions, DialogContent,
+  Alert, Box, Button, Card, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogContentText, DialogTitle, Stack, Typography,
 } from "@mui/material";
-import { subscribeToSnapshots, restoreSnapshot, captureSnapshot, JUDGING_PATHS } from "../snapshots";
+import {
+  subscribeToSnapshots, restoreSnapshot, captureSnapshot, previewSnapshot, readJudgeNames,
+  JUDGING_PATHS,
+} from "../snapshots";
+import { ConfirmDialog } from "../adminUi.js";
+import { diffSnapshot } from "./snapshotDiff";
 
 /**
  * The way back from a bulk mistake.
@@ -37,14 +42,98 @@ function when(value) {
   return new Date(value).toLocaleString();
 }
 
+/** `{ teamId: { name } }`, parsed from the snapshot's own "teams" entry. */
+function teamNamesFrom(entries) {
+  const teamsEntry = entries.find((entry) => entry.path === "teams");
+  if (!teamsEntry) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(teamsEntry.value);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(parsed).map(([teamId, team]) => [teamId, team?.name || teamId])
+  );
+}
+
+function pathLine({ path, added, changed, removed }) {
+  return `${path}: ${added} added, ${changed} changed, ${removed} removed`;
+}
+
+/** "<n> score card(s) will be destroyed: <team> by <judge>, ..." or null. */
+function lostScoresLine(lostScores, teamNames, judgeNames) {
+  if (!lostScores.length) return null;
+  const who = lostScores
+    .map(({ teamId, judgeUid }) => `${teamNames[teamId] ?? teamId} by ${judgeNames[judgeUid] ?? judgeUid}`)
+    .join(", ");
+  return `${lostScores.length} score card${lostScores.length === 1 ? "" : "s"} will be destroyed: ${who}`;
+}
+
 export default function RestorePointsSection({ onResult }) {
   const [points, setPoints] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [confirming, setConfirming] = useState(null);
+
+  // the point currently open in the preview dialog, or null
+  const [previewing, setPreviewing] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+  const [diff, setDiff] = useState(null);
+  const [teamNames, setTeamNames] = useState({});
+  const [judgeNames, setJudgeNames] = useState({});
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
 
   // live, so a restore point taken by the danger zone or by a generation shows
   // up here without a reload
   useEffect(() => subscribeToSnapshots(setPoints), []);
+
+  // Reads the snapshot's payload and the live values for its paths, so the
+  // dialog can show what a restore would actually change before anyone
+  // commits to it. Judge names are a one-shot read issued here rather than a
+  // subscription kept open in Control.js -- a permanently open /judges
+  // listener is the wrong price for a dialog almost nobody opens. If that
+  // read fails, the fallback below (`judgeNames[uid] ?? uid`) renders the uid
+  // instead -- naming who loses a score is a nicety, not the reason this
+  // dialog exists, so its failure must not keep the dialog from opening.
+  useEffect(() => {
+    if (!previewing) return undefined;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setDiff(null);
+    setTeamNames({});
+    setJudgeNames({});
+
+    (async () => {
+      const [snap, judges] = await Promise.all([
+        previewSnapshot(previewing.id),
+        readJudgeNames(),
+      ]);
+      if (cancelled) return;
+
+      setJudgeNames(judges.names ?? {});
+
+      if (!snap.ok) {
+        setPreviewError(snap.error || "Could not read that restore point.");
+        setPreviewLoading(false);
+        return;
+      }
+
+      setTeamNames(teamNamesFrom(snap.entries));
+      setDiff(diffSnapshot(snap.entries, snap.live));
+      setPreviewLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewing]);
+
+  const closePreview = () => {
+    setPreviewing(null);
+    setConfirmingRestore(false);
+  };
 
   const take = async () => {
     setBusy(true);
@@ -61,8 +150,8 @@ export default function RestorePointsSection({ onResult }) {
   };
 
   const restore = async () => {
-    const target = confirming;
-    setConfirming(null);
+    const target = previewing;
+    closePreview();
     setBusy(true);
     try {
       const result = await restoreSnapshot(target.id);
@@ -74,6 +163,15 @@ export default function RestorePointsSection({ onResult }) {
       setBusy(false);
     }
   };
+
+  const lostLine = diff ? lostScoresLine(diff.lostScores, teamNames, judgeNames) : null;
+  const consequences = diff
+    ? [
+        ...diff.byPath.map(pathLine),
+        "The current state is saved as a new restore point first, so this is reversible.",
+        ...(lostLine ? [lostLine] : []),
+      ]
+    : [];
 
   return (
     <section>
@@ -128,10 +226,10 @@ export default function RestorePointsSection({ onResult }) {
                     color="warning"
                     variant="outlined"
                     disabled={busy}
-                    onClick={() => setConfirming(point)}
+                    onClick={() => setPreviewing(point)}
                     sx={{ flexShrink: 0 }}
                   >
-                    Restore
+                    Preview
                   </Button>
                 </Stack>
               ))}
@@ -140,28 +238,61 @@ export default function RestorePointsSection({ onResult }) {
         </Stack>
       </Card>
 
-      <Dialog open={Boolean(confirming)} onClose={() => setConfirming(null)}>
-        <DialogTitle>Restore this point?</DialogTitle>
+      <Dialog open={Boolean(previewing)} onClose={closePreview} fullWidth maxWidth="sm">
+        <DialogTitle>Preview “{previewing?.label ?? previewing?.id}”</DialogTitle>
         <DialogContent>
           <DialogContentText component="div">
-            <p>
-              This replaces <strong>{(confirming?.paths ?? []).join(", ")}</strong> with the values
-              held in “{confirming?.label}”.
-            </p>
-            <p>
-              Anything written since then is overwritten — including scores judges have submitted
-              in the meantime. The current state is saved as a new restore point first, so this is
-              reversible.
-            </p>
+            {previewLoading && (
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                <CircularProgress size={18} />
+                <Typography variant="body2">Comparing against the live data…</Typography>
+              </Stack>
+            )}
+
+            {!previewLoading && previewError && <Alert severity="error">{previewError}</Alert>}
+
+            {!previewLoading && diff && (
+              <Stack spacing={1.5} sx={{ py: 1 }}>
+                <Typography variant="body2">
+                  Restoring replaces every path below with the values held in this restore point.
+                  Anything written since then — including scores judges have submitted in the
+                  meantime — is overwritten.
+                </Typography>
+                <Stack spacing={0.5}>
+                  {diff.byPath.map((p) => (
+                    <Typography key={p.path} variant="body2">
+                      <strong>{p.path}</strong> — {p.added} added, {p.changed} changed,{" "}
+                      {p.removed} removed
+                    </Typography>
+                  ))}
+                </Stack>
+                {lostLine && <Alert severity="warning">{lostLine}</Alert>}
+              </Stack>
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirming(null)}>Cancel</Button>
-          <Button color="warning" variant="contained" onClick={restore}>
-            Restore
+          <Button onClick={closePreview}>Close</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={previewLoading || Boolean(previewError)}
+            onClick={() => setConfirmingRestore(true)}
+          >
+            Restore…
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmingRestore}
+        title={`Restore “${previewing?.label ?? previewing?.id}”?`}
+        consequences={consequences}
+        typeToConfirm={previewing?.label ?? previewing?.id}
+        confirmLabel="Restore"
+        onConfirm={restore}
+        onCancel={() => setConfirmingRestore(false)}
+      />
     </section>
   );
 }
