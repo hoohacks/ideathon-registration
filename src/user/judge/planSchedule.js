@@ -136,12 +136,12 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
 
         const unjudged = Object.values(teamAssignments).filter((a) => a.judges.length === 0);
         if (unjudged.length) {
-            // Unreachable given the checks above, but refuse to write rather than
-            // send a team to a room nobody is coming to.
+            // Unreachable given the checks above, but refuse to build a plan that
+            // would send a team to a room nobody is coming to.
             return fail(
                 `${unjudged.length} team(s) ended up with no judges (${unjudged
                     .map((a) => a.teamName)
-                    .join(", ")}). Nothing was saved.`
+                    .join(", ")}). No plan was built.`
             );
         }
 
