@@ -13,7 +13,7 @@
  * refusal from `applyEdit` is exactly what the "refused edit" case needs.
  */
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
@@ -185,6 +185,31 @@ test("a refused edit surfaces its error message in the drawer", async () => {
 
   expect(await screen.findByText(/only judge assigned/i)).toBeInTheDocument();
   expect(mockSaveDraft).not.toHaveBeenCalled();
+});
+
+// ---- Finding 4: a failed saveDraft must not read as success in the drawer --
+
+test("a saveDraft failure is returned to the drawer, not swallowed as success", async () => {
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan()); return () => {}; });
+  mockSaveDraft.mockResolvedValueOnce({
+    ok: false,
+    error: "Sam changed this draft while you were looking. Reload the preview to pick up their version.",
+  });
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+
+  // Aurora (t1) has two judges, so applyEdit accepts removing one -- the
+  // failure this test forces comes from saveDraft, not applyEdit.
+  userEvent.click(screen.getByRole("button", { name: "Open Aurora" }));
+  const removeButtons = await screen.findAllByRole("button", { name: "Remove" });
+  userEvent.click(removeButtons[0]);
+
+  // The same message reaches both the page Snackbar (who moved it) and the
+  // drawer (its own save failed) -- neither one alone used to be wrong, but
+  // the drawer previously got told `{ ok: true }` and showed nothing at all.
+  await waitFor(() => {
+    expect(screen.getAllByText(/Sam changed this draft/i)).toHaveLength(2);
+  });
 });
 
 // ---- 4. Undo is disabled with no edits, enabled with some --------------------

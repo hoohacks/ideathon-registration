@@ -32,10 +32,10 @@ import { readScheduleMeta } from "../../judge/scheduleConfig.js";
  * `TeamSlotDrawer` and `DriftPanel` are presentational. The one edit
  * pipeline, `handleEdit`, is passed down to the drawer as `onEdit`: it runs
  * an op through `applyEdit` and, on success, `saveDraft`s the result. A
- * `saveDraft` refusal (another organizer changed the draft first) goes to
- * this page's Snackbar rather than the drawer, because by the time it comes
- * back the live subscription has already replaced `plan` with their version
- * -- there is nothing left in the drawer to correct.
+ * `saveDraft` refusal is surfaced two ways: this page's Snackbar carries who
+ * moved it, since the live subscription is about to replace `plan` with
+ * their version anyway, and the return value tells the drawer its own save
+ * failed too -- a failed save must never be reported back as success.
  */
 
 const REBUILD_LABEL = "Rebuild the plan";
@@ -93,9 +93,11 @@ export default function SchedulePreview() {
     const saved = await saveDraft(result.plan);
     if (!saved.ok) {
       // The live subscription has already replaced `plan` with whoever
-      // else's version won -- there is nothing left for the drawer to
-      // correct, so this goes to the page instead.
+      // else's version won, so this also goes to the page Snackbar -- but the
+      // drawer still needs to know its own save failed, or it clears its
+      // error and the edit reads as having worked.
       setToast({ severity: "error", message: saved.error });
+      return { ok: false, error: saved.error };
     }
     return { ok: true };
   }
