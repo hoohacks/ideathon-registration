@@ -73,6 +73,11 @@ export default function SchedulePreview() {
   const [publishing, setPublishing] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [scheduleMeta, setScheduleMeta] = useState(null);
+  // Distinct from "scheduleMeta is null because there is no schedule yet" --
+  // a transient read failure must not be read as "nothing to protect", or the
+  // typed-confirmation gate silently disappears in exactly the case (a
+  // schedule really does exist) it exists to guard.
+  const [scheduleMetaFailed, setScheduleMetaFailed] = useState(false);
   const [eventName, setEventName] = useState(null);
 
   useEffect(() => subscribeDraft(setPlan), []);
@@ -174,11 +179,21 @@ export default function SchedulePreview() {
   // ---- publish ----
 
   async function openPublishConfirm() {
-    const [meta, eventNameSnap] = await Promise.all([
-      readScheduleMeta().catch(() => null),
-      get(ref(database, "config/eventName")).catch(() => null),
-    ]);
+    // readScheduleMeta does not catch its own read failures -- a genuine
+    // `null` ("read succeeded, no schedule exists") has to stay distinguishable
+    // from a rejected read, so this catches it here rather than folding both
+    // into the same `.catch(() => null)`, which would fail open.
+    let meta = null;
+    let failed = false;
+    try {
+      meta = await readScheduleMeta();
+    } catch (error) {
+      failed = true;
+    }
+    const eventNameSnap = await get(ref(database, "config/eventName")).catch(() => null);
+
     setScheduleMeta(meta);
+    setScheduleMetaFailed(failed);
     setEventName(eventNameSnap && eventNameSnap.exists() ? eventNameSnap.val() : null);
     setConfirmPublishOpen(true);
   }
@@ -199,6 +214,10 @@ export default function SchedulePreview() {
   }
 
   const hasExistingSchedule = Boolean(scheduleMeta?.generatedAt);
+  // Fail closed: an organizer typing an extra confirmation after a blip costs
+  // nothing; publishing without it, when a schedule might really exist behind
+  // the failed read, is the one outcome this gate exists to prevent.
+  const requiresConfirmPhrase = hasExistingSchedule || scheduleMetaFailed;
   const publishConsequences = [
     "A restore point will be taken first.",
     "Every judge and team assignment in the event is replaced.",
@@ -207,6 +226,11 @@ export default function SchedulePreview() {
     publishConsequences.push(
       `${scheduleMeta.scoredTeams} team(s) already have scores. They are not deleted, but ` +
         "they will belong to judges who are no longer assigned."
+    );
+  }
+  if (scheduleMetaFailed) {
+    publishConsequences.push(
+      "The existing schedule could not be checked, so this is treated as a replacement."
     );
   }
 
@@ -354,7 +378,7 @@ export default function SchedulePreview() {
         open={confirmPublishOpen}
         title="Publish this schedule?"
         consequences={publishConsequences}
-        typeToConfirm={hasExistingSchedule ? (eventName || String(stats.teams)) : undefined}
+        typeToConfirm={requiresConfirmPhrase ? (eventName || String(stats.teams)) : undefined}
         confirmLabel="Publish"
         onConfirm={confirmPublish}
         onCancel={() => setConfirmPublishOpen(false)}

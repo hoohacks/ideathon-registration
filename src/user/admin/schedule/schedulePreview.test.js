@@ -91,6 +91,8 @@ jest.mock("../../judge/scheduleConfig.js", () => ({
 
 const SchedulePreview = require("./SchedulePreview").default;
 const DriftPanel = require("./DriftPanel").default;
+const { readScheduleMeta } = require("../../judge/scheduleConfig.js");
+const { get: mockGet } = require("firebase/database");
 
 // ---- Helpers ---------------------------------------------------------------
 
@@ -139,6 +141,13 @@ beforeEach(() => {
   mockSaveDraft.mockResolvedValue({ ok: true, version: 2 });
   mockClearDraft.mockResolvedValue({ ok: true });
   mockReadDraft.mockResolvedValue(null);
+  readScheduleMeta.mockResolvedValue(null);
+  // create-react-app's `resetMocks: true` strips the implementation off
+  // every jest.fn before each test, including the one the firebase/database
+  // factory above defines inline -- see draftStore.test.js's note on the
+  // same behaviour. Re-established here since openPublishConfirm's own
+  // `get(ref(database, "config/eventName"))` call needs it.
+  mockGet.mockResolvedValue({ exists: () => false, val: () => null });
 });
 
 // ---- 1. No draft ------------------------------------------------------------
@@ -237,4 +246,48 @@ test("DriftPanel renders a separate repair control for each blocking item on the
   expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t1", batch: 1, room: "R3" });
   expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t2", batch: 1, room: "R4" });
   expect(onRebuild).not.toHaveBeenCalled();
+});
+
+// ---- Fix round 1, item 1: a failed schedule-meta read fails closed ----------
+
+test("a failed schedule-meta read still requires the typed confirmation to publish", async () => {
+  readScheduleMeta.mockRejectedValue(new Error("network blip"));
+  mockSubscribeDraft.mockImplementation((cb) => { cb(makePlan()); return () => {}; });
+  renderPage(<SchedulePreview />);
+  await screen.findByText("Aurora");
+
+  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
+
+  // computeStats(makePlan()).teams is 2, and no config/eventName is stubbed
+  // to exist, so the required phrase falls back to "2" -- the point under
+  // test is that a phrase is required at all despite the failed read.
+  expect(await screen.findByText(/could not be checked/i)).toBeInTheDocument();
+  const confirmButton = screen.getByRole("button", { name: "Publish" });
+  expect(confirmButton).toBeDisabled();
+
+  userEvent.type(screen.getByLabelText(/type/i), "2");
+  expect(confirmButton).toBeEnabled();
+});
+
+// ---- Fix round 1, item 2: Drop is gated behind its own confirmation --------
+
+test("the Drop repair opens a confirmation instead of dropping immediately", () => {
+  const drift = {
+    blocking: [{
+      kind: "teamWithdrew",
+      message: "Borealis withdrew its submission since this plan was built.",
+      repair: { type: "dropTeam", teamId: "t2" },
+    }],
+    advisory: [],
+  };
+  const onRepair = jest.fn();
+
+  renderPage(<DriftPanel drift={drift} onRepair={onRepair} onRebuild={jest.fn()} />);
+
+  userEvent.click(screen.getByRole("button", { name: "Drop" }));
+  expect(onRepair).not.toHaveBeenCalled();
+  expect(screen.getByText(/cannot be undone with Undo/i)).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole("button", { name: "Drop the team" }));
+  expect(onRepair).toHaveBeenCalledWith({ type: "dropTeam", teamId: "t2" });
 });

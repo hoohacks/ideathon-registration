@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Alert, Button } from "@mui/material";
+import { ConfirmDialog } from "../adminUi.js";
 
 /**
  * What moved since the plan was built, surfaced right where the organizer is
@@ -17,6 +19,13 @@ import { Alert, Button } from "@mui/material";
  * `repair` is present -- some blocking conditions (a batch count that
  * changed) have no per-item fix and can only be resolved by a full rebuild,
  * which the caller drives through `onRebuild` after its own confirmation.
+ *
+ * `dropTeam` is the one repair type that bypasses `applyEdit` (SchedulePreview
+ * deletes the assignment directly, see its `handleRepair`), which means it
+ * never lands in `plan.edits` and cannot be walked back with Undo -- unlike
+ * every other repair here. That makes it the one button on this panel a
+ * click cannot recover from, so it is the one gated behind its own
+ * `ConfirmDialog` rather than firing on click like the rest.
  */
 
 const REPAIR_LABELS = {
@@ -29,8 +38,15 @@ const REPAIR_LABELS = {
 export default function DriftPanel({ drift, onRepair, onRebuild }) {
   const blocking = drift?.blocking ?? [];
   const advisory = drift?.advisory ?? [];
+  const [confirmDrop, setConfirmDrop] = useState(null);
 
-  if (!blocking.length && !advisory.length) return null;
+  if (!blocking.length && !advisory.length && !confirmDrop) return null;
+
+  function handleClick(item) {
+    if (item.repair.type === "rebuild") { onRebuild(); return; }
+    if (item.repair.type === "dropTeam") { setConfirmDrop(item); return; }
+    onRepair(item.repair);
+  }
 
   return (
     <>
@@ -41,13 +57,7 @@ export default function DriftPanel({ drift, onRepair, onRebuild }) {
           sx={{ mb: 1 }}
           action={
             item.repair ? (
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() =>
-                  item.repair.type === "rebuild" ? onRebuild() : onRepair(item.repair)
-                }
-              >
+              <Button color="inherit" size="small" onClick={() => handleClick(item)}>
                 {REPAIR_LABELS[item.repair.type] ?? "Fix"}
               </Button>
             ) : undefined
@@ -61,6 +71,21 @@ export default function DriftPanel({ drift, onRepair, onRebuild }) {
           {item.message}
         </Alert>
       ))}
+
+      <ConfirmDialog
+        open={Boolean(confirmDrop)}
+        title="Drop this team?"
+        consequences={[
+          confirmDrop?.message ?? "",
+          "This cannot be undone with Undo. The team will have no slot until it is placed again.",
+        ]}
+        confirmLabel="Drop the team"
+        onConfirm={() => {
+          onRepair(confirmDrop.repair);
+          setConfirmDrop(null);
+        }}
+        onCancel={() => setConfirmDrop(null)}
+      />
     </>
   );
 }
