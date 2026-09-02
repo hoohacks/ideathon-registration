@@ -120,13 +120,40 @@ export function checkDrift(basis, live, plan) {
   }
 
   // ---- rooms the plan actually uses that are no longer configured ----
+  // A missing room needs one team moved, not the plan rebuilt -- rebuilding
+  // would discard every hand edit the organizer has made, which is exactly
+  // what classifying drift exists to avoid. So each affected assignment gets
+  // offered a free room in the SAME batch it is already in, keeping its time
+  // and its panel intact. Only when that batch has no room left free does the
+  // repair fall back to a rebuild.
   const liveRoomsSet = new Set(live.rooms);
-  const usedRooms = [...new Set(Object.values(plan.assignments).map((a) => a.room))].sort();
-  for (const room of usedRooms) {
-    if (!liveRoomsSet.has(room)) {
+  const affectedByRoom = Object.values(plan.assignments)
+    .filter((a) => !liveRoomsSet.has(a.room))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  for (const assignment of affectedByRoom) {
+    const takenInBatch = new Set(
+      Object.values(plan.assignments)
+        .filter((a) => a.batch === assignment.batch && a.id !== assignment.id)
+        .map((a) => a.room)
+    );
+    const freeRoom = live.rooms.find((r) => !takenInBatch.has(r));
+
+    if (freeRoom) {
       blocking.push({
         kind: "roomRemoved",
-        message: `${room} is no longer a configured room, but this plan uses it.`,
+        message: `${assignment.room} is no longer a configured room, but ` +
+          `${assignment.teamName} is using it in batch ${assignment.batch}.`,
+        repair: {
+          type: "moveTeam", teamId: assignment.id, batch: assignment.batch, room: freeRoom,
+        },
+      });
+    } else {
+      blocking.push({
+        kind: "roomRemoved",
+        message: `${assignment.room} is no longer a configured room, and batch ` +
+          `${assignment.batch} has no free room to move ${assignment.teamName} into. ` +
+          "Rebuild the plan.",
         repair: { type: "rebuild" },
       });
     }
@@ -198,6 +225,13 @@ export async function readLiveBasis(onlyCheckedIn) {
     fetchBatchConfig(),
   ]);
 
+  // Deliberately diverges from planSchedule, which fails outright on a
+  // missing snapshot: here an absent node reads as {}, which falls out of
+  // the filters below as "every team withdrew" / "every judge left". Both
+  // are blocking, so checkDrift refuses the publish rather than writing a
+  // schedule built on it. A transient read failure therefore blocks a
+  // publish instead of producing a wrong one -- the safe direction to fail
+  // in. Do not "fix" this into a throw.
   const judgeData = judgeSnapshot.exists() ? judgeSnapshot.val() : {};
   const teamData = teamSnapshot.exists() ? teamSnapshot.val() : {};
 
