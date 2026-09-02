@@ -256,15 +256,22 @@ export async function publishFinalRound({ finalists, basis }) {
     const scoresByTeam = await loadFirstRoundScores(teamsData);
 
     // ---- refuse to publish a cut a late card has made stale ----
+    //
+    // Checked across every team `planFinalRound` ranked, not just `finalists`.
+    // A card landing on a team just below the cut line changes THAT team's
+    // average, not any finalist's -- and can lift it above one. That is the
+    // dangerous half of drift: a team that earned a place in the final round
+    // does not get one, and nothing about `finalists` itself looks wrong.
     const cardCounts = basis?.cardCounts ?? {};
-    const stale = finalists.find(
-      (team) => scoredJudgeCount(scoresByTeam[team.teamId]) !== (cardCounts[team.teamId] ?? 0)
+    const staleTeamId = Object.keys(cardCounts).find(
+      (teamId) => scoredJudgeCount(scoresByTeam[teamId]) !== cardCounts[teamId]
     );
-    if (stale) {
+    if (staleTeamId) {
+      const staleName = teamsData[staleTeamId]?.name ?? staleTeamId;
       return {
         ok: false,
         staleScores:
-          `${stale.name} has been scored since this ranking was computed. Re-rank before publishing.`,
+          `${staleName} has been scored since this ranking was computed. Re-rank before publishing.`,
         warnings: [],
       };
     }

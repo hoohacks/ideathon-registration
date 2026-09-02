@@ -163,7 +163,7 @@ export default function FinalRoundPreview({ open, onClose, onActivated }) {
           disabled={!plan || publishing || included.size === 0}
           onClick={() => setConfirmOpen(true)}
         >
-          {publishing ? "Activating…" : "Activate"}
+          {publishing ? "Activating…" : "Activate final round"}
         </Button>
       </DialogActions>
 

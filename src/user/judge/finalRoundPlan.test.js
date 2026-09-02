@@ -38,44 +38,54 @@ const { requireAdmin } = require("../../roles.js");
  * Each card carries only the `problem` field (max 10), scaled so a single
  * criterion decides the whole 40-point average -- simpler than filling every
  * field to hit a target number.
+ *
+ * `scoresData` is module-level and mutable on purpose: a test that wants a
+ * card to "arrive" between `planFinalRound` and `publishFinalRound` mutates
+ * it directly, and the next `get("scores/first")` sees the change -- `world`
+ * always reads the current value, not a snapshot taken when it was built.
  */
-function world() {
-  const teamsData = {};
+let teamsData;
+let judgesData;
+let scoresData;
+
+function resetWorld() {
+  teamsData = {};
   for (let i = 0; i < 5; i++) {
     teamsData[`t${i}`] = { name: `Team ${i}`, submitted: true };
   }
 
-  const judgesData = {};
+  judgesData = {};
   for (let i = 0; i < 5; i++) {
     judgesData[`j${i}`] = {
       firstName: "Judge", lastName: String(i), isRound1Judge: true, checkedIn: true,
     };
   }
 
-  const scoresData = {
+  scoresData = {
     t0: { j0: { problem: 9.5 }, j1: { problem: 9.5 } },
     t1: { j0: { problem: 9 } },
     t2: { j0: { problem: 8.5 }, j1: { problem: 8.5 } },
     t3: { j0: { problem: 7.5 }, j1: { problem: 7.5 } },
     t4: { j0: { problem: 7.5 } },
   };
+}
 
-  return async (r) => {
-    const table = {
-      teams: teamsData,
-      judges: judgesData,
-      "scores/first": scoresData,
-    };
-    const value = table[r.path];
-    return { exists: () => value !== undefined, val: () => value ?? null };
+async function world(r) {
+  const table = {
+    teams: teamsData,
+    judges: judgesData,
+    "scores/first": scoresData,
   };
+  const value = table[r.path];
+  return { exists: () => value !== undefined, val: () => value ?? null };
 }
 
 beforeEach(() => {
+  resetWorld();
   mockUpdate.mockReset();
   mockUpdate.mockResolvedValue(undefined);
   mockGet.mockReset();
-  mockGet.mockImplementation(world());
+  mockGet.mockImplementation(world);
   requireAdmin.mockReset();
   requireAdmin.mockResolvedValue({ uid: "admin-1" });
 });
@@ -110,6 +120,23 @@ describe("publishing", () => {
   test("refuses when a card arrived since the ranking", async () => {
     const plan = await planFinalRound({});
     plan.basis.cardCounts[plan.finalists[0].teamId] -= 1;
+    const result = await publishFinalRound(plan);
+    expect(result.ok).toBe(false);
+    expect(result.staleScores).toMatch(/scored since/i);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("refuses when a team just outside the cut gains a card", async () => {
+    // t4 is ranked 5th -- just below the top-4 cut line, not a finalist --
+    // and starts with one card. A second card lifts it to a 34 average,
+    // which would beat t3's 30 and belongs above the cut line. The
+    // *original*, unmodified finalists (t0-t3) are what gets published: this
+    // is the gap where a finalists-only staleness check sees nothing wrong.
+    const plan = await planFinalRound({});
+    expect(plan.finalists.map((t) => t.teamId)).not.toContain("t4");
+
+    scoresData.t4 = { ...scoresData.t4, j1: { problem: 8.5 } };
+
     const result = await publishFinalRound(plan);
     expect(result.ok).toBe(false);
     expect(result.staleScores).toMatch(/scored since/i);
