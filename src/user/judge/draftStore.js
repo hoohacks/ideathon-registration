@@ -29,7 +29,13 @@ import { resolveName } from "../admin/adminAction.js";
  * "0001", ...), and `readDraft`/`subscribeDraft` sort those keys back into
  * the array `applyEdit` expects. `schedule.judges` inside each assignment is
  * the one array this codebase does keep, because it is the same shape
- * already written to teams/{id}/schedule.
+ * already written to teams/{id}/schedule -- except when it is empty:
+ * `moveTeam` can legitimately place a team with `judges: []` before anyone is
+ * assigned, and RTDB drops an empty array on write the same way it drops an
+ * empty object, leaving the key entirely absent on the way back. `decodeDraft`
+ * restores that key (and `assignments`, `basis.batchTimes`, and an edit's
+ * `before.judges`, which can all go empty the same way) in one place, so
+ * every downstream reader can assume they are always present.
  *
  * `saveDraft` is optimistic-concurrency: two organizers can have the preview
  * open at once, and the second save should not silently clobber the first.
@@ -62,9 +68,38 @@ function decodeEdits(stored) {
     .map((key) => stored[key]);
 }
 
+/**
+ * Realtime Database never stores an empty array or object -- it drops the key
+ * entirely. `judges: []` on a freshly-placed team (moveTeam deliberately
+ * leaves it that way until someone is assigned) comes back with no `judges`
+ * key at all, not an empty one. An assignment missing that key is still an
+ * assignment -- restore just the one key RTDB stripped from it.
+ */
+function normalizeAssignment(assignment) {
+  if (!assignment) return assignment;
+  return { ...assignment, judges: assignment.judges ?? [] };
+}
+
+/**
+ * Restores every shape RTDB can strip from a stored draft, in one place, so
+ * every consumer downstream can assume `assignments`, each assignment's
+ * `judges`, `basis.batchTimes`, and an edit's `before.judges` are always
+ * present -- never scatter `?? []` across the five places that read them.
+ */
 function decodeDraft(raw) {
   if (!raw) return null;
-  return { ...raw, edits: decodeEdits(raw.edits) };
+  const assignments = raw.assignments ?? {};
+  const edits = decodeEdits(raw.edits).map((entry) =>
+    entry?.before ? { ...entry, before: normalizeAssignment(entry.before) } : entry
+  );
+  return {
+    ...raw,
+    assignments: Object.fromEntries(
+      Object.entries(assignments).map(([id, a]) => [id, normalizeAssignment(a)])
+    ),
+    basis: { ...(raw.basis ?? {}), batchTimes: raw.basis?.batchTimes ?? {} },
+    edits,
+  };
 }
 
 /**
