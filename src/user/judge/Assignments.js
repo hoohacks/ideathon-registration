@@ -19,6 +19,7 @@ import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import { hasRole } from "../../roles";
 import { ConfirmDialog } from "../admin/adminUi";
+import FinalRoundPreview from "../admin/schedule/FinalRoundPreview";
 import {
   findTeamIdByName,
   submitScore,
@@ -27,7 +28,7 @@ import {
   FIRST_ROUND,
   FINAL_ROUND,
 } from "./getTeamInfo";
-import { activateFinalRound, deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
+import { deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
 import { useJudgingSync } from "./useJudgingSync";
 import { clearDraft } from "./scoreDraft";
 
@@ -72,6 +73,7 @@ function Assignments() {
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
+  const [finalRoundPreviewOpen, setFinalRoundPreviewOpen] = useState(false);
 
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
@@ -114,20 +116,16 @@ function Assignments() {
     readScheduleMeta().then(setScheduleMeta).catch(() => setScheduleMeta(null));
   }, [canManageSchedule]);
 
-  async function handleActivateFinalRound() {
-    setTogglingFinalRound(true);
+  function handleActivateFinalRound() {
     setFinalRoundError(null);
-    try {
-      const result = await activateFinalRound();
-      if (result.warnings?.length) {
-        setToast({ severity: "warning", message: result.warnings.join(" ") });
-      }
-    } catch (err) {
-      console.error("Failed to activate final round:", err);
-      setFinalRoundError(err.message || "Failed to activate final round.");
-    } finally {
-      setTogglingFinalRound(false);
-    }
+    setFinalRoundPreviewOpen(true);
+  }
+
+  function handleFinalRoundActivated(result) {
+    setToast({
+      severity: result.warnings?.length ? "warning" : "success",
+      message: result.warnings?.length ? result.warnings.join(" ") : "Final round activated.",
+    });
   }
 
   async function handleDeactivateFinalRound() {
@@ -437,6 +435,12 @@ function Assignments() {
         confirmLabel="Deactivate"
         onConfirm={confirmDeactivateFinalRound}
         onCancel={() => setDeactivateConfirmOpen(false)}
+      />
+
+      <FinalRoundPreview
+        open={finalRoundPreviewOpen}
+        onClose={() => setFinalRoundPreviewOpen(false)}
+        onActivated={handleFinalRoundActivated}
       />
     </Layout>
   );
