@@ -1,4 +1,4 @@
-const { applyEdit } = require("./applyEdit");
+const { applyEdit, undoEdit } = require("./applyEdit");
 const { computeStats } = require("./computeStats");
 
 const base = () => ({
@@ -187,5 +187,52 @@ describe("the invariants hold under any sequence of accepted edits", () => {
       // stats never throw on whatever we ended up with
       expect(() => computeStats(plan)).not.toThrow();
     }
+  });
+});
+
+describe("undoEdit", () => {
+  test("undoing addJudge restores the previous roster exactly and drops the newest edits entry", () => {
+    const { plan: edited } = applyEdit(base(), { type: "addJudge", teamId: "t2", judgeUid: "j3" });
+    expect(edited.edits).toHaveLength(1);
+
+    const { ok, plan } = undoEdit(edited);
+    expect(ok).toBe(true);
+    expect(plan.assignments.t2.judges).toEqual([{ judgeId: "j2", judgeName: "Cy" }]);
+    expect(plan.edits).toHaveLength(0);
+  });
+
+  test("undoing a moveTeam that moved an existing team restores its previous batch, room and time", () => {
+    const { plan: edited } = applyEdit(base(), { type: "moveTeam", teamId: "t2", batch: 2, room: "R2" });
+    expect(edited.assignments.t2).toMatchObject({ batch: 2, room: "R2", time: "5:15 PM" });
+
+    const { ok, plan } = undoEdit(edited);
+    expect(ok).toBe(true);
+    expect(plan.assignments.t2).toMatchObject({ batch: 1, room: "R2", time: "5:00 PM" });
+  });
+
+  test("undoing a moveTeam that placed a previously unscheduled team deletes the assignment entirely", () => {
+    const { plan: edited } = applyEdit(base(), { type: "moveTeam", teamId: "t4", batch: 2, room: "R2" });
+    expect(edited.assignments.t4).toBeDefined();
+
+    const { ok, plan } = undoEdit(edited);
+    expect(ok).toBe(true);
+    expect(Object.keys(plan.assignments)).not.toContain("t4");
+  });
+
+  test("on a plan with nothing to undo, refuses without throwing", () => {
+    expect(() => undoEdit(base())).not.toThrow();
+    const result = undoEdit(base());
+    expect(result).toEqual({ ok: false, error: "Nothing to undo." });
+  });
+
+  test("does not mutate the plan it was given", () => {
+    const { plan: edited } = applyEdit(base(), { type: "addJudge", teamId: "t2", judgeUid: "j3" });
+    const editsBefore = edited.edits.length;
+    const judgesBefore = edited.assignments.t2.judges.length;
+
+    undoEdit(edited);
+
+    expect(edited.edits).toHaveLength(editsBefore);
+    expect(edited.assignments.t2.judges).toHaveLength(judgesBefore);
   });
 });
