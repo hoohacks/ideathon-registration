@@ -4,21 +4,21 @@ import {
   Box,
   Button,
   Card,
-  Checkbox,
   Divider,
-  FormControlLabel,
   Grid,
   Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
+import { Link } from "react-router-dom";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
-import { getJudgeSchedule, readScheduleMeta } from "./getJudgeSchedule";
+import { readScheduleMeta } from "./scheduleConfig";
 import { getPersonalSchedule, getFinalRoundSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import { hasRole } from "../../roles";
+import { ConfirmDialog } from "../admin/adminUi";
 import {
   findTeamIdByName,
   submitScore,
@@ -59,9 +59,6 @@ function Assignments() {
     setSelected(null);
   }
 
-  const [generating, setGenerating] = useState(false);
-  const [onlyCheckedIn, setOnlyCheckedIn] = useState(false);
-  const [generateResult, setGenerateResult] = useState(null);
   const [scheduleMeta, setScheduleMeta] = useState(null);
   const [personalAssignments, setPersonalAssignments] = useState([]);
   const [finalAssignments, setFinalAssignments] = useState([]);
@@ -74,6 +71,7 @@ function Assignments() {
   const [finalRoundLoading, setFinalRoundLoading] = useState(true);
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
@@ -114,51 +112,13 @@ function Assignments() {
   useEffect(() => {
     if (!canManageSchedule) return;
     readScheduleMeta().then(setScheduleMeta).catch(() => setScheduleMeta(null));
-  }, [canManageSchedule, generateResult]);
-
-  async function handleGenerateClick() {
-    if (generating) return;
-
-    // The confirmation used to hang off React state, so a reload cleared it and
-    // the next click silently replaced every assignment in the event. The
-    // marker is read back from the database instead, which survives the reload.
-    const existing = scheduleMeta ?? (await readScheduleMeta().catch(() => null));
-    if (existing?.generatedAt) {
-      const when = new Date(existing.generatedAt).toLocaleString();
-      const scored = existing.scoredTeams ?? 0;
-      const warning = scored
-        ? `\n\n${scored} team(s) already have scores. Those scores are NOT deleted, but they will belong to judges who are no longer assigned, and they keep counting toward the averages.`
-        : "";
-      const confirmed = window.confirm(
-        `A schedule was generated on ${when}. Regenerating replaces every judge and team assignment.${warning}\n\nContinue?`
-      );
-      if (!confirmed) return;
-    }
-
-    try {
-      setGenerating(true);
-      setGenerateResult(null);
-      const result = await getJudgeSchedule({ onlyCheckedIn });
-      setGenerateResult(result);
-      if (result.ok) await loadPersonalSchedule();
-    } catch (err) {
-      console.error("Error generating schedule:", err);
-      setGenerateResult({
-        ok: false,
-        error: err.message || "Something went wrong generating the schedule.",
-        warnings: [],
-      });
-    } finally {
-      setGenerating(false);
-    }
-  }
+  }, [canManageSchedule]);
 
   async function handleActivateFinalRound() {
     setTogglingFinalRound(true);
     setFinalRoundError(null);
     try {
       const result = await activateFinalRound();
-      setGenerateResult(null);
       if (result.warnings?.length) {
         setToast({ severity: "warning", message: result.warnings.join(" ") });
       }
@@ -171,11 +131,11 @@ function Assignments() {
   }
 
   async function handleDeactivateFinalRound() {
-    const confirmed = window.confirm(
-      "Deactivate final round judging? Assignments are withdrawn from every judge and the standings are archived."
-    );
-    if (!confirmed) return;
+    setDeactivateConfirmOpen(true);
+  }
 
+  async function confirmDeactivateFinalRound() {
+    setDeactivateConfirmOpen(false);
     setTogglingFinalRound(true);
     setFinalRoundError(null);
     try {
@@ -269,8 +229,6 @@ function Assignments() {
     };
   }, [finalRoundActive, canViewAssignments]);
 
-  const stats = generateResult?.ok ? generateResult.stats : null;
-
   const remaining = useMemo(
     () =>
       personalAssignments.filter(
@@ -334,12 +292,8 @@ function Assignments() {
               <Typography variant="h5" sx={{ flex: 1 }}>
                 Run of show
               </Typography>
-              <Button variant="contained" onClick={handleGenerateClick} disabled={generating}>
-                {generating
-                  ? "Generating…"
-                  : scheduleMeta?.generatedAt
-                  ? "Regenerate schedule"
-                  : "Generate schedule"}
+              <Button variant="contained" component={Link} to="/user/admin/schedule">
+                {scheduleMeta?.generatedAt ? "Plan a new schedule" : "Plan schedule"}
               </Button>
               {finalRoundActive ? (
                 <Button
@@ -360,53 +314,10 @@ function Assignments() {
               )}
             </Stack>
 
-            <FormControlLabel
-              sx={{ mt: 1 }}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={onlyCheckedIn}
-                  onChange={(e) => setOnlyCheckedIn(e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  Only schedule judges who have checked in
-                </Typography>
-              }
-            />
-
-            {(generateResult || finalRoundError || finalRoundActive || scheduleMeta) && (
+            {(finalRoundError || finalRoundActive || scheduleMeta) && (
               <Stack spacing={1} sx={{ mt: 2 }}>
                 {finalRoundActive && <Alert severity="info">Final round is active.</Alert>}
-                {generateResult && !generateResult.ok && (
-                  <Alert severity="error">{generateResult.error}</Alert>
-                )}
-                {generateResult?.warnings?.map((warning) => (
-                  <Alert severity="warning" key={warning}>
-                    {warning}
-                  </Alert>
-                ))}
-                {/* What to change, as opposed to what is wrong. A refusal that
-                    says "not enough rooms" without saying how many more is not
-                    something anyone can act on at 4:45. */}
-                {generateResult?.advice?.map((line) => (
-                  <Alert severity="info" key={line}>
-                    {line}
-                  </Alert>
-                ))}
-                {stats && (
-                  <Alert severity="success">
-                    Scheduled {stats.teams} teams across {stats.judges} judges in batches of{" "}
-                    {stats.batchSizes.join(" / ")}, using {stats.roomsUsed} rooms. Each team
-                    sees{" "}
-                    {stats.minJudgesPerTeam === stats.maxJudgesPerTeam
-                      ? stats.minJudgesPerTeam
-                      : `${stats.minJudgesPerTeam}–${stats.maxJudgesPerTeam}`}{" "}
-                    judges{stats.spareJudges ? `, with ${stats.spareJudges} held back as spares` : ""}.
-                  </Alert>
-                )}
-                {!generateResult && scheduleMeta?.generatedAt && (
+                {scheduleMeta?.generatedAt && (
                   <Typography variant="body2">
                     Schedule generated {new Date(scheduleMeta.generatedAt).toLocaleString()}.
                     Use Judging progress to move a single judge rather than regenerating.
@@ -515,6 +426,18 @@ function Assignments() {
           </Alert>
         ) : undefined}
       </Snackbar>
+
+      <ConfirmDialog
+        open={deactivateConfirmOpen}
+        title="Deactivate final round judging?"
+        consequences={[
+          "Assignments are withdrawn from every judge.",
+          "The standings are archived.",
+        ]}
+        confirmLabel="Deactivate"
+        onConfirm={confirmDeactivateFinalRound}
+        onCancel={() => setDeactivateConfirmOpen(false)}
+      />
     </Layout>
   );
 }

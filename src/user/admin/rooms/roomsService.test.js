@@ -113,7 +113,7 @@ describe("remapping every copy of a room", () => {
 
 describe("rooms live only in the database", () => {
   /**
-   * There used to be a DEFAULT_ROOMS list in getJudgeSchedule.js. A built-in
+   * There used to be a DEFAULT_ROOMS list in planSchedule.js. A built-in
    * list silently papers over an empty config: an organizer who removed the
    * last room would see twelve of them reappear at the next generation, with
    * nothing to say whether the rooms in use were chosen or shipped.

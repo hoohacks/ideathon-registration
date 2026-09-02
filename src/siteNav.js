@@ -56,6 +56,7 @@ const ADMIN = [
     { to: "/user/admin/judges", label: "Judges" },
     { to: "/user/admin/teams", label: "Teams" },
     { to: "/user/admin/judging", label: "Judging progress" },
+    { to: "/user/admin/schedule", label: "Schedule" },
     { to: "/user/admin/metrics", label: "Metrics" },
     { to: "/user/admin/control", label: "Control panel" },
 ];

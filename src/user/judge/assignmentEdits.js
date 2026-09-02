@@ -15,7 +15,7 @@ import { assignmentList } from "./assignmentList.js";
  * An assignment is stored twice on purpose, at `teams/{id}/schedule` and at
  * `judges/{uid}/teamAssignments/{id}`, so that a judge can read their own list
  * without read access to every team. Every function here therefore writes both
- * copies in ONE atomic multi-path update, the same way getJudgeSchedule does.
+ * copies in ONE atomic multi-path update, the same way publishPlan does.
  * They cannot half-apply.
  *
  * The wrinkle is that each judge's copy carries the whole `judges` roster for
@@ -136,7 +136,7 @@ export async function findOpenSlots() {
  * Give a team its own schedule entry without regenerating anything.
  *
  * Writes the team's entry and each chosen judge's copy in ONE update, the same
- * shape getJudgeSchedule produces, so nothing downstream can tell the
+ * shape publishPlan produces, so nothing downstream can tell the
  * difference between a team scheduled here and one scheduled by a generation.
  */
 export async function scheduleTeamIntoBatch({

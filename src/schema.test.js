@@ -286,6 +286,17 @@ describe("the audit log pins its author", () => {
   });
 });
 
+describe("the schedule draft is admin-only", () => {
+  test("/scheduleDraft has no rule of its own", () => {
+    expect(RULES.rules.scheduleDraft).toBeUndefined();
+  });
+
+  test("the root rule is what covers it", () => {
+    expect(RULES.rules[".read"]).toContain("admins");
+    expect(RULES.rules[".write"]).toContain("admins");
+  });
+});
+
 describe("a team cannot grow without bound, or reopen after submitting", () => {
   /**
    * Both limits are enforced in the rules, because a check that lives only in

@@ -1,10 +1,11 @@
 /**
  * Deciding the shape of the judging round, with no Firebase in sight.
  *
- * getJudgeSchedule used to do the arithmetic and the writing in one function,
- * which meant the only way to ask "what would this event look like?" was to
- * generate it for real. Everything here is pure, so the answer is available
- * before anything is written -- and testable without an emulator.
+ * planSchedule and publishPlan used to be one function that did the
+ * arithmetic and the writing, which meant the only way to ask "what would
+ * this event look like?" was to generate it for real. Everything here is
+ * pure, so the answer is available before anything is written -- and
+ * testable without an emulator.
  *
  * Two ideas drive the whole file.
  *
