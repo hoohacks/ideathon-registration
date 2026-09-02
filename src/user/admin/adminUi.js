@@ -1,4 +1,8 @@
-import { Box, Card, LinearProgress, Stack, TextField, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import {
+    Alert, Box, Button, Card, Dialog, DialogActions, DialogContent, DialogContentText,
+    DialogTitle, LinearProgress, Stack, TextField, Typography,
+} from "@mui/material";
 
 /**
  * Shared furniture for the three admin dashboards. They used to each carry
@@ -109,5 +113,64 @@ export function Row({ children, accent = false }) {
         >
             {children}
         </Box>
+    );
+}
+
+/**
+ * The shared destructive-action dialog. `window.confirm` gets dismissed by
+ * reflex, so this spells out what will happen in an `Alert`, and for the
+ * worst actions makes the confirm button unusable until the caller's phrase
+ * — usually the event name, not "DELETE" — is typed exactly.
+ *
+ * The typed value always resets when `open` goes false, so cancelling and
+ * reopening never leaves the button enabled from a stale value.
+ */
+export function ConfirmDialog({
+    open, title, consequences = [], typeToConfirm, confirmLabel, onConfirm, onCancel,
+}) {
+    const [typed, setTyped] = useState("");
+
+    useEffect(() => {
+        if (!open) setTyped("");
+    }, [open]);
+
+    const requiresPhrase = typeof typeToConfirm === "string" && typeToConfirm.length > 0;
+    const canConfirm = !requiresPhrase || typed === typeToConfirm;
+
+    return (
+        <Dialog open={open} onClose={onCancel}>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogContent>
+                <DialogContentText component="div">
+                    {consequences.length > 0 && (
+                        <Alert severity="warning" sx={{ my: 1 }}>
+                            <Stack spacing={0.5}>
+                                {consequences.map((consequence) => (
+                                    <Typography key={consequence} variant="body2">
+                                        {consequence}
+                                    </Typography>
+                                ))}
+                            </Stack>
+                        </Alert>
+                    )}
+                    {requiresPhrase && (
+                        <TextField
+                            fullWidth
+                            size="small"
+                            sx={{ mt: 2 }}
+                            label={`Type "${typeToConfirm}" to confirm`}
+                            value={typed}
+                            onChange={(event) => setTyped(event.target.value)}
+                        />
+                    )}
+                </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onCancel}>Cancel</Button>
+                <Button color="error" variant="contained" disabled={!canConfirm} onClick={onConfirm}>
+                    {confirmLabel}
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 }
