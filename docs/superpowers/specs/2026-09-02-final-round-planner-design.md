@@ -99,7 +99,7 @@ updatedBy          uid
 updatedByName      resolved display name
 room               the one room, seeded from config/finalRoundRoom
 ranked             { "0000": {teamId, name, averageScore, fundableVotes, judgeCount} }
-assignments        { [teamId]: {teamId, teamName, order, judges: [{judgeId, judgeName}], conflicted: {uid: true}} }
+assignments        { [teamId]: {teamId, teamName, order, judges: [{judgeId, judgeName}]} }
 edits              { "0000": {op, summary, before} }
 basis              { cardCounts: {teamId: n}, eligibleJudges: {uid: true}, size, room }
 ```
@@ -113,10 +113,6 @@ has no arrays, and order matters.
 be addressed and deleted without renumbering. Order lives in the `order` field
 rather than in the key, because both are needed: address by team, present by
 slot. `order` is `0…n-1` and every save asserts it is a permutation.
-
-`conflicted` records judges deliberately put on a panel they scored in round
-one. Without it, publish cannot tell an override from a mistake, and the
-prefill would silently undo the organizer's edit on the next build.
 
 ### `basis` — the fingerprint
 
@@ -155,7 +151,7 @@ alert.
 
 | Op | Rule |
 | --- | --- |
-| `addJudge` | Allowed even when they scored the team in round one — the organizer asked for it. Records the override in `conflicted` and warns; does not refuse. |
+| `addJudge` | **Refused** if they scored that team in round one — a judge does not mark the same team twice, and the refusal names why. Anyone else in the eligible pool may be added. |
 | `removeJudge` | Allowed. Removing the last judge leaves the team presenting to an empty room, which the stats bar counts and the publish confirmation names. |
 | `swapJudge` | `removeJudge` then `addJudge`, one edit. |
 | `moveSlot` | Moves a team to a slot index; everything between shifts by one. Refuses anything that is not a permutation. |
@@ -166,8 +162,9 @@ alert.
 `undoEdit` walks the newest edit back, repeatedly, exactly as it does today.
 
 With one room there is no "judge in two places at once", so no op refuses on a
-clash. The refusals that remain are structural: an unknown team, a judge who is
-not in the eligible pool, a slot index out of range.
+clash. The refusals are the round-one conflict above, plus the structural ones:
+an unknown team, a judge who is not in the eligible pool, a slot index out of
+range.
 
 ## Drift
 
@@ -199,7 +196,8 @@ the plan rather than from a derivation:
 
 `excludedJudges` is still written into the standings, and still means "scored
 this team in round one", which is what `peopleService` and `dangerZone` already
-clean up. A `conflicted` override does not change it.
+clean up. Since `addJudge` refuses a conflicted judge, the panel and the
+exclusions can never disagree.
 
 On success the draft is deleted, as `publishPlan` deletes `/scheduleDraft`.
 
@@ -223,7 +221,7 @@ Above it, two things:
   with a checkbox per row, which is today's dialog moved inline. The cut line
   and any tie straddling it are marked.
 - **The stats bar.** Finalists, panel min and max, teams with no judge, judges
-  with nothing to do, and conflict overrides.
+  with nothing to do.
 
 `FinalRoundPreview.js` is retired. On the Judging page, **Activate final round**
 becomes **Plan final round**, linking to the planner; **Deactivate final round**
