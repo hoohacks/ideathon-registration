@@ -24,6 +24,8 @@ import {
 } from "@mui/material";
 
 import { EVENT } from "./eventInfo";
+import { REGISTRATION_OPEN } from "./registrationWindow";
+import ClosedNotice from "./ClosedNotice";
 import {
   cleanName,
   focusField,
@@ -230,6 +232,12 @@ function problemsFor(values) {
 }
 
 const JudgeRegistration = () => {
+  if (!REGISTRATION_OPEN) return <ClosedNotice what="Judge and mentor sign-up" />;
+
+  return <JudgeRegistrationForm />;
+};
+
+const JudgeRegistrationForm = () => {
   const navigate = useNavigate();
   const { formRef, values, setValue, handleChange, collect } = useSyncedForm(INITIAL);
 

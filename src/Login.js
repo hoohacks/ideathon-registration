@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "./App.js";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -16,8 +16,21 @@ import {
 } from "@mui/material";
 import { EVENT } from "./eventInfo";
 import { PublicShell } from "./registrationUi";
+import { REGISTRATION_OPEN, isStaffEntrance } from "./registrationWindow";
+import ClosedNotice from "./ClosedNotice";
 
 export default function LoginPage() {
+  // Organizers still have to reach the control panel while the doors are shut,
+  // and signing in is how. `#/login?staff` is the way through.
+  const { search } = useLocation();
+  if (!REGISTRATION_OPEN && !isStaffEntrance(search)) {
+    return <ClosedNotice what="Sign-in" />;
+  }
+
+  return <SignInForm />;
+}
+
+function SignInForm() {
   const { handleLogin } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState("");

@@ -70,6 +70,36 @@ Two things that will confuse you:
 
 ---
 
+## Before sign-ups open
+
+The site goes live weeks before the event does, so registration and sign-in are
+**closed by default**. A build with nothing set produces a closed site —
+forgetting the flag keeps strangers out rather than letting them in.
+
+| | |
+| --- | --- |
+| Both registration forms | replaced by a "not open yet" page |
+| Sign in | the same page |
+| `#/login?staff` | the sign-in form, so organizers can still reach the control panel |
+
+**To open it:** set the repository variable `REGISTRATION_OPEN` to `true`
+(Settings → Secrets and variables → Actions → Variables), then run the Deploy
+workflow. No code change, no pull request. The deploy summary says which way the
+doors are, every time.
+
+It is a **build-time** flag (`src/registrationWindow.js`) rather than something
+in `/config`, and the reason is the one place it has to work: somebody who is
+not signed in. The rules grant `config` to `auth != null`, so a logged-out
+visitor on the registration page cannot read a database flag at all — a gate
+built on one could never be lifted for the people it is for.
+
+It is **not security**. It hides the forms; it does not stop anyone calling
+Firebase directly. The rules are what protect the data, and somebody who forced
+an account into existence would hold no role and see nothing.
+
+`npm start`, `npm run start:emulator` and the browser suite all set it, so local
+work is never gated.
+
 ## First-time Firebase setup
 
 Only needed once per project.
@@ -571,7 +601,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 41 suites, 895 tests, no JVM
+npm run test:ci     # 43 suites, 910 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 npm run test:e2e    # 45 journeys in a real browser, desktop and phone (needs JDK 17+)
 ```

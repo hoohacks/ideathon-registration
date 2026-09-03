@@ -25,7 +25,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "cross-env REACT_APP_REGISTRATION_OPEN=true react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:ci": "cross-env CI=true react-scripts test --watchAll=false",
@@ -38,7 +38,7 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "eject": "react-scripts eject",
-    "start:emulator": "cross-env REACT_APP_USE_EMULATOR=true react-scripts start",
+    "start:emulator": "cross-env REACT_APP_USE_EMULATOR=true REACT_APP_REGISTRATION_OPEN=true react-scripts start",
     "seed": "node scripts/seed-event.mjs",
     "test:e2e": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=8 --judges=12 --rooms=8 --schedule && playwright test\"",
     "test:e2e:ui": "playwright test --ui"

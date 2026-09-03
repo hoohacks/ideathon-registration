@@ -26,6 +26,8 @@ import {
 } from "@mui/material";
 
 import { EVENT, GRADUATION_YEARS } from "./eventInfo";
+import { REGISTRATION_OPEN } from "./registrationWindow";
+import ClosedNotice from "./ClosedNotice";
 import {
   cleanName,
   focusField,
@@ -153,6 +155,13 @@ function problemsFor(values) {
 }
 
 const Registration = () => {
+  // the site is live weeks before sign-ups are; see registrationWindow.js
+  if (!REGISTRATION_OPEN) return <ClosedNotice />;
+
+  return <RegistrationForm />;
+};
+
+const RegistrationForm = () => {
   const navigate = useNavigate();
   const { formRef, values, handleChange, collect } = useSyncedForm(INITIAL);
 

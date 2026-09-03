@@ -55,10 +55,26 @@ jobs:
       - name: Security rules
         run: npm run test:rules
 
+      # Registration is CLOSED unless the repository variable says otherwise, so
+      # a deploy that forgets it keeps strangers out rather than letting them
+      # in. Flip it in Settings -> Secrets and variables -> Actions -> Variables,
+      # then run this workflow again; no code change and no pull request.
       - name: Build
         run: npm run build
         env:
           CI: false
+          REACT_APP_REGISTRATION_OPEN: ${{ vars.REGISTRATION_OPEN }}
+
+      - name: Say which way the doors are
+        run: |
+          if [ "${{ vars.REGISTRATION_OPEN }}" = "true" ]; then
+            echo "### Registration is OPEN on this deploy" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Registration is CLOSED on this deploy" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Set the repository variable \`REGISTRATION_OPEN\` to \`true\` and re-run to open it." >> $GITHUB_STEP_SUMMARY
+            echo "Organizers can still sign in at \`#/login?staff\`." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
