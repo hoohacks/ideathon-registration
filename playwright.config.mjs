@@ -81,7 +81,13 @@ export default defineConfig({
    * inherited from whatever script happened to start something.
    */
   webServer: {
-    command: "cross-env PORT=3010 REACT_APP_USE_EMULATOR=true react-scripts start",
+    // CI=false for the dev server only: Create React App treats lint warnings as
+    // errors when CI is set, which would stop the server starting on a branch
+    // that merely has an unused import. Playwright's own CI behaviour is
+    // unaffected -- this config is read in the parent process, where CI is
+    // still whatever the runner set. BROWSER=none stops CRA opening a tab.
+    command:
+      "cross-env CI=false BROWSER=none PORT=3010 REACT_APP_USE_EMULATOR=true react-scripts start",
     url: "http://localhost:3010",
     // create-react-app takes its time on a cold start
     timeout: 180_000,

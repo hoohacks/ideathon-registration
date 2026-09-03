@@ -30,6 +30,28 @@ when you mean to.
 | `npm run test:ci` | unit tests once (what CI runs) |
 | `npm run test:rules` | rules executed against the emulator (needs a JDK) |
 | `npm run test:e2e` | the app driven in a real browser against the emulators |
+
+### What runs where
+
+| | Pull request | Push to a branch | Release | By hand |
+| --- | --- | --- | --- | --- |
+| Unit tests, rules, build | yes | yes | yes | yes |
+| Browser journeys | yes | no | no | yes |
+| Deploy to gh-pages | no | no | yes | yes |
+
+Both workflows take `workflow_dispatch`, so either can be run from the Actions
+tab on any branch. The browser suite is skipped on ordinary pushes because it
+costs minutes and a work-in-progress branch does not need it on every commit —
+it still gates every pull request.
+
+Deploying happens on a **published release**, not on a merge, and it is the one
+workflow that does not run the browser suite: a flaky spec must not stand
+between the event and a fix that needs to go out now. Its `workflow_dispatch` is
+the same emergency handle.
+
+On failure the browser job keeps its report — trace, screenshot and the DOM at
+the moment it broke — as an artifact for seven days, so a red run can be read
+without reproducing it locally.
 | `npm run build` | production bundle |
 
 `npm run seed` takes `--teams`, `--judges`, `--rooms`, `--batches`, `--scores`,
