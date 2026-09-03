@@ -111,6 +111,8 @@ const Search = require("./user/admin/Search").default;
 const JudgeSearch = require("./user/admin/JudgeSearch").default;
 const TeamSearch = require("./user/admin/TeamSearch").default;
 const JudgingProgress = require("./user/admin/JudgingProgress").default;
+const Registration = require("./Registration").default;
+const JudgeRegistration = require("./JudgeRegistration").default;
 const SchedulePreview = require("./user/admin/schedule/SchedulePreview").default;
 const SchedulePlanner = require("./user/admin/schedule/SchedulePlanner").default;
 const Metrics = require("./RegisteredAtDisplay").default;
@@ -193,6 +195,34 @@ describe("pages render without crashing", () => {
     // the two things an organizer is actually watching during the event
     expect(await screen.findByText(/scores in/)).toBeInTheDocument();
     expect(await screen.findByText(/no scores/)).toBeInTheDocument();
+  });
+
+  test("the public pages ask different people for different things", async () => {
+    // they share RegistrationShell and Hero, so they look alike -- the thing
+    // worth pinning is that they are not the same form
+    const { unmount } = render(
+      <ThemeProvider theme={theme}>
+        <MemoryRouter><JudgeRegistration /></MemoryRouter>
+      </ThemeProvider>
+    );
+
+    expect(await screen.findByText(/Mentor a shift/)).toBeInTheDocument();
+    // each section name appears twice: once in the progress rail, once on the
+    // section itself
+    expect(screen.getAllByText("Mentoring").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Judging").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Your studies")).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <ThemeProvider theme={theme}>
+        <MemoryRouter><Registration /></MemoryRouter>
+      </ThemeProvider>
+    );
+
+    expect(await screen.findByText(/An idea in the morning/)).toBeInTheDocument();
+    expect(screen.getAllByText("Your studies").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Mentoring")).not.toBeInTheDocument();
   });
 
   test("the planner opens on the first round", async () => {
