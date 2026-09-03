@@ -29,6 +29,7 @@ when you mean to.
 | `npm run seed` | fill the emulator with an event |
 | `npm run test:ci` | unit tests once (what CI runs) |
 | `npm run test:rules` | rules executed against the emulator (needs a JDK) |
+| `npm run test:e2e` | the app driven in a real browser against the emulators |
 | `npm run build` | production bundle |
 
 `npm run seed` takes `--teams`, `--judges`, `--rooms`, `--batches`, `--scores`,
@@ -547,7 +548,33 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ```
 npm run test:ci     # 39 suites, 862 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
+npm run test:e2e    # 19 journeys in a real browser (needs JDK 17+)
 ```
+
+### The four layers, and what only the last two can see
+
+| Layer | Runs | Blind to |
+| --- | --- | --- |
+| Pure logic | the arithmetic, no I/O | anything about the database or the screen |
+| Service tests | the shape of each write, database mocked | **permission denials — every read succeeds** |
+| Render smoke | each page in jsdom | **layout: jsdom has no viewport** |
+| `test:rules` | the real rules engine, as different users | the app |
+| `test:e2e` | a real browser, real rules, real routing | nothing above it, but slow |
+
+Three bugs shipped because of the two "blind to" rows: joining a team failed on
+a read the rules always refuse, the planner stacked two full-height page frames
+so its content sat below the fold, and the room sheets had no link to them. The
+e2e specs pin all three.
+
+`test:e2e` starts the emulators, seeds an event, and runs the app on port
+**3010** — never 3000, and never reusing an existing server. That is deliberate:
+Playwright's default would adopt whatever dev server is already running, and if
+that one was not started in emulator mode the specs sign in against the **live
+project**. A spec that publishes a schedule would then publish it for real.
+
+One wrinkle on Windows: `firebase emulators:exec` sometimes leaves its Java
+process holding port 9000, and the next run fails with "port taken". Kill it and
+re-run.
 
 | Suite | Pins |
 | --- | --- |

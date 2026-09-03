@@ -39,7 +39,9 @@
     "deploy": "gh-pages -d build",
     "eject": "react-scripts eject",
     "start:emulator": "cross-env REACT_APP_USE_EMULATOR=true react-scripts start",
-    "seed": "node scripts/seed-event.mjs"
+    "seed": "node scripts/seed-event.mjs",
+    "test:e2e": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=8 --judges=12 --rooms=8 && playwright test\"",
+    "test:e2e:ui": "playwright test --ui"
   },
   "eslintConfig": {
     "extends": [
@@ -61,6 +63,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^2.0.7",
+    "@playwright/test": "^1.62.1",
     "cross-env": "^7.0.3",
     "firebase-tools": "^13.29.1",
     "gh-pages": "^4.0.0",

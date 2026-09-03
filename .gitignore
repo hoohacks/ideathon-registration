@@ -43,3 +43,7 @@ scripts/backups/
 # agent scratch: worktrees and subagent-driven-development ledgers
 .claude/worktrees/
 .superpowers/
+/playwright-report
+/test-results
+/blob-report
+/playwright/.cache
