@@ -8,7 +8,7 @@
  * nesting. It asserts the page paints something recognisable, not how it looks.
  */
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "./theme";
@@ -112,6 +112,7 @@ const JudgeSearch = require("./user/admin/JudgeSearch").default;
 const TeamSearch = require("./user/admin/TeamSearch").default;
 const JudgingProgress = require("./user/admin/JudgingProgress").default;
 const SchedulePreview = require("./user/admin/schedule/SchedulePreview").default;
+const SchedulePlanner = require("./user/admin/schedule/SchedulePlanner").default;
 const Metrics = require("./RegisteredAtDisplay").default;
 const Scan = require("./user/admin/Scan").default;
 const Control = require("./user/admin/Control").default;
@@ -192,6 +193,33 @@ describe("pages render without crashing", () => {
     // the two things an organizer is actually watching during the event
     expect(await screen.findByText(/scores in/)).toBeInTheDocument();
     expect(await screen.findByText(/no scores/)).toBeInTheDocument();
+  });
+
+  test("the planner opens on the first round", async () => {
+    renderPage(SchedulePlanner, { userTypes: ["admin"] });
+    expect(await screen.findByRole("tab", { name: "First round" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Schedule preview" })).toBeInTheDocument();
+  });
+
+  test("the planner draws one page frame, not two", async () => {
+    // Layout is the whole frame -- a 100vh box with the nav and the footer in
+    // it. Two of them stacked pushed the planner a full screen below the fold,
+    // which reads as a blank page in a browser and as a pass in jsdom, since
+    // jsdom has no viewport. Counting frames is the part jsdom can see.
+    renderPage(SchedulePlanner, { userTypes: ["admin"] });
+    await screen.findByRole("tab", { name: "First round" });
+
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
+    expect(screen.getAllByRole("contentinfo")).toHaveLength(1);
+  });
+
+  test("the final round tab draws one page frame too", async () => {
+    renderPage(SchedulePlanner, { userTypes: ["admin"] });
+    fireEvent.click(await screen.findByRole("tab", { name: "Final round" }));
+
+    expect(await screen.findByRole("heading", { name: "Final round" })).toBeInTheDocument();
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /Build a final round plan/ })).toBeInTheDocument();
   });
 
   test("schedule preview", async () => {

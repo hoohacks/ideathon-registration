@@ -14,6 +14,14 @@ import FinalRoundPlanner from "./FinalRoundPlanner.js";
  * the same page, and one nav entry covers both.
  *
  * `?round=final` so the Judging page can link straight to the half it means.
+ *
+ * **One `Layout` per page.** `Layout` is the whole page frame: a 100vh box with
+ * the site nav and the footer in it. Rendering the tabs in their own Layout
+ * above the preview stacked two of those, so the first screenful was a nav, a
+ * tab strip, a viewport-tall empty container and a footer — the planner sat one
+ * full screen below the fold and the page read as blank. jsdom has no viewport,
+ * so only a browser showed it. The tabs are therefore handed to whichever view
+ * is showing and rendered inside its frame.
  */
 export default function SchedulePlanner() {
   const [params, setParams] = useSearchParams();
@@ -25,37 +33,23 @@ export default function SchedulePlanner() {
     setParams(next === "final" ? { round: "final" } : {}, { replace: true });
   }
 
-  // The first-round preview brings its own Layout and heading; the final round
-  // planner is a section, so it gets them here.
-  if (round === "first") {
-    return (
-      <>
-        <RoundTabs round={round} onPick={pick} />
-        <SchedulePreview />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <RoundTabs round={round} onPick={pick} />
-      <Layout maxWidth="lg">
-        <Stack spacing={2}>
-          <Typography variant="h1">Final round</Typography>
-          <FinalRoundPlanner />
-        </Stack>
-      </Layout>
-    </>
+  const tabs = (
+    <Tabs value={round} onChange={(_, next) => pick(next)} sx={{ mb: 2 }}>
+      <Tab value="first" label="First round" />
+      <Tab value="final" label="Final round" />
+    </Tabs>
   );
-}
 
-function RoundTabs({ round, onPick }) {
+  // the first-round preview owns its own frame, so the tabs go into it
+  if (round === "first") return <SchedulePreview header={tabs} />;
+
   return (
-    <Layout maxWidth="lg" sx={{ pb: 0 }}>
-      <Tabs value={round} onChange={(_, next) => onPick(next)}>
-        <Tab value="first" label="First round" />
-        <Tab value="final" label="Final round" />
-      </Tabs>
+    <Layout maxWidth="lg">
+      {tabs}
+      <Stack spacing={2}>
+        <Typography variant="h1">Final round</Typography>
+        <FinalRoundPlanner />
+      </Stack>
     </Layout>
   );
 }

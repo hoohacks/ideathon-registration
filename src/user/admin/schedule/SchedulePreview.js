@@ -52,7 +52,7 @@ function formatAge(createdAt) {
   return new Date(createdAt).toLocaleString();
 }
 
-export default function SchedulePreview() {
+export default function SchedulePreview({ header = null }) {
   const navigate = useNavigate();
 
   // undefined: subscription has not delivered its first value yet.
@@ -285,6 +285,7 @@ export default function SchedulePreview() {
   if (plan === undefined) {
     return (
       <Layout maxWidth="lg">
+        {header}
         <Typography variant="body2">Loading the schedule preview…</Typography>
       </Layout>
     );
@@ -293,6 +294,7 @@ export default function SchedulePreview() {
   if (plan === null) {
     return (
       <Layout maxWidth="lg">
+        {header}
         <Stack spacing={3}>
           <Typography variant="h1">Schedule preview</Typography>
 
@@ -342,6 +344,7 @@ export default function SchedulePreview() {
 
   return (
     <Layout maxWidth="lg">
+      {header}
       <Stack spacing={2} sx={{ pb: 10 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
