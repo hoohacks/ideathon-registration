@@ -164,6 +164,7 @@ function JudgingProgress() {
   const [judges, setJudges] = useState({});
   const [scores, setScores] = useState({});
   const [legacyScores, setLegacyScores] = useState({});
+  const [finalRoundTeams, setFinalRoundTeams] = useState(null);
   const [round, setRound] = useState(FIRST_ROUND);
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
@@ -179,6 +180,12 @@ function JudgingProgress() {
       ),
       onValue(ref(database, "judges"), (snap) => setJudges(snap.val() ?? {}), (e) =>
         setError(e.message)
+      ),
+      // the finalists, and nothing about the first round says who they are
+      onValue(
+        ref(database, "finalRound/teams"),
+        (snap) => setFinalRoundTeams(snap.exists() ? snap.val() : null),
+        (e) => setError(e.message)
       ),
     ];
     return () => stop.forEach((fn) => fn());
@@ -213,9 +220,11 @@ function JudgingProgress() {
     return out;
   }, [scores, legacyScores]);
 
+  const final = round === FINAL_ROUND;
+
   const { teamRows, judgeRows, totals } = useMemo(
-    () => buildProgress({ teams, judges, scores: merged }),
-    [teams, judges, merged]
+    () => buildProgress({ teams, judges, scores: merged, final, finalRoundTeams }),
+    [teams, judges, merged, final, finalRoundTeams]
   );
 
   const allJudges = useMemo(
@@ -278,10 +287,16 @@ function JudgingProgress() {
         </Alert>
       )}
 
+      {final && !finalRoundTeams && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          The final round has not been activated, so there are no finalists to show yet.
+        </Alert>
+      )}
+
       {totals.unjudged > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {totals.unjudged} team{totals.unjudged === 1 ? " has" : "s have"} no scores at all.
-          Use Judges on a row to send someone.
+          {final ? " Check the panel is in the room." : " Use Judges on a row to send someone."}
         </Alert>
       )}
 
@@ -339,9 +354,14 @@ function JudgingProgress() {
                   </Box>
 
                   <Stack direction="row" spacing={1}>
-                    <Button size="small" variant="outlined" onClick={() => setReassigning(team)}>
-                      Judges
-                    </Button>
+                    {/* the dialog writes teamAssignments, which is the first
+                        round's node -- pressing it here would edit the wrong
+                        round. Final round panels are set when it is planned. */}
+                    {!final && (
+                      <Button size="small" variant="outlined" onClick={() => setReassigning(team)}>
+                        Judges
+                      </Button>
+                    )}
                     <Button size="small" variant="outlined" onClick={() => setScoring(team)}>
                       Record score
                     </Button>
@@ -352,7 +372,7 @@ function JudgingProgress() {
           })}
         </RowList>
       ) : (
-        <RowList empty="No first round judges yet.">
+        <RowList empty={final ? "No judges have final round assignments." : "No first round judges yet."}>
           {visibleJudges.map((judge) => {
             const left = judge.assignedCount - judge.submittedCount;
             return (

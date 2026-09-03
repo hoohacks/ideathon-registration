@@ -34,20 +34,58 @@ function rosterOf(schedule) {
  * @param judges   the /judges node
  * @param scores   { teamId: { judgeUid: card } } for the round being shown
  * @param minJudges below this a team is flagged as thinly judged
+ * @param final    show the final round instead of the first
+ * @param finalRoundTeams the /finalRound/teams node, required when final
  */
-export function buildProgress({ teams = {}, judges = {}, scores = {}, minJudges = 2 } = {}) {
+export function buildProgress({
+  teams = {},
+  judges = {},
+  scores = {},
+  minJudges = 2,
+  final = false,
+  finalRoundTeams = null,
+} = {}) {
   const judgeEntries = Object.entries(judges ?? {});
 
-  const teamRows = Object.entries(teams ?? {})
-    .filter(([, team]) => team?.schedule || team?.submitted)
+  // Which teams the round is about, and where each one presents. The final
+  // round is not a filtered view of the first: a different set of teams, in a
+  // different room, at a different time, in front of a different panel. Reading
+  // team.schedule while showing final-round scores put every submitted team on
+  // the page with its first-round room and its first-round panel, none of which
+  // has anything to do with what is happening on stage.
+  const inRound = final
+    ? Object.entries(finalRoundTeams ?? {}).map(([teamId, standing]) => [
+        teamId,
+        teams?.[teamId] ?? { name: standing?.name, submitted: true },
+      ])
+    : Object.entries(teams ?? {}).filter(([, team]) => team?.schedule || team?.submitted);
+
+  // In the final round the panel is not on the team, it is on each judge --
+  // /judges/{uid}/finalAssignments is what the rules treat as proof of
+  // assignment, so it is also the truth about who is expected to score.
+  const finalPanels = {};
+  if (final) {
+    for (const [judgeId, judge] of judgeEntries) {
+      for (const teamId of Object.keys(judge?.finalAssignments ?? {})) {
+        (finalPanels[teamId] ??= []).push({
+          judgeId,
+          judgeName: judgeName(judge, "Unnamed Judge"),
+        });
+      }
+    }
+  }
+
+  const teamRows = inRound
     .map(([teamId, team]) => {
-      const schedule = team?.schedule;
-      const assigned = rosterOf(schedule).map((entry) => ({
-        judgeId: entry.judgeId,
-        // the roster caches the name, but the judge record is the truth if
-        // they have since corrected it
-        judgeName: judgeName(judges[entry.judgeId], entry.judgeName ?? "Unnamed Judge"),
-      }));
+      const schedule = final ? team?.finalSlot : team?.schedule;
+      const assigned = final
+        ? (finalPanels[teamId] ?? [])
+        : rosterOf(schedule).map((entry) => ({
+            judgeId: entry.judgeId,
+            // the roster caches the name, but the judge record is the truth if
+            // they have since corrected it
+            judgeName: judgeName(judges[entry.judgeId], entry.judgeName ?? "Unnamed Judge"),
+          }));
 
       const cards = scores?.[teamId] ?? {};
       const scoredBy = new Set(Object.keys(cards));
@@ -70,7 +108,7 @@ export function buildProgress({ teams = {}, judges = {}, scores = {}, minJudges 
         name: team?.name ?? "Unnamed Team",
         submitted: Boolean(team?.submitted),
         room: schedule?.room ?? null,
-        time: schedule?.time ?? null,
+        time: (final ? schedule?.timeslot : schedule?.time) ?? null,
         batch: schedule?.batch ?? null,
         assigned,
         outstanding,
@@ -92,7 +130,7 @@ export function buildProgress({ teams = {}, judges = {}, scores = {}, minJudges 
 
   const judgeRows = judgeEntries
     .map(([judgeId, judge]) => {
-      const assignments = assignmentList(judge?.teamAssignments);
+      const assignments = assignmentList(final ? judge?.finalAssignments : judge?.teamAssignments);
       const submitted = assignments.filter((assignment) => {
         const teamId = assignment.id ?? assignment.teamId;
         return Boolean(scores?.[teamId]?.[judgeId]);
@@ -112,7 +150,9 @@ export function buildProgress({ teams = {}, judges = {}, scores = {}, minJudges 
         }),
       };
     })
-    .filter((row) => row.isRound1Judge || row.assignedCount > 0)
+    // a round-one judge with nothing to do in the final -- every finalist
+    // already scored by them -- is not somebody to chase
+    .filter((row) => (final ? row.assignedCount > 0 : row.isRound1Judge || row.assignedCount > 0))
     .sort((a, b) => {
       // most outstanding work first, so the judge to chase is at the top
       const aLeft = a.assignedCount - a.submittedCount;

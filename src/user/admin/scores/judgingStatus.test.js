@@ -230,3 +230,89 @@ describe("teams that are not scheduled", () => {
     expect(buildProgress(data).teamRows.map((r) => r.name)).not.toContain("Epsilon");
   });
 });
+
+/**
+ * The final round is not a filtered view of the first.
+ *
+ * Switching the round used to swap nothing but which /scores node was read, so
+ * the page showed every submitted team, in its first-round room, in front of
+ * its first-round panel, with a Judges button that wrote to the first round's
+ * assignments. None of that describes what is happening on stage.
+ */
+describe("the final round shows the final round", () => {
+  function finalFixture() {
+    return {
+      teams: {
+        t1: { name: "Alpha", submitted: true, schedule: scheduleFor("t1", ["j1", "j2"]),
+              finalSlot: { room: "Rice 011", timeslot: "Slot 1" } },
+        t2: { name: "Beta", submitted: true, schedule: scheduleFor("t2", ["j1", "j2"], 2),
+              finalSlot: { room: "Rice 011", timeslot: "Slot 2" } },
+        t3: { name: "Gamma", submitted: true, schedule: scheduleFor("t3", ["j1"], 3) },
+      },
+      judges: {
+        j1: { ...judge("Ada"), teamAssignments: { t3: scheduleFor("t3", ["j1"], 3) },
+              finalAssignments: { t1: { teamId: "t1", teamName: "Alpha", room: "Rice 011", timeslot: "Slot 1" } } },
+        j2: { ...judge("Bo"), teamAssignments: {},
+              finalAssignments: {
+                t1: { teamId: "t1", teamName: "Alpha", room: "Rice 011", timeslot: "Slot 1" },
+                t2: { teamId: "t2", teamName: "Beta", room: "Rice 011", timeslot: "Slot 2" },
+              } },
+        j3: { ...judge("Cy"), teamAssignments: {} },
+      },
+      scores: { t1: { j1: card() } },
+      final: true,
+      finalRoundTeams: {
+        t1: { name: "Alpha", timeslot: "Slot 1", room: "Rice 011" },
+        t2: { name: "Beta", timeslot: "Slot 2", room: "Rice 011" },
+      },
+    };
+  }
+
+  test("only the finalists are listed", () => {
+    const { teamRows } = buildProgress(finalFixture());
+    expect(teamRows.map((r) => r.name).sort()).toEqual(["Alpha", "Beta"]);
+  });
+
+  test("the room and time come from the final slot, not the first round's", () => {
+    const alpha = buildProgress(finalFixture()).teamRows.find((r) => r.name === "Alpha");
+    expect(alpha.room).toBe("Rice 011");
+    expect(alpha.time).toBe("Slot 1");
+  });
+
+  test("the panel comes from the judges' final assignments", () => {
+    const alpha = buildProgress(finalFixture()).teamRows.find((r) => r.name === "Alpha");
+    expect(alpha.assigned.map((a) => a.judgeId).sort()).toEqual(["j1", "j2"]);
+    expect(alpha.expected).toBe(2);
+    expect(alpha.received).toBe(1);
+    expect(alpha.outstanding.map((a) => a.judgeId)).toEqual(["j2"]);
+  });
+
+  test("a finalist nobody has scored is flagged", () => {
+    const beta = buildProgress(finalFixture()).teamRows.find((r) => r.name === "Beta");
+    expect(beta.status).toBe(TEAM_UNJUDGED);
+  });
+
+  test("judge rows count final assignments, not first round ones", () => {
+    const { judgeRows } = buildProgress(finalFixture());
+    const ada = judgeRows.find((r) => r.name === "Ada Judge");
+    expect(ada.assignedCount).toBe(1);
+    expect(ada.submittedCount).toBe(1);
+  });
+
+  test("a round-one judge with no final assignments is not listed to chase", () => {
+    const { judgeRows } = buildProgress(finalFixture());
+    expect(judgeRows.map((r) => r.name)).not.toContain("Cy Judge");
+  });
+
+  test("before activation there are no finalists, not every team", () => {
+    const { teamRows, totals } = buildProgress({ ...finalFixture(), finalRoundTeams: null });
+    expect(teamRows).toEqual([]);
+    expect(totals.percent).toBe(0);
+  });
+
+  test("the first round is untouched by any of this", () => {
+    const { teamRows } = buildProgress(fixture());
+    expect(teamRows).toHaveLength(3);
+    expect(teamRows.find((r) => r.name === "Alpha").room).toBe("Rice 110");
+  });
+});
