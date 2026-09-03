@@ -40,7 +40,7 @@
     "eject": "react-scripts eject",
     "start:emulator": "cross-env REACT_APP_USE_EMULATOR=true react-scripts start",
     "seed": "node scripts/seed-event.mjs",
-    "test:e2e": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=8 --judges=12 --rooms=8 && playwright test\"",
+    "test:e2e": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=8 --judges=12 --rooms=8 --schedule && playwright test\"",
     "test:e2e:ui": "playwright test --ui"
   },
   "eslintConfig": {

@@ -20,32 +20,35 @@ test("an organizer can build a plan, publish it, and a judge then has cards", as
   await goto(organizer, "/user/admin/schedule");
   await expectPagePainted(organizer);
 
-  // Build is only offered when no draft is open; a previous run may have left
-  // one, in which case the plan is already on screen.
-  const build = organizer.getByRole("button", { name: /Build a plan|Build the plan/i });
-  if (await build.isVisible().catch(() => false)) {
-    await build.click();
-  }
+  // The planner loads its draft asynchronously, so probing for a button before
+  // it has rendered races the page and silently does nothing. Wait for whichever
+  // state the page settles into: a draft already open, or the build prompt.
+  const build = organizer.getByRole("button", { name: "Build a plan" });
+  const publish = organizer.getByRole("button", { name: "Publish schedule" });
 
-  // the stats bar above the grid is what tells you the plan exists
-  await expect(organizer.getByRole("button", { name: /^Publish/i })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(build.or(publish).first()).toBeVisible({ timeout: 30_000 });
+  if (await build.isVisible()) await build.click();
 
-  await organizer.getByRole("button", { name: /^Publish/i }).click();
+  await expect(publish).toBeVisible({ timeout: 30_000 });
+  await publish.click();
 
-  // publishing asks for a typed confirmation whenever a schedule may exist
-  const phrase = organizer.getByLabel(/type/i);
-  if (await phrase.isVisible().catch(() => false)) {
-    const expected = await organizer
-      .getByText(/type .* to confirm/i)
-      .textContent()
-      .catch(() => null);
-    const match = expected?.match(/type\s+(.+?)\s+to confirm/i);
-    if (match) await phrase.fill(match[1].replace(/[“”"]/g, "").trim());
-  }
+  // Publishing over an existing schedule asks for a typed phrase: the event
+  // name if one is set, the team count otherwise. Read it off the field rather
+  // than assuming, because it changes with the data.
+  const dialog = organizer.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: /Publish this schedule/ })).toBeVisible();
 
-  const confirm = organizer.getByRole("button", { name: /^(Publish|Confirm)/i }).last();
+  const field = dialog.getByRole("textbox");
+  // the prompt is a label, not an aria-label, so read what is on screen
+  const prompt = (await dialog.getByText(/Type\s+".+?"\s+to confirm/).first().textContent()) ?? "";
+  const phrase = prompt.match(/Type\s+"(.+?)"\s+to confirm/)?.[1];
+  expect(phrase, `could not read the confirmation phrase from "${prompt}"`).toBeTruthy();
+
+  const confirm = dialog.getByRole("button", { name: "Publish", exact: true });
+  await expect(confirm).toBeDisabled();
+
+  await field.fill(phrase);
+  await expect(confirm).toBeEnabled();
   await confirm.click();
 
   // publishing navigates to judging progress
@@ -63,6 +66,26 @@ test("an organizer can build a plan, publish it, and a judge then has cards", as
 
   await organizer.close();
   await judge.close();
+});
+
+test("the typed phrase is the guard: a wrong one cannot publish", async ({ page }) => {
+  await signIn(page, "admin");
+  await goto(page, "/user/admin/schedule");
+
+  const build = page.getByRole("button", { name: "Build a plan" });
+  const publish = page.getByRole("button", { name: "Publish schedule" });
+
+  await expect(build.or(publish).first()).toBeVisible({ timeout: 30_000 });
+  if (await build.isVisible()) await build.click();
+
+  await publish.click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox").fill("not the phrase");
+  await expect(dialog.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test("judging progress shows the first round, and the final round separately", async ({ page }) => {
