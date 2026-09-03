@@ -3,6 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { AuthContext } from "../App";
 import { hasRole, roleList } from "../roles";
+import AdminHome from "./admin/AdminHome";
 import { Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { ref, onValue } from "firebase/database";
 import { database } from "../firebase";
@@ -102,6 +103,7 @@ function Home() {
     }, [eventStart]);
 
     const roles = roleList(userTypes);
+    const isAdmin = hasRole(userTypes, "admin");
     const isCompetitor = hasRole(userTypes, "competitor");
     const isJudge = hasRole(userTypes, "judge");
     const onATeam = Boolean(userData?.teamId);
@@ -193,6 +195,9 @@ function Home() {
                         </Stack>
                     )}
                 </Box>
+
+                {/* organizers first: this page used to build nothing for them */}
+                {isAdmin && <AdminHome />}
 
                 <Card>
                     <CardContent sx={{ py: 3.5, "&:last-child": { pb: 3.5 } }}>

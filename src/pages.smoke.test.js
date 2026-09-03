@@ -135,6 +135,22 @@ describe("pages render without crashing", () => {
     expect(await screen.findByText(/Welcome/)).toBeInTheDocument();
   });
 
+  test("an organizer's dashboard tells them where the day is", async () => {
+    // it used to build cards for competitors and for judges and nothing for
+    // organizers, so the people running the event landed on an empty page
+    renderPage(Home, { userTypes: ["admin"] });
+
+    expect(await screen.findByText("Event status")).toBeInTheDocument();
+    expect(screen.getByText("Before judging can run")).toBeInTheDocument();
+    expect(screen.getByText("Judging rooms added")).toBeInTheDocument();
+  });
+
+  test("a competitor's dashboard is unchanged by that", async () => {
+    renderPage(Home, { userTypes: ["competitor"] });
+    await screen.findByText(/Welcome/);
+    expect(screen.queryByText("Event status")).not.toBeInTheDocument();
+  });
+
   test("profile", async () => {
     renderPage(Profile, { userTypes: ["competitor"] });
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();

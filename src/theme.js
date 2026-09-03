@@ -12,12 +12,12 @@ import { createTheme } from "@mui/material/styles";
  *
  * Three rules hold it together.
  *
- * **Colour is reserved for state.** The interface itself is neutral: buttons,
- * controls and chrome are ink. Crimson -- the brand, sampled from the logo --
- * appears only where something is genuinely live, and red only where something
- * is genuinely wrong. Crimson used to be the primary action colour, which put
- * "Publish schedule" in the same register as "3 teams have no scores at all" on
- * a page whose entire job is telling you which is which.
+ * **The accent is the brand, and the alert is not.** Crimson carries the
+ * interface: primary actions, the progress meter, focus rings. What it must not
+ * do is double as the alert colour -- "Publish schedule" and "3 teams have no
+ * scores at all" cannot read at the same volume on a page whose entire job is
+ * telling you which is which. So the error red is a deliberately darker
+ * oxblood, in the same family but plainly not the same colour.
  *
  * **The numbers are the content.** Times, rooms, slots, scores, batches and
  * counts are set in IBM Plex Mono with tabular figures, so a schedule grid or a
@@ -34,8 +34,8 @@ import { createTheme } from "@mui/material/styles";
  * There is no light surface it can sit on.
  */
 
-// Brand. Sampled from the logo: every crimson pixel in it is exactly this.
-// Reserved for the wordmark and for live state -- never for ordinary actions.
+// Brand. Sampled from the logo: every crimson pixel in it is exactly this, and
+// it carries the interface -- primary actions, the progress meter, focus rings.
 const BRAND = "#d62749";
 const BRAND_DARK = "#b41f3c";
 const BRAND_WASH = "#fdf0f3";
@@ -79,9 +79,8 @@ const ACCENT_WASH = BRAND_WASH;
 
 const theme = createTheme({
   palette: {
-    // Actions are neutral. See "colour is reserved for state" above.
-    primary: { main: INK, dark: INK_HOVER, contrastText: "#fff" },
-    secondary: { main: BRAND, dark: BRAND_DARK, contrastText: "#fff" },
+    primary: { main: BRAND, dark: BRAND_DARK, contrastText: "#fff" },
+    secondary: { main: INK, dark: INK_HOVER, contrastText: "#fff" },
     error: { main: DANGER },
     warning: { main: CAUTION },
     success: { main: GOOD },
@@ -142,7 +141,7 @@ const theme = createTheme({
         body: { backgroundColor: CANVAS, color: INK },
         // Every interactive element gets the same ring. Browsers disagree on
         // the default and MUI removes several of them.
-        ":focus-visible": { outline: `2px solid ${INK}`, outlineOffset: 2 },
+        ":focus-visible": { outline: `2px solid ${BRAND}`, outlineOffset: 2 },
       },
     },
 
@@ -155,7 +154,7 @@ const theme = createTheme({
       styleOverrides: {
         root: { paddingInline: 14, minHeight: 36, borderRadius: 6 },
         // colour change only -- no scaling, no shadow bloom
-        containedPrimary: { "&:hover": { backgroundColor: INK_HOVER } },
+        containedPrimary: { "&:hover": { backgroundColor: BRAND_DARK } },
         outlined: {
           borderColor: LINE_STRONG,
           color: INK,

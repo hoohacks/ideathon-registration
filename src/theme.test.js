@@ -19,14 +19,13 @@ const luminance = (hex) => {
 };
 const onWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
 
-describe("colour means state", () => {
-  test("actions are neutral, not the brand", () => {
-    expect(theme.palette.primary.main).toBe(tokens.INK);
-    expect(theme.palette.primary.main).not.toBe(tokens.BRAND);
+describe("the accent is the brand, the alert is not", () => {
+  test("the brand carries the interface", () => {
+    expect(theme.palette.primary.main).toBe(tokens.BRAND);
   });
 
-  test("the brand is still available, as its own role", () => {
-    expect(theme.palette.secondary.main).toBe(tokens.BRAND);
+  test("ink is still available, as its own role", () => {
+    expect(theme.palette.secondary.main).toBe(tokens.INK);
   });
 
   test("danger is separable from the brand, not a near miss of it", () => {
