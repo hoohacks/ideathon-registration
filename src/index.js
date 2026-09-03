@@ -7,6 +7,12 @@ import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
 import theme from "./theme";
 import "./index.css";
+import { redirectToHashRoute } from "./hashRedirect";
+
+// Before anything renders: a path-shaped URL (…/judge-registration) has an
+// empty hash, so the router would match "/" and quietly serve the competitor
+// form. Send it to the hash route it meant instead.
+redirectToHashRoute();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

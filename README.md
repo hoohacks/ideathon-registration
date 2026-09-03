@@ -86,8 +86,19 @@ URL.
 | Competitor registration | `/` and `/ideathon-registration` | name, email, major, school year, skills, resume upload, dietary needs |
 | Judge registration | `/judge-registration` | name, email, company, whether they can mentor and which shifts, whether they can judge, skills |
 
-Locally that is `http://localhost:3000/judge-registration`; in production,
-`hoohacks.github.io/ideathon-registration/judge-registration`.
+**The app is a HashRouter, so every route lives after a `#`:**
+
+| | URL |
+| --- | --- |
+| Local | `http://localhost:3000/#/judge-registration` |
+| Production | `https://hoohacks.github.io/ideathon-registration/#/judge-registration` |
+
+The same URL without the `#` used to serve the **competitor** form — an empty
+hash matches `/` — so a judge sent the tidy-looking link signed up as a
+competitor with nothing on screen to say so. `src/hashRedirect.js` now rewrites
+a path-shaped URL to the hash route of the same name before React mounts, and
+`public/404.html` does it on GitHub Pages, where such a request never reaches
+the bundle. Both URLs work; the `#` one is still the one to send.
 
 They share `RegistrationShell` and `Hero`, so the two forms are siblings by
 design. The judge one carries **its own accent** — indigo rather than the
@@ -453,7 +464,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 31 suites, 733 tests, no JVM
+npm run test:ci     # 32 suites, 745 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 

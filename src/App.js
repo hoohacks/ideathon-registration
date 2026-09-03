@@ -178,6 +178,10 @@ function App() {
             <Route path="control" element={<ProtectedRoute requiredRoles={["admin"]}><Control /></ProtectedRoute>} />
           </Route>
         </Route>
+
+        {/* an unmatched hash route rendered nothing at all, which reads as the
+            app being broken rather than the address being wrong */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
   )

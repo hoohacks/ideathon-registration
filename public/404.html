@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ideathon</title>
+    <meta name="robots" content="noindex" />
+    <script>
+      // GitHub Pages serves this for any path it has no file for.
+      //
+      // The app is a HashRouter, so its routes live after a "#". A tidy-looking
+      // link -- /ideathon-registration/judge-registration -- is not a file, so
+      // without this it is a GitHub 404 and the person never reaches the app at
+      // all. Rewrite it to the hash route of the same name.
+      //
+      // src/hashRedirect.js does the same job wherever the bundle does load.
+      (function () {
+        var base = "/ideathon-registration";
+        var loc = window.location;
+
+        var path = loc.pathname.indexOf(base) === 0 ? loc.pathname.slice(base.length) : loc.pathname;
+        path = path.replace(/^\/+/, "").replace(/\/+$/, "");
+
+        // the root already serves index.html, so there is nothing to rewrite
+        loc.replace(base + "/" + (path ? "#/" + path : "") + loc.search);
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>
+      This page needs JavaScript. Go to
+      <a href="/ideathon-registration/">the Ideathon site</a>.
+    </noscript>
+  </body>
+</html>
