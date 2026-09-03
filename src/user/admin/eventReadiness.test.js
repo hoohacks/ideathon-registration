@@ -6,7 +6,9 @@
  * the moment an organizer walked into it. This is the same arithmetic, asked
  * early enough to act on.
  */
-import { readEventState, SETUP, READY, SCHEDULED, JUDGING, FINAL } from "./eventReadiness";
+import {
+  readEventState, REQUIRED_RULES_VERSION, SETUP, READY, SCHEDULED, JUDGING, FINAL,
+} from "./eventReadiness";
 
 const teams = (n, { submitted = n, scheduled = 0 } = {}) =>
   Object.fromEntries(
@@ -126,5 +128,49 @@ describe("what to do next", () => {
   test("never more than three, or it is the dropdown again", () => {
     const state = readEventState({ ...ready, teams: teams(9, { scheduled: 9 }), scoredTeams: 4, hasDraft: true });
     expect(state.actions.length).toBeLessThanOrEqual(3);
+  });
+});
+
+/**
+ * Two things that must happen before the event and that nothing else would
+ * mention, because both fail quietly: unpublished rules make a restore point
+ * silently do nothing, and an unfinished migration reads every average from two
+ * places at once.
+ */
+describe("what fails silently if nobody does it", () => {
+  const ids = (state) => state.blockers.map((b) => b.id);
+
+  test("rules nobody has recorded as published are a blocker", () => {
+    expect(ids(readEventState(ready))).toContain("rules");
+  });
+
+  test("an older recorded version is still a blocker, and says which", () => {
+    const state = readEventState({ ...ready, config: { ...ready.config, rulesVersion: 3 } });
+    const rules = state.blockers.find((b) => b.id === "rules");
+    expect(rules.detail).toMatch(/Version 3 is recorded/);
+  });
+
+  test("the required version published clears it", () => {
+    const state = readEventState({
+      ...ready,
+      config: { ...ready.config, rulesVersion: REQUIRED_RULES_VERSION },
+    });
+    expect(ids(state)).not.toContain("rules");
+  });
+
+  test("scores left under the team node are a blocker, counted", () => {
+    const state = readEventState({ ...ready, legacyScoreTeams: 4 });
+    const migration = state.blockers.find((b) => b.id === "migration");
+    expect(migration.detail).toMatch(/4 teams still have/);
+  });
+
+  test("no legacy cards left is not a blocker", () => {
+    expect(ids(readEventState({ ...ready, legacyScoreTeams: 0 }))).not.toContain("migration");
+  });
+
+  test("every blocker says how to clear it, not just that it exists", () => {
+    for (const blocker of readEventState(ready).blockers) {
+      expect(blocker.how.length).toBeGreaterThan(20);
+    }
   });
 });

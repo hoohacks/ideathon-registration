@@ -27,11 +27,17 @@ export default function AdminHome() {
   const [scoredTeams, setScoredTeams] = useState(0);
   const [finalActive, setFinalActive] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [legacyScoreTeams, setLegacyScoreTeams] = useState(0);
 
   useEffect(() => {
     const stop = [
       onValue(ref(database, "config"), (s) => setConfig(s.val() ?? {})),
-      onValue(ref(database, "teams"), (s) => setTeams(s.val() ?? {})),
+      onValue(ref(database, "teams"), (s) => {
+        const all = s.val() ?? {};
+        setTeams(all);
+        // cards still under the team node mean migrate-scores has not been run
+        setLegacyScoreTeams(Object.values(all).filter((team) => team?.scores).length);
+      }),
       onValue(ref(database, "judges"), (s) => setJudges(s.val() ?? {})),
       onValue(ref(database, "competitors"), (s) => setCompetitors(s.val() ?? {})),
       onValue(ref(database, "scores/first"), (s) => setScoredTeams(Object.keys(s.val() ?? {}).length)),
@@ -42,8 +48,11 @@ export default function AdminHome() {
   }, []);
 
   const state = useMemo(
-    () => readEventState({ config, teams, judges, competitors, scoredTeams, finalActive, hasDraft }),
-    [config, teams, judges, competitors, scoredTeams, finalActive, hasDraft]
+    () =>
+      readEventState({
+        config, teams, judges, competitors, scoredTeams, finalActive, hasDraft, legacyScoreTeams,
+      }),
+    [config, teams, judges, competitors, scoredTeams, finalActive, hasDraft, legacyScoreTeams]
   );
 
   const { counts } = state;
@@ -51,6 +60,28 @@ export default function AdminHome() {
 
   return (
     <Stack spacing={2.5}>
+      {/* Both of these fail silently rather than loudly, so nothing else in the
+          app would ever mention them. */}
+      {state.blockers.map((blocker) => (
+        <Alert
+          key={blocker.id}
+          severity="error"
+          action={
+            <Button size="small" component={RouterLink} to={blocker.to}>
+              Open
+            </Button>
+          }
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600, color: "inherit" }}>
+            {blocker.title}
+          </Typography>
+          <Typography variant="body2">{blocker.detail}</Typography>
+          <Typography variant="caption" component="p" sx={{ mt: 0.5 }}>
+            {blocker.how}
+          </Typography>
+        </Alert>
+      ))}
+
       <Card>
         <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
           <Stack

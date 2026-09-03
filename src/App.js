@@ -25,6 +25,8 @@ import TeamDashboard from "./user/admin/TeamSearch.js"
 import JudgingProgress from "./user/admin/JudgingProgress.js"
 import Control from "./user/admin/Control.js"
 import SchedulePlanner from "./user/admin/schedule/SchedulePlanner.js"
+import Results from "./user/admin/results/Results.js"
+import PrintableSchedule from "./user/admin/schedule/PrintableSchedule.js"
 import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
 
 const AuthContext = createContext(null);
@@ -175,6 +177,8 @@ function App() {
             <Route path="teams" element={<ProtectedRoute requiredRoles={["admin"]}><TeamDashboard /></ProtectedRoute>} />
             <Route path="judging" element={<ProtectedRoute requiredRoles={["admin"]}><JudgingProgress /></ProtectedRoute>} />
             <Route path="schedule" element={<ProtectedRoute requiredRoles={["admin"]}><SchedulePlanner /></ProtectedRoute>} />
+            <Route path="print" element={<ProtectedRoute requiredRoles={["admin"]}><PrintableSchedule /></ProtectedRoute>} />
+            <Route path="results" element={<ProtectedRoute requiredRoles={["admin"]}><Results /></ProtectedRoute>} />
             <Route path="control" element={<ProtectedRoute requiredRoles={["admin"]}><Control /></ProtectedRoute>} />
           </Route>
         </Route>

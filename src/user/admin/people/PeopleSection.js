@@ -6,7 +6,7 @@ import {
 } from "@mui/material";
 import {
   listPeople, matchesQuery, setSoleRole, setOrganizer, describeSwitch, deletePerson,
-  createPerson, attachRecord, sendReset, bulkSet, ROLE_LABELS,
+  createPerson, attachRecord, sendReset, bulkSet, ROLE_LABELS, listArchived, restoreArchived,
 } from "./peopleService";
 
 /**
@@ -53,6 +53,8 @@ export default function PeopleSection({ onResult }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [alsoScores, setAlsoScores] = useState(false);
   const [confirmSwitch, setConfirmSwitch] = useState(null);
+  const [archiveFor, setArchiveFor] = useState(null);
+  const [archived, setArchived] = useState([]);
 
   const refresh = useCallback(() => {
     listPeople().then(setPeople).catch(() => setPeople([]));
@@ -258,6 +260,18 @@ export default function PeopleSection({ onResult }) {
                       </Button>
                     </span>
                   </Tooltip>
+                  <Tooltip title="Records deleted by a role change">
+                    <Button
+                      size="small"
+                      disabled={busy}
+                      onClick={async () => {
+                        setArchiveFor(person);
+                        setArchived(await listArchived(person.uid));
+                      }}
+                    >
+                      History
+                    </Button>
+                  </Tooltip>
                   <Button size="small" color="error" disabled={busy}
                     onClick={() => { setAlsoScores(false); setConfirmDelete(person); }}>
                     Delete
@@ -285,6 +299,57 @@ export default function PeopleSection({ onResult }) {
         onClose={() => setCreating(false)}
         onDone={(result, message) => { onResult(result, message); refresh(); }}
       />
+
+      <Dialog open={Boolean(archiveFor)} onClose={() => setArchiveFor(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Archived records for {archiveFor?.name}</DialogTitle>
+        <DialogContent>
+          {archived.length === 0 ? (
+            <DialogContentText>
+              Nothing archived. A record is copied here whenever a role change deletes one.
+            </DialogContentText>
+          ) : (
+            <Stack divider={<Divider />}>
+              {archived.map((entry) => (
+                <Stack
+                  key={entry.key}
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ py: 1.25 }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ color: "text.primary" }}>
+                      {ROLE_LABELS[entry.role] ?? entry.role} record
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      {[entry.record?.firstName, entry.record?.lastName].filter(Boolean).join(" ") ||
+                        "no name on it"}
+                      {entry.record?.email ? ` · ${entry.record.email}` : ""}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onClick={async () => {
+                      const target = archiveFor;
+                      setArchiveFor(null);
+                      await run(
+                        () => restoreArchived({ uid: target.uid, key: entry.key }),
+                        `Restored the ${entry.role} record for ${target.name}`
+                      );
+                    }}
+                  >
+                    Restore
+                  </Button>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setArchiveFor(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(confirmSwitch)} onClose={() => setConfirmSwitch(null)} fullWidth maxWidth="xs">
         <DialogTitle>

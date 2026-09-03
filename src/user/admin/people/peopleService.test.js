@@ -32,6 +32,7 @@ jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid
 const {
   removalChanges, listPeople, matchesQuery, blankJudge, blankCompetitor,
   setSoleRole, setOrganizer, describeSwitch, deletePerson, bulkSet, deleteTeam,
+  listArchived, restoreArchived,
 } = require("./peopleService");
 const { requireAdmin } = require("../../../roles.js");
 
@@ -499,5 +500,63 @@ describe("blank records", () => {
     const competitor = blankCompetitor({ firstName: "New" });
     expect(competitor.checkedIn).toBe(false);
     expect(competitor.teamId).toBeUndefined();
+  });
+});
+
+/**
+ * The archive had nothing to read it.
+ *
+ * A role change copied the record it was about to delete and then offered no
+ * way to get it back, which made "a copy is archived, and can be put back" true
+ * only of the first half.
+ */
+describe("putting an archived record back", () => {
+  const archive = {
+    "1800000000000-competitor": {
+      role: "competitor",
+      record: { firstName: "Grace", lastName: "Hopper", email: "grace@example.com", major: "CS" },
+    },
+    "1700000000000-judge": {
+      role: "judge",
+      record: { firstName: "Grace", lastName: "Hopper", email: "grace@example.com" },
+    },
+  };
+
+  test("newest first, so the obvious choice is the top one", async () => {
+    mockGet.mockImplementation(world({ "archive/people/c9": archive }));
+    const entries = await listArchived("c9");
+    expect(entries.map((e) => e.role)).toEqual(["competitor", "judge"]);
+  });
+
+  test("nothing archived is an empty list, not a throw", async () => {
+    mockGet.mockImplementation(world());
+    expect(await listArchived("nobody")).toEqual([]);
+  });
+
+  test("restoring writes the record back under its own role", async () => {
+    mockGet.mockImplementation(world({ "archive/people/c9": archive }));
+    const result = await restoreArchived({ uid: "c9", key: "1800000000000-competitor" });
+
+    expect(result.ok).toBe(true);
+    expect(payload()["competitors/c9"].major).toBe("CS");
+    expect(payload()["competitors/c9"].firstName).toBe("Grace");
+  });
+
+  test("it refuses rather than overwriting a record made since", async () => {
+    // c1 already has a competitor record in the world fixture
+    mockGet.mockImplementation(world({ "archive/people/c1": archive }));
+    const result = await restoreArchived({ uid: "c1", key: "1800000000000-competitor" });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/already have a competitor record/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("an archive key that is gone is reported, not written as undefined", async () => {
+    mockGet.mockImplementation(world({ "archive/people/c9": archive }));
+    const result = await restoreArchived({ uid: "c9", key: "9999999999999-competitor" });
+
+    expect(result.ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

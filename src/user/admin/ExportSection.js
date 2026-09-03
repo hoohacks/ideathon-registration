@@ -55,11 +55,19 @@ export default function ExportSection({ onResult }) {
       ),
     },
     {
-      label: "Standings",
+      label: "Standings — first round",
       hint: "Ranked by average, with judge counts and fundable votes.",
       run: () => run(
-        (data) => downloadCsv(`ideathon-standings-${stamp()}.csv`, standingsRows(data)),
-        "Standings downloaded"
+        (data) => downloadCsv(`ideathon-standings-first-${stamp()}.csv`, standingsRows(data, FIRST_ROUND)),
+        "First round standings downloaded"
+      ),
+    },
+    {
+      label: "Standings — final round",
+      hint: "The result, ranked the same way. Matches the Results page.",
+      run: () => run(
+        (data) => downloadCsv(`ideathon-standings-final-${stamp()}.csv`, standingsRows(data, FINAL_ROUND)),
+        "Final round standings downloaded"
       ),
     },
     {

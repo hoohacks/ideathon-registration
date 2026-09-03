@@ -5,6 +5,7 @@ import { HashRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
+import ErrorBoundary from "./ErrorBoundary";
 import theme from "./theme";
 import "./index.css";
 import { redirectToHashRoute } from "./hashRedirect";
@@ -20,9 +21,13 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <ThemeProvider theme={theme}>
     <CssBaseline />
-    <HashRouter>
-      <App />
-    </HashRouter>
+    {/* inside the theme so the fallback is not unstyled, outside the router so
+        a throw during routing is still caught */}
+    <ErrorBoundary>
+      <HashRouter>
+        <App />
+      </HashRouter>
+    </ErrorBoundary>
   </ThemeProvider>
 );
 

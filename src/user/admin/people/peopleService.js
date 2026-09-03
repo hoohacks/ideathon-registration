@@ -389,6 +389,66 @@ export async function setSoleRole({ uid, name, role, includeScores = false }) {
 }
 
 /**
+ * What was archived for this person, newest first.
+ *
+ * The archive existed with nothing to read it: a role change copied the record
+ * it was about to delete and then there was no way to get it back, which made
+ * "a copy is archived, and can be put back" true only of the first half.
+ */
+export async function listArchived(uid) {
+  if (!uid) return [];
+  try {
+    const snap = await get(ref(database, `archive/people/${uid}`));
+    if (!snap.exists()) return [];
+    return Object.entries(snap.val() ?? {})
+      .map(([key, entry]) => ({ key, ...entry }))
+      .sort((a, b) => b.key.localeCompare(a.key));
+  } catch (error) {
+    console.error("Could not read the archive:", error);
+    return [];
+  }
+}
+
+/**
+ * Put an archived record back.
+ *
+ * It refuses rather than overwrites when a record already exists at that path:
+ * whatever is there now is something somebody made after the archive was taken,
+ * and losing it to a restore is the failure this whole mechanism exists to
+ * prevent.
+ */
+export async function restoreArchived({ uid, key }) {
+  if (!uid || !key) return { ok: false, error: "Pick an archived record to restore." };
+
+  const entries = await listArchived(uid);
+  const entry = entries.find((candidate) => candidate.key === key);
+  if (!entry?.record) return { ok: false, error: "That archived record no longer exists." };
+
+  const node = ROLE_NODES[entry.role];
+  if (!node) return { ok: false, error: `Cannot restore a "${entry.role}" record.` };
+
+  // whole-node read, like every other lookup in this file, so one place decides
+  // what "they already have a record" means
+  const world = await loadWorld();
+  const existing = entry.role === "judge" ? world.judgesData[uid] : world.competitorsData[uid];
+  if (existing) {
+    return {
+      ok: false,
+      error:
+        `They already have a ${entry.role} record. Restoring would overwrite what is there now — ` +
+        `change their role away from ${entry.role} first if you mean to replace it.`,
+    };
+  }
+
+  const name = [entry.record.firstName, entry.record.lastName].filter(Boolean).join(" ").trim();
+  return applyAdminAction({
+    action: "archive.restore",
+    summary: `Restored the ${entry.role} record for ${name || uid}`,
+    changes: [{ path: `${node}/${uid}`, before: null, after: entry.record }],
+  });
+}
+
+/**
  * Turn organizer access on or off, independently of the person's role.
  *
  * Delegates rather than reimplements: `revokeAdmin` carries the lockout guard

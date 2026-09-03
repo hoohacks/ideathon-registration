@@ -36,7 +36,12 @@ export const KNOWN_KEYS = {
   judgingRooms: "json",
   batchTimes: "json",
   finalRoundRoom: "string",
+  finalRoundSize: "number",
   eventStart: "string",
+  // What an admin confirms they pasted into the Firebase console. The app knows
+  // which version it needs; it cannot read what is actually deployed, so this is
+  // the only way it can warn that a restore point will fail silently.
+  rulesVersion: "number",
 };
 
 function parseValue(type, raw) {

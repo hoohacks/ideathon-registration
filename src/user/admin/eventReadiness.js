@@ -1,6 +1,21 @@
 import { describeSupply, BATCH_COUNT } from "../judge/schedulePlan.js";
 
 /**
+ * The rules version this build of the app needs deployed.
+ *
+ * `database.rules.json` carries the same number in a comment, and `npm test`
+ * fails if the rules change without it being bumped. What neither can do is
+ * tell whether the file was ever pasted into the Firebase console -- rules are
+ * not readable from a browser. So an admin records what they published in
+ * `config/rulesVersion`, and this compares the two.
+ *
+ * It matters more than a version mismatch usually does: until version 5 is
+ * published, restoring a restore point that contains scores fails and changes
+ * nothing. The recovery mechanism is inert and says so nowhere.
+ */
+export const REQUIRED_RULES_VERSION = 5;
+
+/**
  * Where the event has got to, and what an organizer should do next.
  *
  * The app knew all of this and told nobody. Every constraint in it was enforced
@@ -69,6 +84,7 @@ export function readEventState({
   scoredTeams = 0,
   finalActive = false,
   hasDraft = false,
+  legacyScoreTeams = 0,
 } = {}) {
   const team = countTeams(teams);
   const judge = countJudges(judges);
@@ -103,6 +119,7 @@ export function readEventState({
     supply,
     hasDraft,
     checks: checksFor({ rooms, judge, team, config, supply }),
+    blockers: blockersFor({ config, legacyScoreTeams }),
     actions: actionsFor({ phase, hasDraft, supply, team, judge, scoredTeams }),
   };
 }
@@ -151,6 +168,39 @@ function checksFor({ rooms, judge, team, config, supply }) {
       to: "/user/admin/schedule",
     },
   ];
+}
+
+/**
+ * Things that must be done before the event and that nothing else will remind
+ * anyone about, because both fail silently rather than loudly.
+ */
+function blockersFor({ config, legacyScoreTeams }) {
+  const blockers = [];
+
+  const published = Number(config.rulesVersion);
+  if (published !== REQUIRED_RULES_VERSION) {
+    blockers.push({
+      id: "rules",
+      title: `Publish database rules version ${REQUIRED_RULES_VERSION}`,
+      detail: Number.isFinite(published)
+        ? `Version ${published} is recorded as published. Until ${REQUIRED_RULES_VERSION} is, restoring a restore point that contains scores fails and changes nothing.`
+        : `Nobody has recorded which version is deployed. Until ${REQUIRED_RULES_VERSION} is published, restoring a restore point that contains scores fails and changes nothing.`,
+      how: "Paste database.rules.json into Realtime Database → Rules, then set config/rulesVersion to match.",
+      to: "/user/admin/control?tab=setup",
+    });
+  }
+
+  if (legacyScoreTeams > 0) {
+    blockers.push({
+      id: "migration",
+      title: "Finish the score migration",
+      detail: `${legacyScoreTeams} team${legacyScoreTeams === 1 ? " still has" : "s still have"} score cards under the old location, so every average is read from two places at once.`,
+      how: "Run npm run migrate:scores, check the standings still look right, then turn off READ_LEGACY_SCORE_PATH.",
+      to: "/user/admin/control?tab=data",
+    });
+  }
+
+  return blockers;
 }
 
 /**

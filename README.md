@@ -160,6 +160,41 @@ nav could not:
 - **What to do next** — at most three actions. An unpublished draft outranks
   everything, because judges see nothing until it is published.
 
+It also carries the two pre-event jobs that **fail silently** if nobody does
+them, which is why nothing else in the app would ever mention them:
+
+| Blocker | Why it is quiet |
+| --- | --- |
+| Database rules not published | Until version 5 is deployed, restoring a restore point that contains scores fails and changes nothing. Rules cannot be read from a browser, so an admin records what they published in `config/rulesVersion` and the dashboard compares it. |
+| Score migration unfinished | Cards still under `teams/{id}/scores` mean every average is read from two locations at once. The dashboard counts the teams that still have them. |
+
+## Results
+
+`/user/admin/results`. The final round ranked on its **own** scores, by the same
+tiebreak the cut used, with each team's first-round average kept beside it.
+
+There was no screen for this before: the standings were written at activation,
+never read — `subscribeToFinalRoundStandings` was exported and never imported —
+and they carry the first round's averages, which nothing updates as final scores
+arrive. Finding the winner meant exporting raw cards and doing the arithmetic.
+
+The page is careful about one thing: **a ranking with cards outstanding is a
+running total, not a result.** There is always a first row, because the tiebreak
+is a total order — so no winner is declared until every expected card is in, and
+until then it names who it is waiting on.
+
+`Standings — final round` is now an export too; it matches this page.
+
+## Room sheets
+
+`/user/admin/print`. One printable sheet per room — batch, time, team, panel,
+and a blank column for the score.
+
+The paper fallback was already treated as ordinary (there is a **Record score**
+flow for it) but nothing printed, so it began with someone copying a screen by
+hand. A room is the unit rather than a batch because a judge stays put while
+teams rotate through: one sheet on one door covers the evening.
+
 ## The control panel
 
 `/user/admin/control`. Everything that used to need the Firebase console.
@@ -235,6 +270,12 @@ from the final round exclusions — a name left on a card is otherwise unexplain
 stale exclusion can leave a finalist with nobody eligible to judge it.
 
 Deleting the last admin is refused. Nothing in the app could add one back.
+
+**History** on a person's row lists the records a role change archived, newest
+first, and puts one back. It refuses rather than overwrites when they already
+have a record of that role — whatever is there now was made after the archive
+was taken, and losing it to a restore is the failure the archive exists to
+prevent.
 
 ### Restore points
 
@@ -485,7 +526,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 33 suites, 776 tests, no JVM
+npm run test:ci     # 36 suites, 809 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -504,6 +545,9 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
 | `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
 | `eventReadiness.test.js` | the phase the event is in, what is blocking, and what to do next |
+| `finalStandings.test.js` | the result, and the difference between a running total and one |
+| `printableSchedule.test.js` | the paper fallback, grouped by room |
+| `ErrorBoundary.test.js` | a thrown page says so instead of going white |
 | `roles.test.js` | the profile merge, so a second role cannot blank the first |
 | `exportData.test.js` | CSV quoting and formula defusing |
 | `resilience.test.js` | the judge outbox surviving a reload |

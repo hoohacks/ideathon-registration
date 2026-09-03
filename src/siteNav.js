@@ -76,7 +76,10 @@ const ADMIN_GROUPS = [
     {
         id: "judging",
         label: "Judging",
-        links: [{ to: "/user/admin/judging", label: "Judging progress" }],
+        links: [
+            { to: "/user/admin/judging", label: "Judging progress" },
+            { to: "/user/admin/results", label: "Results" },
+        ],
     },
     {
         id: "setup",
