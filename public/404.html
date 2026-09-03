@@ -8,13 +8,13 @@
       // GitHub Pages serves this for any path it has no file for.
       //
       // The app is a HashRouter, so its routes live after a "#". A tidy-looking
-      // link -- /IdeaX/judge-registration -- is not a file, so
+      // link -- /idea-x/judge-registration -- is not a file, so
       // without this it is a GitHub 404 and the person never reaches the app at
       // all. Rewrite it to the hash route of the same name.
       //
       // src/hashRedirect.js does the same job wherever the bundle does load.
       (function () {
-        var base = "/IdeaX";
+        var base = "/idea-x";
         var loc = window.location;
 
         var path = loc.pathname.indexOf(base) === 0 ? loc.pathname.slice(base.length) : loc.pathname;
@@ -28,7 +28,7 @@
   <body>
     <noscript>
       This page needs JavaScript. Go to
-      <a href="/IdeaX/">the Ideathon site</a>.
+      <a href="/idea-x/">the Ideathon site</a>.
     </noscript>
   </body>
 </html>

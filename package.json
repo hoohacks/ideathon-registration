@@ -1,7 +1,7 @@
 {
-  "name": "ideax",
+  "name": "idea-x",
   "version": "0.1.0",
-  "homepage": "https://hoohacks.github.io/IdeaX",
+  "homepage": "https://hoohacks.github.io/idea-x",
   "private": false,
   "dependencies": {
     "@emotion/react": "^11.11.1",
