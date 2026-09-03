@@ -548,7 +548,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ```
 npm run test:ci     # 39 suites, 862 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
-npm run test:e2e    # 38 journeys in a real browser (needs JDK 17+)
+npm run test:e2e    # 45 journeys in a real browser, desktop and phone (needs JDK 17+)
 ```
 
 ### The four layers, and what only the last two can see
@@ -585,6 +585,15 @@ Two habits that suite taught, both learned by getting them wrong:
   that has not rendered yet returns false and the step is silently skipped.
 - **An input's value is not text on the page.** `getByText` cannot see it;
   `toHaveValue` can. A whole afternoon went into that one.
+- **Give each scoring spec its own judge.** A card cannot be scored twice, so
+  sharing a judge leaves the next spec nothing to submit — and worse, an
+  assertion like "a Scored button exists" can pass on a card some *other* spec
+  scored. That false positive hid a real bug for a full run.
+
+The suite runs twice over: a **desktop** profile, and a **mobile** one (Pixel 5)
+covering the judging journey, the dense organizer pages and both public forms.
+The phone specs assert there is no sideways scroll, which is the classic mobile
+failure and one jsdom cannot see at all — it has no viewport.
 
 `test:e2e` starts the emulators, seeds an event, and runs the app on port
 **3010** — never 3000, and never reusing an existing server. That is deliberate:
@@ -686,6 +695,14 @@ the team changes — a teammate joining, an organizer fixing the name, the
 schedule being published — and re-seeding on each of those overwrote whatever
 the person was in the middle of typing. Somebody writing their problem statement
 lost it the moment a teammate pressed Join.
+
+When the queue drains, the cards are re-read. A score that synced in the
+background used to land in the database without the judging page noticing: the
+card stopped saying "Saved on device" and fell back to "Score team", inviting
+the judge to score the same team again and reading, to them, as though their
+work had been thrown away. `e2e/offline.spec.mjs` takes the network away from a
+real browser and checks both halves — that the card is on disk, and that the
+page tells the truth once it lands.
 
 One caveat: **a queued score only syncs while that page is open.** If a judge
 closes the tab, the card sits on their device and nobody else can see it, and

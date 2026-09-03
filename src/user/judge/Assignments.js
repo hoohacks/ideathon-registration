@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Alert,
   Box,
@@ -110,6 +110,48 @@ function Assignments() {
   useEffect(() => {
     loadPersonalSchedule();
   }, [loadPersonalSchedule]);
+
+  /**
+   * Pick up scores that synced in the background.
+   *
+   * `scoredTeamIds` is read once, when the assignments load. A card queued on
+   * the device and drained later therefore landed in the database without this
+   * component knowing: the card stopped being "Saved on device" and fell back
+   * to "Score team", inviting the judge to score the same team a second time
+   * and reading, to them, as though their work had been thrown away.
+   *
+   * The queue emptying is the signal, so that is what this watches.
+   */
+  const lastPending = useRef(0);
+  useEffect(() => {
+    const drained = lastPending.current > 0 && pendingCount === 0;
+    lastPending.current = pendingCount;
+    if (!drained || !canViewAssignments) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const firstRoundIds = personalAssignments.map((assignment) => assignment.id);
+        if (firstRoundIds.length) {
+          const scored = await getMyScoredTeamIds(firstRoundIds);
+          if (!cancelled) setScoredTeamIds(scored);
+        }
+
+        const finalIds = finalAssignments.map((team) => team.id);
+        if (finalIds.length) {
+          const scored = await getMyFinalRoundScoredTeamIds(finalIds);
+          if (!cancelled) setFinalRoundScoredTeamIds(scored);
+        }
+      } catch (error) {
+        // the card stays as it is; the next load will correct it
+        console.warn("Could not refresh scored teams after syncing:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingCount, canViewAssignments, personalAssignments, finalAssignments]);
 
   useEffect(() => {
     if (!canManageSchedule) return;

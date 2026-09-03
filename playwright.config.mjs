@@ -45,7 +45,27 @@ export default defineConfig({
     video: "off",
   },
 
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "desktop",
+      use: { ...devices["Desktop Chrome"] },
+      // the phone journey has its own assertions and its own viewport
+      testIgnore: /mobile\.spec\.mjs/,
+    },
+    {
+      /**
+       * Judges score on their phones, standing in a room.
+       *
+       * Every layout bug this project has had was invisible to jsdom, which has
+       * no viewport at all -- including a planner page whose content sat a full
+       * screen below the fold and read as blank. A real device profile is the
+       * only place that class of failure shows up.
+       */
+      name: "mobile",
+      use: { ...devices["Pixel 5"] },
+      testMatch: /mobile\.spec\.mjs/,
+    },
+  ],
 
   /**
    * Always our own server, on a port the ordinary dev server does not use.

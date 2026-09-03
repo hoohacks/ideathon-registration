@@ -17,6 +17,15 @@ export const ACCOUNTS = {
  * tests as well as the app -- `/judge-registration` without the hash silently
  * served the competitor form for weeks.
  */
+/**
+ * A specific seeded judge.
+ *
+ * Cards can only be scored once, so specs that submit a score must not share a
+ * judge with each other -- the second one finds nothing left to score and fails
+ * looking like a bug. The seed makes judge1..judgeN with one password.
+ */
+export const judge = (n) => ({ email: `judge${n}@example.com`, password: "testtest" });
+
 export const route = (path) => `/#${path.startsWith("/") ? path : `/${path}`}`;
 
 export async function goto(page, path) {
