@@ -31,7 +31,9 @@ export function PageHeader({ title, stats = [], progress, children }) {
                 >
                     {stats.map(({ label, value }) => (
                         <Stack key={label} direction="row" spacing={0.75} alignItems="baseline">
-                            <Typography sx={{ fontWeight: 650, fontVariantNumeric: "tabular-nums" }}>
+                            {/* the numbers an organizer reads off the screen and acts on,
+                                so they are set as data rather than as prose */}
+                            <Typography variant="data" sx={{ fontSize: "1rem", fontWeight: 600 }}>
                                 {value}
                             </Typography>
                             <Typography variant="body2">{label}</Typography>

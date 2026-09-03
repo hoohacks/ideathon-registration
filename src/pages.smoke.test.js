@@ -206,12 +206,12 @@ describe("pages render without crashing", () => {
       </ThemeProvider>
     );
 
-    expect(await screen.findByText(/Mentor a shift/)).toBeInTheDocument();
+    expect(await screen.findByText("Judge and mentor sign-up")).toBeInTheDocument();
     // each section name appears twice: once in the progress rail, once on the
     // section itself
     expect(screen.getAllByText("Mentoring").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Judging").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Your studies")).not.toBeInTheDocument();
+    expect(screen.queryByText("Studies")).not.toBeInTheDocument();
     unmount();
 
     render(
@@ -220,8 +220,8 @@ describe("pages render without crashing", () => {
       </ThemeProvider>
     );
 
-    expect(await screen.findByText(/An idea in the morning/)).toBeInTheDocument();
-    expect(screen.getAllByText("Your studies").length).toBeGreaterThan(0);
+    expect(await screen.findByText("Student registration")).toBeInTheDocument();
+    expect(screen.getAllByText("Studies").length).toBeGreaterThan(0);
     expect(screen.queryByText("Mentoring")).not.toBeInTheDocument();
   });
 

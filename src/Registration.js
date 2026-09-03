@@ -107,12 +107,12 @@ const INITIAL = {
 const SECTIONS = [
   {
     id: "account",
-    label: "Your account",
+    label: "Account",
     required: ["firstName", "lastName", "email", "password"],
   },
-  { id: "studies", label: "Your studies", required: ["major"] },
-  { id: "bring", label: "What you bring", required: ["skills", "learn"] },
-  { id: "details", label: "Last few things", required: ["gender"] },
+  { id: "studies", label: "Studies", required: ["major"] },
+  { id: "bring", label: "Skills and interests", required: ["skills", "learn"] },
+  { id: "details", label: "Additional details", required: ["gender"] },
 ];
 
 const REQUIRED = SECTIONS.flatMap((section) => section.required);
@@ -346,32 +346,32 @@ const Registration = () => {
     <RegistrationShell
       hero={
         <Hero
-          eyebrow={`Registration · ${EVENT.edition}`}
-          title="An idea in the morning. A pitch by seven."
+          eyebrow="Student registration"
+          title={`${EVENT.name} ${EVENT.year}`}
           facts={[EVENT.dateLabel, EVENT.hours, EVENT.venue]}
         >
-          Students with technical experience and students with business experience spend
-          the day building one idea together. Sponsors run workshops on pitching, valuation
-          and prototyping, teams meet industry experts one to one, and the day closes with
-          a two-hour pitch event judged for real funding.
+          A one-day event for students from technical and business backgrounds, working in
+          teams on a single idea. The day includes workshops on pitching, valuation and
+          prototyping, one-to-one time with industry mentors, and a two-hour judged pitch
+          event with funding awarded at the end.
         </Hero>
       }
     >
       <ResultDialog
         open={registered}
-        title="You're registered"
+        title="Registration complete"
         actions={
           <>
             <Button href={EVENT.siteUrl} variant="outlined">
-              See the schedule
+              View the schedule
             </Button>
             <Button variant="contained" onClick={() => navigate("/user/home")}>
-              Go to your dashboard
+              Go to dashboard
             </Button>
           </>
         }
       >
-        {`Your place at ${EVENT.name} ${EVENT.year} is saved. You are signed in already — find or start a team before ${EVENT.dayLabel}.`}
+        {`Your place is confirmed and you are signed in. Join or create a team before ${EVENT.dayLabel}.`}
       </ResultDialog>
 
       <ResultDialog
@@ -391,7 +391,7 @@ const Registration = () => {
         <Grid container spacing={{ xs: 4, md: 6 }}>
           <Grid item xs={12} md={7} lg={8}>
             <Stack spacing={5}>
-              <Section id="account" label="Your account">
+              <Section id="account" label="Account">
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     {...fieldProps("firstName")}
@@ -435,7 +435,7 @@ const Registration = () => {
                 />
               </Section>
 
-              <Section id="studies" label="Your studies">
+              <Section id="studies" label="Studies">
                 <FormControl fullWidth>
                   <InputLabel id="uvaSchool-label">School</InputLabel>
                   <Select
@@ -481,7 +481,7 @@ const Registration = () => {
                 />
               </Section>
 
-              <Section id="bring" label="What you bring">
+              <Section id="bring" label="Skills and interests">
                 <Question
                   htmlFor="skills"
                   prompt="What skills would you bring to a team?"
@@ -553,7 +553,7 @@ const Registration = () => {
                 </Box>
               </Section>
 
-              <Section id="details" label="Last few things">
+              <Section id="details" label="Additional details">
                 <FormControl fullWidth error={Boolean(errorFor("gender"))}>
                   <InputLabel id="gender-label">Gender</InputLabel>
                   <Select

@@ -111,7 +111,7 @@ describe("competitor registration", () => {
   test("renders the form and its progress rail", async () => {
     renderPage(Registration);
     expect(
-      await screen.findByRole("heading", { name: /An idea in the morning/ })
+      await screen.findByRole("heading", { name: /Ideathon/ })
     ).toBeInTheDocument();
     expect(shows("8 answers left")).toBeInTheDocument();
     expect(submit("Register")).toBeInTheDocument();
@@ -214,7 +214,7 @@ describe("competitor registration", () => {
 describe("judge and mentor registration", () => {
   test("renders", async () => {
     renderPage(JudgeRegistration);
-    expect(await screen.findByRole("heading", { name: /Mentor a shift/ })).toBeInTheDocument();
+    expect(await screen.findByText("Judge and mentor sign-up")).toBeInTheDocument();
   });
 
   test("asks for a company only when there is one", async () => {
@@ -237,13 +237,13 @@ describe("judge and mentor registration", () => {
     answer(/Would you like to mentor/, "Yes");
     answer(/Would you like to judge/, "Yes");
 
-    userEvent.click(submit("Sign up"));
+    userEvent.click(submit("Create account"));
     expect(mockCreateUser).not.toHaveBeenCalled();
     expect(await screen.findByText(/Pick at least 2 shifts/)).toBeInTheDocument();
 
     userEvent.click(screen.getByRole("checkbox", { name: "11:00 AM" }));
     userEvent.click(screen.getByRole("checkbox", { name: "1:00 PM" }));
-    userEvent.click(submit("Sign up"));
+    userEvent.click(submit("Create account"));
 
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     const record = mockDbUpdate.mock.calls[0][1]["/judges/new-uid"];
@@ -264,7 +264,7 @@ describe("judge and mentor registration", () => {
 
     expect(screen.queryByText(/Which shifts/)).not.toBeInTheDocument();
 
-    userEvent.click(submit("Sign up"));
+    userEvent.click(submit("Create account"));
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     expect(mockDbUpdate.mock.calls[0][1]["/judges/new-uid"].timeslots).toEqual([]);
   });

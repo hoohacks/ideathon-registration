@@ -110,12 +110,12 @@ const INITIAL = {
 const SECTIONS = [
   {
     id: "account",
-    label: "Your account",
+    label: "Account",
     required: () => ["firstName", "lastName", "email", "password"],
   },
   {
     id: "company",
-    label: "Who you are here with",
+    label: "Affiliation",
     required: (values) => (values.withCompany ? ["withCompany", "company"] : ["withCompany"]),
   },
   {
@@ -358,15 +358,15 @@ const JudgeRegistration = () => {
     total: required.length,
     error: formError,
     busy: submitting,
-    submitLabel: "Sign up",
-    busyLabel: "Signing up…",
+    submitLabel: "Create account",
+    busyLabel: "Creating account…",
   };
 
   // the tab is a label too, and "Ideathon Registration" on both public pages
   // is the same problem as two forms that look alike
   useEffect(() => {
     const was = document.title;
-    document.title = "Judge & mentor sign-up · Ideathon";
+    document.title = "Judge and mentor sign-up · Ideathon";
     return () => {
       document.title = was;
     };
@@ -385,32 +385,32 @@ const JudgeRegistration = () => {
     <RegistrationShell
       hero={
         <Hero
-          eyebrow={`Judge & mentor sign-up · ${EVENT.edition}`}
-          title="Mentor a shift. Judge a pitch. Both, if you can."
+          eyebrow="Judge and mentor sign-up"
+          title={`${EVENT.name} ${EVENT.year}`}
           facts={[EVENT.dateLabel, `Judging ${EVENT.judgingHours}`, EVENT.venue]}
         >
-          Student teams spend the day turning an idea into a pitch. Mentors take
-          one-hour shifts helping them shape it; judges score the pitches at the end of the
-          day and decide who leaves with funding. You are welcome to do either, and nobody
-          is expected to stay for the whole event.
+          Student teams spend the day developing an idea into a pitch. Mentors take one-hour
+          shifts helping teams shape their work; judges score the pitches in the evening and
+          decide which teams receive funding. You can sign up for either or both, and there
+          is no expectation of staying for the full day.
         </Hero>
       }
     >
       <ResultDialog
         open={registered}
-        title="You're signed up"
+        title="Sign-up complete"
         actions={
           <>
             <Button href={EVENT.siteUrl} variant="outlined">
-              See the schedule
+              View the schedule
             </Button>
             <Button variant="contained" onClick={() => navigate("/user/home")}>
-              Go to your dashboard
+              Go to dashboard
             </Button>
           </>
         }
       >
-        {`Thank you. We will email your ${EVENT.dayLabel} schedule once assignments are set. You are signed in already.`}
+        {`You are signed in. Your ${EVENT.dayLabel} assignments will be emailed once the schedule is published.`}
       </ResultDialog>
 
       <ResultDialog
@@ -430,7 +430,7 @@ const JudgeRegistration = () => {
         <Grid container spacing={{ xs: 4, md: 6 }}>
           <Grid item xs={12} md={7} lg={8}>
             <Stack spacing={5}>
-              <Section id="account" label="Your account">
+              <Section id="account" label="Account">
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     {...fieldProps("firstName")}
@@ -470,7 +470,7 @@ const JudgeRegistration = () => {
                 />
               </Section>
 
-              <Section id="company" label="Who you are here with">
+              <Section id="company" label="Affiliation">
                 <YesNo
                   {...choiceProps("withCompany")}
                   legend={`Are you here on behalf of a company sponsoring the ${EVENT.name}?`}

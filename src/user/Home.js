@@ -28,12 +28,12 @@ function Unit({ value, label }) {
         <Box sx={{ textAlign: "center", minWidth: { xs: 60, sm: 78 } }}>
             <Typography
                 sx={{
-                    // the countdown is the display element on this page, so it
-                    // is set in the display face rather than the body one
-                    fontFamily: tokens.DISPLAY,
-                    fontSize: { xs: "2rem", sm: "2.75rem" },
-                    fontWeight: 700,
-                    letterSpacing: "-0.03em",
+                    // A clock. Mono with tabular figures so the digits hold
+                    // their columns as they tick rather than nudging each other.
+                    fontFamily: tokens.MONO,
+                    fontSize: { xs: "2rem", sm: "2.5rem" },
+                    fontWeight: 500,
+                    letterSpacing: "-0.04em",
                     lineHeight: 1.05,
                     fontVariantNumeric: "tabular-nums",
                 }}
@@ -158,12 +158,12 @@ function Home() {
     if (isCompetitor || isJudge) {
         steps.push({
             key: "checkin",
-            label: "When you arrive",
-            title: "Your check-in code",
-            body: `Show it at the desk in ${EVENT.venue}. It also gets you lunch and dinner.`,
+            label: "Check-in",
+            title: "Check-in code",
+            body: `Show this at the desk in ${EVENT.venue}. It also covers lunch and dinner.`,
             actions: (
                 <Button variant="outlined" component={RouterLink} to="/user/checkin">
-                    Show my code
+                    Show code
                 </Button>
             ),
         });
@@ -199,7 +199,7 @@ function Home() {
                         {time ? (
                             <>
                                 <Typography variant="overline" align="center" sx={{ display: "block", mb: 1.5 }}>
-                                    Doors open in
+                                    Event starts in
                                 </Typography>
                                 <Stack
                                     direction="row"
@@ -214,8 +214,23 @@ function Home() {
                                 </Stack>
                             </>
                         ) : (
-                            <Stack spacing={0.5} alignItems="center">
-                                <Typography variant="h2">{EVENT.name} is live</Typography>
+                            <Stack spacing={0.75} alignItems="center">
+                                {/* the only place the brand colour appears in the
+                                    interface: something is genuinely happening */}
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <Box
+                                        sx={{
+                                            width: 7,
+                                            height: 7,
+                                            borderRadius: "50%",
+                                            bgcolor: "secondary.main",
+                                        }}
+                                    />
+                                    <Typography variant="overline" sx={{ color: "secondary.main" }}>
+                                        In progress
+                                    </Typography>
+                                </Stack>
+                                <Typography variant="h2">{EVENT.name} {EVENT.year}</Typography>
                                 <Typography variant="body2">
                                     {EVENT.hours} · {EVENT.venue}
                                 </Typography>

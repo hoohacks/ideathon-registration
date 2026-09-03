@@ -71,8 +71,20 @@ function ScheduleCard({
             {teamName}
           </Typography>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip label={time} size="small" variant="outlined" />
-            <Chip label={room} size="small" variant="outlined" />
+            {/* where and when: the two things a judge reads off this card while
+                walking, so they are set as data rather than as labels */}
+            <Chip
+              label={time}
+              size="small"
+              variant="outlined"
+              sx={{ "& .MuiChip-label": (t) => ({ ...t.typography.data }) }}
+            />
+            <Chip
+              label={room}
+              size="small"
+              variant="outlined"
+              sx={{ "& .MuiChip-label": (t) => ({ ...t.typography.data }) }}
+            />
             {pending && <Chip label="Not synced" size="small" color="warning" />}
           </Stack>
         </Stack>
