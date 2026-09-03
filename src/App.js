@@ -25,7 +25,7 @@ import TeamDashboard from "./user/admin/TeamSearch.js"
 import JudgingProgress from "./user/admin/JudgingProgress.js"
 import Control from "./user/admin/Control.js"
 import SchedulePreview from "./user/admin/schedule/SchedulePreview.js"
-import { ROLES, hasRole } from "./roles.js"
+import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
 
 const AuthContext = createContext(null);
 
@@ -96,7 +96,7 @@ function AuthProvider({ children }) {
       setToken(idToken);
 
       const foundRoles = [];
-      let profile = null;
+      const records = [];
 
       for (const role of ROLES) {
         try {
@@ -104,15 +104,17 @@ function AuthProvider({ children }) {
           const snapshot = await get(userRef);
           if (snapshot.exists()) {
             foundRoles.push(role);
-            profile = { ...(profile ?? {}), ...snapshot.val() };
+            records.push(snapshot.val());
           }
         } catch (error) {
           console.warn(`Could not read ${role} data:`, error);
         }
       }
 
+      // merged rather than spread, so the record for a role granted later does
+      // not blank the name and email on the one they registered with
       // replace rather than append, otherwise roles accumulate across logins
-      setUserData(profile);
+      setUserData(mergeRoleProfiles(records));
       setUserTypes(foundRoles);
     } finally {
       setLoadingUserData(false);

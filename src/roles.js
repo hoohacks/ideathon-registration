@@ -24,6 +24,36 @@ export function roleList(userTypes) {
   return Array.isArray(userTypes) ? userTypes : [];
 }
 
+/**
+ * One profile from the records of every role a person holds, merged in ROLES
+ * order.
+ *
+ * The rule is that a later record never blanks a field an earlier one filled
+ * in. Records are written with their fields present and empty rather than
+ * absent -- granting someone a second role from the control panel writes
+ * `firstName: ""`, not nothing -- so a plain spread let the record they were
+ * given second erase the name and email on the one they registered with. To
+ * that person their account looked wiped: no name, no email, and a password
+ * reset that refused because there was no address on file.
+ *
+ * An empty value still lands when no record supplies a better one, so a field
+ * nobody has filled in reads the same as it always did.
+ */
+export function mergeRoleProfiles(profiles) {
+  const filled = (value) => value !== undefined && value !== null && value !== "";
+
+  let merged = null;
+  for (const profile of profiles) {
+    if (!profile) continue;
+    merged = merged ?? {};
+    for (const [key, value] of Object.entries(profile)) {
+      if (!filled(value) && filled(merged[key])) continue;
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
 export function isAdmin(userTypes) {
   return hasRole(userTypes, "admin");
 }
