@@ -27,7 +27,7 @@ export const JUDGE_FIELDS = [
 ];
 
 /** Every path holding a copy of this team's name. Pure. */
-export function renameTeamChanges({ teamId, from, to, teamData, judgesData }) {
+export function renameTeamChanges({ teamId, from, to, teamData, judgesData, finalRoundTeams }) {
   const changes = [{ path: `teams/${teamId}/name`, before: from, after: to }];
 
   if (teamData?.schedule) {
@@ -42,6 +42,27 @@ export function renameTeamChanges({ teamId, from, to, teamData, judgesData }) {
         after: to,
       });
     }
+
+    // The final round caches the name a second time, on a different node. This
+    // used to be missed, so a team renamed during the event kept its old name
+    // on every finalist judge's card.
+    if (judge?.finalAssignments?.[teamId]) {
+      changes.push({
+        path: `judges/${judgeUid}/finalAssignments/${teamId}/teamName`,
+        before: from,
+        after: to,
+      });
+    }
+  }
+
+  // And a third time, in the standings -- which is the name the results page
+  // announces. Renaming a team to fix a typo and then announcing the typo is
+  // the worst version of this bug.
+  //
+  // `finalRound/archive` is deliberately not touched: it is a record of what
+  // the standings were at the moment the round closed, not a live copy.
+  if (finalRoundTeams?.[teamId]) {
+    changes.push({ path: `finalRound/teams/${teamId}/name`, before: from, after: to });
   }
 
   return changes;
@@ -113,9 +134,10 @@ export async function renameTeam(teamId, name) {
   const to = String(name ?? "").trim();
   if (!to) return { ok: false, error: "Give the team a name." };
 
-  const [teamSnap, judgesSnap] = await Promise.all([
+  const [teamSnap, judgesSnap, finalSnap] = await Promise.all([
     get(ref(database, `teams/${teamId}`)),
     get(ref(database, "judges")),
+    get(ref(database, "finalRound/teams")),
   ]);
   if (!teamSnap.exists()) return { ok: false, error: "That team no longer exists." };
 
@@ -126,6 +148,7 @@ export async function renameTeam(teamId, name) {
   const changes = renameTeamChanges({
     teamId, from, to, teamData,
     judgesData: judgesSnap.exists() ? judgesSnap.val() : {},
+    finalRoundTeams: finalSnap.exists() ? finalSnap.val() : {},
   });
 
   return applyAdminAction({

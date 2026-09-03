@@ -81,6 +81,52 @@ describe("renaming a team reaches every copy of the name", () => {
     });
     expect(changes.map((c) => c.path)).toEqual(["teams/t1/name"]);
   });
+
+  /**
+   * The final round caches the name twice more, on nodes the first round does
+   * not touch. Both were missed: a team renamed during the event kept its old
+   * name on every finalist judge card, and -- worse -- in the standings, which
+   * is the name the results page announces.
+   */
+  describe("including the copies the final round makes", () => {
+    const inFinal = {
+      j1: {
+        teamAssignments: { t1: { teamName: "Alpha" } },
+        finalAssignments: { t1: { teamName: "Alpha" }, t2: { teamName: "Beta" } },
+      },
+      j2: { finalAssignments: { t2: { teamName: "Beta" } } },
+    };
+    const finalRoundTeams = { t1: { name: "Alpha" }, t2: { name: "Beta" } };
+
+    const rename = (over = {}) =>
+      renameTeamChanges({
+        teamId: "t1", from: "Alpha", to: "Omega", teamData,
+        judgesData: inFinal, finalRoundTeams, ...over,
+      }).map((c) => c.path);
+
+    test("the finalist judge card", () => {
+      expect(rename()).toContain("judges/j1/finalAssignments/t1/teamName");
+    });
+
+    test("the standings, which is what gets announced", () => {
+      expect(rename()).toContain("finalRound/teams/t1/name");
+    });
+
+    test("and no other team in the round", () => {
+      const paths = rename();
+      expect(paths).not.toContain("judges/j1/finalAssignments/t2/teamName");
+      expect(paths).not.toContain("finalRound/teams/t2/name");
+    });
+
+    test("nothing final-round is written when there is no final round", () => {
+      const paths = rename({ finalRoundTeams: {}, judgesData: { j1: { teamAssignments: { t1: {} } } } });
+      expect(paths.some((path) => path.includes("final"))).toBe(false);
+    });
+
+    test("the archive is left alone -- it records what the standings were", () => {
+      expect(rename().some((path) => path.includes("archive"))).toBe(false);
+    });
+  });
 });
 
 describe("moving a competitor between teams", () => {

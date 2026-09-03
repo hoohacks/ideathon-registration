@@ -134,6 +134,7 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 | Problem | Do this |
 | --- | --- |
 | A judge did not turn up | **Judges** on the team row → add or swap. Rewrites one team, not the schedule. Spares are listed first. |
+| A team name is wrong | **Edit** on the Teams dashboard. The name is cached on the schedule, on every judge's card for both rounds, and in the standings; renaming rewrites all of them. |
 | A judge scored on paper | **Record score** on the team row. Filed under them, stamped with you. |
 | A judge says they submitted, nothing shows | Ask if their page says "saved on this device". Queued scores send on reconnect — the page must stay open. **Retry now** forces it. |
 | A team submitted after the schedule was published | Open the team on the Teams dashboard → pick batch, room and judges. **Do not plan and publish a new schedule** — that replaces every assignment and strands collected scores. |
@@ -543,7 +544,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 38 suites, 831 tests, no JVM
+npm run test:ci     # 39 suites, 853 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -561,6 +562,7 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `snapshotDiff.test.js` | named score loss in a restore diff, by team, judge and round |
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
 | `teamMembership.test.js` | joining a team, including the reads the rules refuse |
+| `assignmentEdits.test.js` | moving one judge on the day, and the fan-out to every copy |
 | `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
 | `eventReadiness.test.js` | the phase the event is in, what is blocking, and what to do next |
 | `finalStandings.test.js` | the result, and the difference between a running total and one |
