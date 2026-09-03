@@ -31,7 +31,7 @@ jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid
 
 const {
   removalChanges, listPeople, matchesQuery, blankJudge, blankCompetitor,
-  setSoleRole, describeSwitch, deletePerson, bulkSet, deleteTeam,
+  setSoleRole, setOrganizer, describeSwitch, deletePerson, bulkSet, deleteTeam,
 } = require("./peopleService");
 const { requireAdmin } = require("../../../roles.js");
 
@@ -267,21 +267,24 @@ describe("giving somebody their one role", () => {
     expect(p["competitors/c1"]).toBeNull();
   });
 
-  test("switching to organizer clears the records and sets the flag", async () => {
-    await setSoleRole({ uid: "c1", name: "Grace", role: "admin" });
+  test("organizer access is untouched by a role change", async () => {
+    // organizer is a flag on top, not one of the roles being swapped. Making it
+    // exclusive deleted the judge record an organizer needs to be scheduled, to
+    // see their cards and to score under their own name.
+    mockGet.mockImplementation(world({ admins: { ...WORLD.admins, c1: true } }));
+    await setSoleRole({ uid: "c1", name: "Grace", role: "judge" });
+
     const p = payload();
-    expect(p["admins/c1"]).toBe(true);
-    expect(p["competitors/c1"]).toBeNull();
+    expect(p["admins/c1"]).toBeUndefined();
+    expect(p["judges/c1"].firstName).toBe("Grace");
   });
 
-  test("an organizer keeping their flag is not rewritten", async () => {
-    mockGet.mockImplementation(world({
-      admins: { ...WORLD.admins, j1: true },
-    }));
-    await setSoleRole({ uid: "j1", name: "Ada", role: "admin" });
-    const p = payload();
-    expect(p["admins/j1"]).toBeUndefined();
-    expect(p["judges/j1"]).toBeNull();
+  test("an organizer with no other record can still be given one", async () => {
+    mockGet.mockImplementation(world({ admins: { ...WORLD.admins, x1: true } }));
+    const result = await setSoleRole({ uid: "x1", name: "Mary", role: "judge" });
+
+    expect(result.ok).toBe(true);
+    expect(payload()["judges/x1"].wantsToJudge).toBe(true);
   });
 
   test("no role removes everything they hold", async () => {
@@ -303,19 +306,6 @@ describe("giving somebody their one role", () => {
     expect(result.ok).toBe(false);
   });
 
-  test("the last organizer cannot be switched away", async () => {
-    mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
-    const result = await setSoleRole({ uid: "admin-9", name: "Nine", role: "judge" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/last organizer/);
-  });
-
-  test("you cannot switch your own organizer access away", async () => {
-    const result = await setSoleRole({ uid: "admin-1", name: "Me", role: "judge" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/your own/);
-  });
-
   test("an unknown role is refused rather than writing a junk node", async () => {
     expect((await setSoleRole({ uid: "j1", role: "wizard" })).ok).toBe(false);
   });
@@ -326,8 +316,47 @@ describe("giving somebody their one role", () => {
   });
 });
 
+describe("organizer access, on top of the role", () => {
+  test("granting sets the flag and nothing else", async () => {
+    const result = await setOrganizer({ uid: "c1", name: "Grace", enabled: true });
+    expect(result.ok).toBe(true);
+    const p = payload();
+    expect(p["admins/c1"]).toBe(true);
+    expect(p["competitors/c1"]).toBeUndefined();
+  });
+
+  test("revoking clears the flag and leaves their record", async () => {
+    await setOrganizer({ uid: "admin-2", name: "Two", enabled: false });
+    const p = payload();
+    expect(p["admins/admin-2"]).toBeNull();
+    expect(p["judges/admin-2"]).toBeUndefined();
+  });
+
+  test("the last organizer cannot be revoked", async () => {
+    mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
+    const result = await setOrganizer({ uid: "admin-9", name: "Nine", enabled: false });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/last organizer/);
+  });
+
+  test("you cannot revoke your own organizer access", async () => {
+    const result = await setOrganizer({ uid: "admin-1", name: "Me", enabled: false });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/your own/);
+  });
+});
+
 describe("describing what a switch costs", () => {
   const person = (over) => ({ uid: "c1", roles: ["competitor"], judge: null, competitor: null, ...over });
+
+  test("organizer access is never described as something being dropped", () => {
+    const lines = describeSwitch({
+      person: person({ roles: ["admin", "competitor"], competitor: { firstName: "Grace" } }),
+      role: "judge",
+    });
+    expect(lines.join(" ")).not.toMatch(/organizer/i);
+    expect(lines.join(" ")).toMatch(/competitor record/i);
+  });
 
   test("names the record being dropped", () => {
     const lines = describeSwitch({ person: person({ competitor: { firstName: "Grace" } }), role: "judge" });

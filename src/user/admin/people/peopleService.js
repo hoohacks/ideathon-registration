@@ -10,7 +10,7 @@ import {
 import { database, auth, USING_EMULATOR } from "../../../firebase.js";
 import { firebaseConfig } from "../../../firebaseConfig.js";
 import { applyAdminAction } from "../adminAction.js";
-import { revokeGuard } from "../organizers/adminsService.js";
+import { grantAdmin, revokeAdmin, revokeGuard } from "../organizers/adminsService.js";
 
 /**
  * Everything about a person that used to need the Firebase console.
@@ -238,6 +238,9 @@ async function loadWorld() {
 
 export const ROLE_LABELS = { admin: "Organizer", judge: "Judge", competitor: "Competitor" };
 
+/** The roles a person holds one of. Organizer sits on top and is not one. */
+export const PERSON_ROLES = ["judge", "competitor"];
+
 /** Only the removal paths that belong to one role. */
 function changesForRole(role, all) {
   return all.filter((change) =>
@@ -282,15 +285,12 @@ function identityFrom(records) {
  */
 export function describeSwitch({ person, role }) {
   const lines = [];
-  const leaving = (person?.roles ?? []).filter((held) => held !== role);
+  // organizer is a flag on top, not one of the roles being swapped
+  const leaving = (person?.roles ?? []).filter(
+    (held) => held !== role && PERSON_ROLES.includes(held)
+  );
 
-  for (const held of leaving) {
-    if (held === "admin") {
-      lines.push("Removes their organizer access.");
-      continue;
-    }
-    lines.push(`Deletes their ${held} record.`);
-  }
+  for (const held of leaving) lines.push(`Deletes their ${held} record.`);
 
   const competitor = leaving.includes("competitor") ? person?.competitor : null;
   if (competitor?.teamId) lines.push("Takes them off their team.");
@@ -304,7 +304,7 @@ export function describeSwitch({ person, role }) {
   if (judge?.isRound1Judge) lines.push("Clears their first-round judge mark.");
   if (judge) lines.push("Scores they filed are kept, because they count toward averages.");
 
-  if (leaving.some((held) => held !== "admin")) {
+  if (leaving.length) {
     lines.push("A copy of the record is archived, and can be put back.");
   }
 
@@ -314,49 +314,46 @@ export function describeSwitch({ person, role }) {
 /**
  * Give somebody exactly one role, replacing whatever they hold.
  *
- * Roles used to be additive -- one account could be an organizer, a judge and a
- * competitor at once -- and the control panel offered a +/- button per role.
- * Two of those buttons in a row is how a record gets deleted and re-created
- * empty, which reads as an account wiping itself. One role, one dropdown, one
- * write.
+ * Roles used to be additive -- one account could be a judge and a competitor at
+ * once -- and the control panel offered a +/- button per role. Two of those
+ * buttons in a row is how a record gets deleted and re-created empty, which
+ * reads as an account wiping itself. One role, one dropdown, one write.
+ *
+ * Organizer is deliberately NOT one of these. It is a flag at /admins/{uid}
+ * with no record of its own, and it sits on top: an organizer who is also a
+ * judge needs the judge record to be scheduled, to see their cards and to file
+ * a score under their own name. Making organizer exclusive with the rest
+ * deleted that record and quietly took away their ability to judge. See
+ * `setOrganizer`.
  *
  * Everything goes into a single atomic update: the archive copy, the removal
- * fan-out for the roles being left, and the record for the role being taken.
+ * fan-out for the role being left, and the record for the role being taken.
  * The archive is written in the SAME update as the delete, so there is no
  * window in which the record is gone and the copy is not yet there.
  *
- * `role` is "admin", "judge", "competitor", or "none".
+ * `role` is "judge", "competitor", or "none".
  */
 export async function setSoleRole({ uid, name, role, includeScores = false }) {
   if (!uid) return { ok: false, error: "Pick a person first." };
-  if (role !== "none" && !ROLE_NODES[role]) return { ok: false, error: `Unknown role "${role}".` };
+  if (role !== "none" && !PERSON_ROLES.includes(role)) {
+    return { ok: false, error: `Unknown role "${role}".` };
+  }
 
   const world = await loadWorld();
 
-  const held = [];
-  if (world.adminUids.includes(uid)) held.push("admin");
-  if (world.judgesData[uid]) held.push("judge");
-  if (world.competitorsData[uid]) held.push("competitor");
+  const held = PERSON_ROLES.filter((current) =>
+    current === "judge" ? world.judgesData[uid] : world.competitorsData[uid]
+  );
 
   const label = role === "none" ? "no role" : ROLE_LABELS[role].toLowerCase();
   if (held.length === 1 && held[0] === role) {
-    return { ok: false, error: `${name || uid} is already ${label === "organizer" ? "an" : "a"} ${label}.` };
+    return { ok: false, error: `${name || uid} is already a ${label}.` };
   }
   if (role === "none" && !held.length) {
-    return { ok: false, error: `${name || uid} has no roles to remove.` };
+    return { ok: false, error: `${name || uid} has no role to remove.` };
   }
 
   const leaving = held.filter((current) => current !== role);
-
-  // the lockout guard, in the one place it can still be reached from
-  if (leaving.includes("admin")) {
-    const refusal = revokeGuard({
-      uid,
-      currentUid: auth.currentUser?.uid ?? null,
-      adminUids: world.adminUids,
-    });
-    if (refusal) return { ok: false, error: refusal };
-  }
 
   const changes = [];
   const stamp = Date.now();
@@ -364,10 +361,6 @@ export async function setSoleRole({ uid, name, role, includeScores = false }) {
   const all = removalChanges({ uid, ...world, includeScores });
 
   for (const current of leaving) {
-    if (current === "admin") {
-      changes.push({ path: `admins/${uid}`, before: true, after: null });
-      continue;
-    }
     const record = current === "judge" ? world.judgesData[uid] : world.competitorsData[uid];
     changes.push({
       path: `archive/people/${uid}/${stamp}-${current}`,
@@ -380,23 +373,31 @@ export async function setSoleRole({ uid, name, role, includeScores = false }) {
   // A record for the role they are keeping is left exactly as it is. Rewriting
   // it would blank whatever an organizer or the person had already filled in.
   if (role !== "none" && !held.includes(role)) {
-    if (role === "admin") {
-      changes.push({ path: `admins/${uid}`, before: null, after: true });
-    } else {
-      const identity = identityFrom([world.judgesData[uid], world.competitorsData[uid]]);
-      const record =
-        role === "judge"
-          ? blankJudge(identity)
-          : blankCompetitor(identity);
-      changes.push({ path: `${ROLE_NODES[role]}/${uid}`, before: null, after: record });
-    }
+    const identity = identityFrom([world.judgesData[uid], world.competitorsData[uid]]);
+    const record = role === "judge" ? blankJudge(identity) : blankCompetitor(identity);
+    changes.push({ path: `${ROLE_NODES[role]}/${uid}`, before: null, after: record });
   }
 
   return applyAdminAction({
     action: "role.set",
-    summary: role === "none" ? `Removed every role from ${name || uid}` : `Made ${name || uid} ${label === "organizer" ? "an" : "a"} ${label}`,
+    summary:
+      role === "none"
+        ? `Removed the role from ${name || uid}`
+        : `Made ${name || uid} a ${label}`,
     changes,
   });
+}
+
+/**
+ * Turn organizer access on or off, independently of the person's role.
+ *
+ * Delegates rather than reimplements: `revokeAdmin` carries the lockout guard
+ * that stops /admins being emptied, which cannot be undone from inside the app
+ * because writing /admins requires already being an admin.
+ */
+export async function setOrganizer({ uid, name, enabled }) {
+  if (!uid) return { ok: false, error: "Pick a person first." };
+  return enabled ? grantAdmin({ uid, name }) : revokeAdmin(uid, { name });
 }
 
 /**

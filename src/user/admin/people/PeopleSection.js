@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Card, Checkbox, Chip, Dialog, DialogActions, DialogContent,
   DialogContentText, DialogTitle, Divider, FormControlLabel, MenuItem, Stack,
-  TextField, Tooltip, Typography,
+  Switch, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  listPeople, matchesQuery, setSoleRole, describeSwitch, deletePerson, createPerson,
-  attachRecord, sendReset, bulkSet, ROLE_LABELS,
+  listPeople, matchesQuery, setSoleRole, setOrganizer, describeSwitch, deletePerson,
+  createPerson, attachRecord, sendReset, bulkSet, ROLE_LABELS,
 } from "./peopleService";
 
 /**
@@ -29,10 +29,18 @@ import {
 
 const ROLE_COLORS = { admin: "error", judge: "primary", competitor: "default" };
 
-/** What the dropdown shows: their one role, or that they still hold several. */
+/**
+ * What the dropdown shows: their one role, or that they still hold several.
+ *
+ * Organizer is not in here. It is a flag at /admins/{uid} that sits on top of
+ * the role, because an organizer who judges needs the judge record — without it
+ * they cannot be scheduled, cannot see their cards, and cannot file a score
+ * under their own name.
+ */
 function roleValue(person) {
-  if (person.roles.length > 1) return "multiple";
-  return person.roles[0] ?? "none";
+  const roles = person.roles.filter((role) => role !== "admin");
+  if (roles.length > 1) return "multiple";
+  return roles[0] ?? "none";
 }
 
 export default function PeopleSection({ onResult }) {
@@ -99,7 +107,9 @@ export default function PeopleSection({ onResult }) {
       <Alert severity="info" sx={{ mb: 2 }}>
         One account, one role. Changing it deletes the record for the role they are leaving — a
         copy is archived first — and creates one for the new role, carrying their name and email
-        across. Fill in the rest from the dashboards.
+        across. Fill in the rest from the dashboards. <strong>Organizer sits on top of the
+        role</strong>, so an organizer who is also a judge can be scheduled and score like
+        anyone else.
       </Alert>
 
       <Card sx={{ p: 2 }}>
@@ -210,11 +220,37 @@ export default function PeopleSection({ onResult }) {
                       // selectable or the field renders blank and looks broken
                       <MenuItem value="multiple">Multiple — pick one</MenuItem>
                     )}
-                    <MenuItem value="admin">Organizer</MenuItem>
                     <MenuItem value="judge">Judge</MenuItem>
                     <MenuItem value="competitor">Competitor</MenuItem>
                     <MenuItem value="none">No role</MenuItem>
                   </TextField>
+
+                  <Tooltip title="Organizer access. Sits on top of the role, so an organizer can judge.">
+                    <FormControlLabel
+                      sx={{ mr: 0 }}
+                      label="Organizer"
+                      control={
+                        <Switch
+                          size="small"
+                          checked={person.roles.includes("admin")}
+                          disabled={busy}
+                          onChange={(event) =>
+                            run(
+                              () =>
+                                setOrganizer({
+                                  uid: person.uid,
+                                  name: person.name,
+                                  enabled: event.target.checked,
+                                }),
+                              event.target.checked
+                                ? `${person.name} is now an organizer`
+                                : `${person.name} is no longer an organizer`
+                            )
+                          }
+                        />
+                      }
+                    />
+                  </Tooltip>
                   <Tooltip title={person.email ? "Email them a password reset link" : "No email on file"}>
                     <span>
                       <Button size="small" disabled={busy || !person.email}
@@ -254,10 +290,8 @@ export default function PeopleSection({ onResult }) {
       <Dialog open={Boolean(confirmSwitch)} onClose={() => setConfirmSwitch(null)} fullWidth maxWidth="xs">
         <DialogTitle>
           {confirmSwitch?.role === "none"
-            ? `Remove every role from ${confirmSwitch?.person?.name}?`
-            : `Make ${confirmSwitch?.person?.name} ${
-                confirmSwitch?.role === "admin" ? "an organizer" : `a ${ROLE_LABELS[confirmSwitch?.role]?.toLowerCase()}`
-              }?`}
+            ? `Remove ${confirmSwitch?.person?.name}'s role?`
+            : `Make ${confirmSwitch?.person?.name} a ${ROLE_LABELS[confirmSwitch?.role]?.toLowerCase()}?`}
         </DialogTitle>
         <DialogContent>
           <DialogContentText component="div">
@@ -290,13 +324,11 @@ export default function PeopleSection({ onResult }) {
                 () => setSoleRole({ uid: target.person.uid, name: target.person.name, role: target.role }),
                 target.role === "none"
                   ? `${target.person.name} now has no role`
-                  : `${target.person.name} is now ${
-                      target.role === "admin" ? "an organizer" : `a ${ROLE_LABELS[target.role].toLowerCase()}`
-                    }`
+                  : `${target.person.name} is now a ${ROLE_LABELS[target.role].toLowerCase()}`
               );
             }}
           >
-            {confirmSwitch?.role === "none" ? "Remove roles" : "Change role"}
+            {confirmSwitch?.role === "none" ? "Remove role" : "Change role"}
           </Button>
         </DialogActions>
       </Dialog>

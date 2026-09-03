@@ -126,9 +126,15 @@ Per-record editing lives on the Competitors, Judges and Teams dashboards
 
 ### People and roles
 
-A role is membership of a node: `/admins/{uid}`, `/judges/{uid}`,
-`/competitors/{uid}`. **One account holds exactly one of them**, picked from the
-dropdown on each row — Organizer, Judge, Competitor, or no role.
+A role is membership of a node: `/judges/{uid}` or `/competitors/{uid}`. **One
+account holds exactly one of them**, picked from the dropdown on each row —
+Judge, Competitor, or no role.
+
+**Organizer is a flag on top, not one of them.** `/admins/{uid}` is `true` and
+nothing else, and it has its own switch on the row. It has to sit on top: an
+organizer who judges needs the judge record, because being scheduled, seeing
+your cards and filing a score under your own name all key off it. Making
+organizer exclusive with the rest silently took judging away from them.
 
 Changing it deletes the record for the role they are leaving and creates one for
 the role they are taking, carrying their name, email and company across. The
@@ -145,9 +151,8 @@ buttons in a row looks like one action — `− Competitor` deletes the record a
 `+ Competitor` writes an empty one back — and the account reads as having wiped
 itself. The dropdown is one action with one confirmation.
 
-An organizer has no record of their own: `/admins/{uid}` is only `true`. So the
-list falls back to the most recent archived record for their name and email,
-which is otherwise deleted the moment you make someone an organizer.
+An organizer who holds no role has no record and so no name anywhere. The list
+falls back to the most recent archived record for their name and email.
 
 Accounts that predate this hold more than one role. Their dropdown reads
 **Multiple — pick one** until you choose, which collapses them to that role.
@@ -377,7 +382,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 30 suites, 489 tests, no JVM
+npm run test:ci     # 30 suites, 500 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
