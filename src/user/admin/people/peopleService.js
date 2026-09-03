@@ -651,10 +651,11 @@ export async function createTeam(name) {
 
 /** Delete a team, detaching its members rather than orphaning their teamId. */
 export async function deleteTeam({ teamId, teamName }) {
-  const [teamSnap, competitorsSnap, judgesSnap] = await Promise.all([
+  const [teamSnap, competitorsSnap, judgesSnap, finalSnap] = await Promise.all([
     get(ref(database, `teams/${teamId}`)),
     get(ref(database, "competitors")),
     get(ref(database, "judges")),
+    get(ref(database, "finalRound/teams")),
   ]);
   if (!teamSnap.exists()) return { ok: false, error: "That team no longer exists." };
 
@@ -683,6 +684,14 @@ export async function deleteTeam({ teamId, teamName }) {
         after: null,
       });
     }
+  }
+
+  // And out of the standings. Without this, deleting a finalist left a team in
+  // /finalRound/teams that no longer exists anywhere else -- and the results
+  // page ranks whatever is in there, so a deleted team could be shown winning.
+  const standing = (finalSnap.exists() ? finalSnap.val() : {})?.[teamId];
+  if (standing) {
+    changes.push({ path: `finalRound/teams/${teamId}`, before: standing, after: null });
   }
 
   return applyAdminAction({

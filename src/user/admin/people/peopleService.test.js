@@ -474,6 +474,35 @@ describe("deleting a team", () => {
     expect(payload()["judges/j1/finalAssignments/t1"]).toBeNull();
   });
 
+  test("a finalist is taken out of the standings too", async () => {
+    // the results page ranks whatever is in /finalRound/teams, so a team left
+    // there after being deleted could be shown winning
+    const table = world({
+      "finalRound/teams": { t1: { name: "Lumen", averageScore: 33, excludedJudges: { j1: true } } },
+    });
+    mockGet.mockImplementation(async (r) => {
+      // the fixture is keyed by node, so the single-team read needs its own case
+      if (r.path === "teams/t1") return { exists: () => true, val: () => WORLD.teams.t1 };
+      return table(r);
+    });
+    await deleteTeam({ teamId: "t1", teamName: "Lumen" });
+
+    expect(payload()["finalRound/teams/t1"]).toBeNull();
+  });
+
+  test("a team that was never in the final round leaves the standings alone", async () => {
+    const table = world({ "finalRound/teams": { t9: { name: "Other" } } });
+    mockGet.mockImplementation(async (r) => {
+      if (r.path === "teams/t1") return { exists: () => true, val: () => WORLD.teams.t1 };
+      return table(r);
+    });
+    await deleteTeam({ teamId: "t1", teamName: "Lumen" });
+
+    const p = payload();
+    expect(p["finalRound/teams/t1"]).toBeUndefined();
+    expect(p["finalRound/teams/t9"]).toBeUndefined();
+  });
+
   test("a team that is already gone is reported", async () => {
     mockGet.mockImplementation(async (r) => {
       if (r.path === "teams/gone") return { exists: () => false, val: () => null };

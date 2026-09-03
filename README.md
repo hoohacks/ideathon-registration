@@ -571,7 +571,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 39 suites, 862 tests, no JVM
+npm run test:ci     # 41 suites, 895 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 npm run test:e2e    # 45 journeys in a real browser, desktop and phone (needs JDK 17+)
 ```
@@ -645,6 +645,8 @@ re-run.
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
 | `teamMembership.test.js` | joining a team, including the reads the rules refuse |
 | `assignmentEdits.test.js` | moving one judge on the day, and the fan-out to every copy |
+| `finalDraftStore.test.js` | the draft's concurrency rule, and the shapes that cross the wire |
+| `checkFinalDrift.test.js` | blocking vs advisory drift in the final round, and its repairs |
 | `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
 | `eventReadiness.test.js` | the phase the event is in, what is blocking, and what to do next |
 | `finalStandings.test.js` | the result, and the difference between a running total and one |
@@ -696,6 +698,7 @@ of them has to reach all of them, and the two rules are not the same:
 | Team name | `teams/{id}/name`, `schedule/teamName`, each judge's `teamAssignments` and `finalAssignments`, `finalRound/teams/{id}/name` | **fanned out** on rename |
 | Room | `config/judgingRooms`, `schedule/room`, `finalSlot/room`, both sets of judge assignments, `finalRound/teams/{id}/room` | **fanned out** on rename and remap |
 | Judge name | `teams/{id}/schedule/judges[].judgeName` | **not** fanned out — every reader resolves from the judge record and treats the cache as a fallback |
+| A team's existence | `teams/{id}`, both sets of judge assignments, `finalRound/teams/{id}` | **fanned out** on delete — the results page ranks whatever is in the standings, so a deleted finalist could be shown winning |
 
 The judge name is the odd one out on purpose: it is written into a roster that
 is rewritten wholesale by other operations anyway, so a single source of truth

@@ -57,7 +57,17 @@ export default function FinalRoundPlanner() {
       setError(result.error);
       return;
     }
-    const saved = await saveFinalDraft(result.plan);
+    // Carry the version of whatever is stored.
+    //
+    // A fresh plan is version 0, and the draft store refuses a save whose
+    // version does not match what is there -- that is what stops two organizers
+    // clobbering each other. Building over an existing draft is not that: it is
+    // the same person deliberately starting again, and it is what the "Re-rank"
+    // repair does when a card lands mid-planning. Without this, that repair
+    // failed with "another organizer changed this draft", which is both wrong
+    // and unactionable.
+    const draft = { ...result.plan, version: plan?.version ?? 0 };
+    const saved = await saveFinalDraft(draft);
     setBuilding(false);
     if (!saved.ok) {
       setError(saved.error);
