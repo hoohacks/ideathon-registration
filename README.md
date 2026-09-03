@@ -35,14 +35,17 @@ when you mean to.
 
 | | Pull request | Push to a branch | Release | By hand |
 | --- | --- | --- | --- | --- |
-| Unit tests, rules, build | yes | yes | yes | yes |
-| Browser journeys | yes | no | no | yes |
+| Unit tests, rules, build | yes | **no** | yes | yes |
+| Browser journeys | yes | **no** | no | yes |
 | Deploy to gh-pages | no | no | yes | yes |
 
+Nothing runs on an ordinary push. A branch somebody is still working on does not
+need the whole suite on every commit, and the gate that matters is the one
+before code merges. The consequence worth knowing: **a direct push to main runs
+nothing** — merging through a pull request is what keeps that from being a gap.
+
 Both workflows take `workflow_dispatch`, so either can be run from the Actions
-tab on any branch. The browser suite is skipped on ordinary pushes because it
-costs minutes and a work-in-progress branch does not need it on every commit —
-it still gates every pull request.
+tab on any branch.
 
 Deploying happens on a **published release**, not on a merge, and it is the one
 workflow that does not run the browser suite: a flaky spec must not stand

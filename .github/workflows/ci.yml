@@ -1,15 +1,16 @@
 name: CI
 
-# Runs on every push and pull request. Deploying is a separate workflow that
-# fires on a published release -- pushing to main no longer puts anything live.
+# Runs on pull requests, and on demand. Deliberately NOT on every push: a branch
+# somebody is still working on does not need the whole suite on each commit, and
+# the gate that matters is the one before code merges.
 #
-# `workflow_dispatch` runs the whole thing by hand from the Actions tab, on any
+# The consequence worth knowing: a direct push to main runs nothing. Merging
+# through a pull request is what keeps that from being a gap.
+#
+# `workflow_dispatch` runs everything by hand from the Actions tab, on any
 # branch: useful before cutting a release, or to re-run a suite that failed for
 # an environmental reason rather than a real one.
 on:
-  push:
-    branches-ignore:
-      - gh-pages
   pull_request:
   workflow_dispatch:
 
@@ -68,11 +69,8 @@ jobs:
           CI: false
 
   e2e:
-    # The browser suite is the slowest thing here, and the only layer that can
-    # see a permission denial and a layout at the same time. It runs on pull
-    # requests and on demand rather than on every push to every branch: it costs
-    # minutes, and a work-in-progress branch does not need it on each commit.
-    if: github.event_name != 'push'
+    # The slowest suite here, and the only layer that can see a permission
+    # denial and a layout at the same time.
     name: Browser journeys
     runs-on: ubuntu-latest
     timeout-minutes: 30
