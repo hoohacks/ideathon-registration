@@ -114,7 +114,7 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 | Judging schedule | batch count, batch times, final round room |
 | Schedule | build, review, hand-edit and publish the judging schedule — a separate page, `/user/admin/schedule`, also on the nav |
 | Event | event start date |
-| People and roles | grant/revoke any role, create accounts, reset passwords, bulk check-in, delete people |
+| People and roles | set each person's one role, create accounts, reset passwords, bulk check-in, delete people |
 | Export | schedule, scores, standings, judges, full JSON backup |
 | Restore points | recover from a bad publish or wipe |
 | Advanced | create an empty team, write any config key |
@@ -127,11 +127,34 @@ Per-record editing lives on the Competitors, Judges and Teams dashboards
 ### People and roles
 
 A role is membership of a node: `/admins/{uid}`, `/judges/{uid}`,
-`/competitors/{uid}`. They are **additive** — one account can be all three.
+`/competitors/{uid}`. **One account holds exactly one of them**, picked from the
+dropdown on each row — Organizer, Judge, Competitor, or no role.
 
-You can grant or revoke any role, create a login and record, attach a record to
-an existing login, email a password reset, bulk check-in, bulk mark round-one
-judges, and delete someone entirely.
+Changing it deletes the record for the role they are leaving and creates one for
+the role they are taking, carrying their name, email and company across. The
+confirmation names what goes with the old record: their team, their resume,
+their judging assignments, their round-one mark. Scores they filed are kept —
+they still count toward the averages the final round is picked from.
+
+**The deleted record is archived first,** to `/archive/people/{uid}/{ts}-{role}`,
+in the same atomic write. Nothing in the app puts it back yet; read it from the
+console, or from a JSON export.
+
+It used to be a `+`/`−` button per role, with roles additive. Two of those
+buttons in a row looks like one action — `− Competitor` deletes the record and
+`+ Competitor` writes an empty one back — and the account reads as having wiped
+itself. The dropdown is one action with one confirmation.
+
+An organizer has no record of their own: `/admins/{uid}` is only `true`. So the
+list falls back to the most recent archived record for their name and email,
+which is otherwise deleted the moment you make someone an organizer.
+
+Accounts that predate this hold more than one role. Their dropdown reads
+**Multiple — pick one** until you choose, which collapses them to that role.
+
+You can also create a login and record, attach a record to an existing login,
+email a password reset, bulk check-in, bulk mark round-one judges, and delete
+someone entirely.
 
 Two limits are real, and shown in the UI:
 
@@ -140,8 +163,8 @@ Two limits are real, and shown in the UI:
   an account with no role. Remove the account in the console if it matters.
 - **You cannot set a password.** Send a reset email instead.
 
-Revoking a judge also removes them from every team's schedule card and from the
-final round exclusions — a name left on a card is otherwise unexplainable, and a
+Moving someone off judge also removes them from every team's schedule card and
+from the final round exclusions — a name left on a card is otherwise unexplainable, and a
 stale exclusion can leave a finalist with nobody eligible to judge it.
 
 Deleting the last organizer is refused. Nothing in the app could add one back.
@@ -292,6 +315,7 @@ remove the need to look at the building.
                            rule of its own. Deleted on publish
 /adminLog/{entryId}        what changed, with before and after
 /snapshotIndex, /snapshots restore points
+/archive/people/{uid}/{ts}-{role}   a role record deleted by a role change
 ```
 
 Four decisions worth knowing:
@@ -353,7 +377,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 29 suites, 458 tests, no JVM
+npm run test:ci     # 30 suites, 489 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -368,7 +392,8 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `publishPlan.test.js` | a restore point is written before the schedule |
 | `snapshotDiff.test.js` | named score loss in a restore diff, by team, judge and round |
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
-| `peopleService.test.js` | role changes and the removal fan-out |
+| `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
+| `roles.test.js` | the profile merge, so a second role cannot blank the first |
 | `exportData.test.js` | CSV quoting and formula defusing |
 | `resilience.test.js` | the judge outbox surviving a reload |
 

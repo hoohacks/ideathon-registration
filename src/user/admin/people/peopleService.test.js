@@ -31,7 +31,7 @@ jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid
 
 const {
   removalChanges, listPeople, matchesQuery, blankJudge, blankCompetitor,
-  setRole, deletePerson, bulkSet, deleteTeam,
+  setSoleRole, describeSwitch, deletePerson, bulkSet, deleteTeam,
 } = require("./peopleService");
 const { requireAdmin } = require("../../../roles.js");
 
@@ -145,6 +145,49 @@ describe("listing people", () => {
     expect(admin2.name).toMatch(/no profile/);
   });
 
+  test("an organizer with only an archived record is still listed by name", async () => {
+    // /admins holds nothing but `true`, so once roles are exclusive the record
+    // carrying an organizer's name is the one the switch deleted. Without this
+    // the person you most need to find is a uid.
+    mockGet.mockImplementation(world({
+      admins: { ...WORLD.admins, x1: true },
+      "archive/people": {
+        x1: {
+          "1700000000000-competitor": {
+            role: "competitor",
+            record: { firstName: "Mary", lastName: "Jackson", email: "mary@example.com" },
+          },
+        },
+      },
+    }));
+
+    const person = (await listPeople()).find((p) => p.uid === "x1");
+    expect(person.name).toBe("Mary Jackson");
+    expect(person.email).toBe("mary@example.com");
+  });
+
+  test("the newest archived record wins", async () => {
+    mockGet.mockImplementation(world({
+      admins: { ...WORLD.admins, x1: true },
+      "archive/people": {
+        x1: {
+          "1700000000000-competitor": { role: "competitor", record: { firstName: "Old" } },
+          "1800000000000-judge": { role: "judge", record: { firstName: "New" } },
+        },
+      },
+    }));
+
+    expect((await listPeople()).find((p) => p.uid === "x1").name).toBe("New");
+  });
+
+  test("a live record beats an archived one", async () => {
+    mockGet.mockImplementation(world({
+      "archive/people": { j1: { "1800000000000-judge": { role: "judge", record: { firstName: "Stale" } } } },
+    }));
+
+    expect((await listPeople()).find((p) => p.uid === "j1").name).toBe("Ada Lovelace");
+  });
+
   test("someone can hold more than one role", async () => {
     mockGet.mockImplementation(world({ admins: { j1: true } }));
     const people = await listPeople();
@@ -167,53 +210,154 @@ describe("searching", () => {
   });
 });
 
-describe("granting and revoking roles", () => {
-  test("granting judge writes a blank record, not an empty object", async () => {
-    const result = await setRole({ uid: "c1", name: "Grace", role: "judge", enabled: true });
+describe("giving somebody their one role", () => {
+  test("switching a competitor to judge carries their name and email across", async () => {
+    // the record is merged into their profile at sign-in, so a blank one here
+    // erases the name and email they registered with -- their own page then
+    // shows nothing and a password reset refuses for want of an address
+    const result = await setSoleRole({ uid: "c1", name: "Grace", role: "judge" });
     expect(result.ok).toBe(true);
 
     const record = payload()["judges/c1"];
-    expect(record.isRound1Judge).toBe(false);
-    expect(record.checkedIn).toBe(false);
+    expect(record.firstName).toBe("Grace");
+    expect(record.lastName).toBe("Hopper");
+    expect(record.email).toBe("grace@example.com");
     expect(record.wantsToJudge).toBe(true);
+    expect(record.isRound1Judge).toBe(false);
   });
 
-  test("granting a role someone already has is refused", async () => {
-    const result = await setRole({ uid: "j1", role: "judge", enabled: true });
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/already a judge/);
+  test("the role they are leaving is deleted, with its roster entries", async () => {
+    await setSoleRole({ uid: "c1", name: "Grace", role: "judge" });
+    const p = payload();
+    expect(p["competitors/c1"]).toBeNull();
+    expect(p["teams/t1/members/c1"]).toBeNull();
   });
 
-  test("revoking judge removes their record and their roster entries", async () => {
-    await setRole({ uid: "j1", role: "judge", enabled: false });
+  test("the record it deletes is archived first, in the same write", async () => {
+    await setSoleRole({ uid: "c1", name: "Grace", role: "judge" });
+    const p = payload();
+
+    const archived = Object.entries(p).find(([path]) => path.startsWith("archive/people/c1/"));
+    expect(archived).toBeTruthy();
+    const [, entry] = archived;
+    expect(entry.role).toBe("competitor");
+    expect(entry.record).toEqual(WORLD.competitors.c1);
+    expect(entry.archivedBy).toBe("admin-1");
+  });
+
+  test("a judge switching away takes their name off every schedule card", async () => {
+    await setSoleRole({ uid: "j1", name: "Ada", role: "competitor" });
     const p = payload();
     expect(p["judges/j1"]).toBeNull();
     expect(p["teams/t1/schedule/judges"]).toEqual([{ judgeId: "j2", judgeName: "Alan Turing" }]);
+    expect(p["finalRound/teams/t1/excludedJudges/j1"]).toBeNull();
+    expect(p["competitors/j1"].firstName).toBe("Ada");
   });
 
-  test("revoking judge leaves a competitor record for the same person alone", async () => {
+  test("a record for the role they are keeping is left alone", async () => {
+    // they hold two roles and you are collapsing them to one; rewriting the
+    // record for the role that survives would blank whatever is in it
     mockGet.mockImplementation(world({
-      judges: { ...WORLD.judges, c1: { firstName: "Grace" } },
+      judges: { ...WORLD.judges, c1: { firstName: "Grace", lastName: "Hopper", isRound1Judge: true } },
     }));
-    await setRole({ uid: "c1", role: "judge", enabled: false });
-    expect(payload()["competitors/c1"]).toBeUndefined();
+    await setSoleRole({ uid: "c1", name: "Grace", role: "judge" });
+
+    const p = payload();
+    expect(p["judges/c1"]).toBeUndefined();
+    expect(p["competitors/c1"]).toBeNull();
   });
 
-  test("the last organizer cannot be revoked", async () => {
+  test("switching to organizer clears the records and sets the flag", async () => {
+    await setSoleRole({ uid: "c1", name: "Grace", role: "admin" });
+    const p = payload();
+    expect(p["admins/c1"]).toBe(true);
+    expect(p["competitors/c1"]).toBeNull();
+  });
+
+  test("an organizer keeping their flag is not rewritten", async () => {
+    mockGet.mockImplementation(world({
+      admins: { ...WORLD.admins, j1: true },
+    }));
+    await setSoleRole({ uid: "j1", name: "Ada", role: "admin" });
+    const p = payload();
+    expect(p["admins/j1"]).toBeUndefined();
+    expect(p["judges/j1"]).toBeNull();
+  });
+
+  test("no role removes everything they hold", async () => {
+    await setSoleRole({ uid: "c1", name: "Grace", role: "none" });
+    const p = payload();
+    expect(p["competitors/c1"]).toBeNull();
+    expect(p["teams/t1/members/c1"]).toBeNull();
+    expect(Object.keys(p).some((path) => path.startsWith("archive/people/c1/"))).toBe(true);
+  });
+
+  test("the role they already hold on its own is refused", async () => {
+    const result = await setSoleRole({ uid: "j1", name: "Ada", role: "judge" });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/already/);
+  });
+
+  test("somebody with no roles cannot be switched to no role", async () => {
+    const result = await setSoleRole({ uid: "nobody", name: "Nobody", role: "none" });
+    expect(result.ok).toBe(false);
+  });
+
+  test("the last organizer cannot be switched away", async () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
-    const result = await setRole({ uid: "admin-9", role: "admin", enabled: false });
+    const result = await setSoleRole({ uid: "admin-9", name: "Nine", role: "judge" });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/last organizer/);
   });
 
-  test("you cannot revoke your own organizer access", async () => {
-    const result = await setRole({ uid: "admin-1", role: "admin", enabled: false });
+  test("you cannot switch your own organizer access away", async () => {
+    const result = await setSoleRole({ uid: "admin-1", name: "Me", role: "judge" });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/your own/);
   });
 
   test("an unknown role is refused rather than writing a junk node", async () => {
-    expect((await setRole({ uid: "j1", role: "wizard", enabled: true })).ok).toBe(false);
+    expect((await setSoleRole({ uid: "j1", role: "wizard" })).ok).toBe(false);
+  });
+
+  test("scores survive a switch, because they count toward averages", async () => {
+    await setSoleRole({ uid: "j1", name: "Ada", role: "competitor" });
+    expect(payload()["scores/first/t1/j1"]).toBeUndefined();
+  });
+});
+
+describe("describing what a switch costs", () => {
+  const person = (over) => ({ uid: "c1", roles: ["competitor"], judge: null, competitor: null, ...over });
+
+  test("names the record being dropped", () => {
+    const lines = describeSwitch({ person: person({ competitor: { firstName: "Grace" } }), role: "judge" });
+    expect(lines.join(" ")).toMatch(/competitor record/i);
+  });
+
+  test("calls out a team and a resume, which do not come back with the role", () => {
+    const lines = describeSwitch({
+      person: person({ competitor: { teamId: "t1", resume: "https://example.com/cv.pdf" } }),
+      role: "judge",
+    });
+    expect(lines.join(" ")).toMatch(/team/i);
+    expect(lines.join(" ")).toMatch(/resume/i);
+  });
+
+  test("calls out judging assignments and the round-one mark", () => {
+    const lines = describeSwitch({
+      person: person({
+        roles: ["judge"],
+        judge: { isRound1Judge: true, teamAssignments: { t1: {}, t2: {} } },
+      }),
+      role: "competitor",
+    });
+    expect(lines.join(" ")).toMatch(/2 judging assignment/i);
+    expect(lines.join(" ")).toMatch(/first-round/i);
+  });
+
+  test("says the copy is recoverable", () => {
+    const lines = describeSwitch({ person: person({ competitor: {} }), role: "judge" });
+    expect(lines.join(" ")).toMatch(/archived/i);
   });
 });
 

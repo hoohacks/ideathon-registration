@@ -5,8 +5,8 @@ import {
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  listPeople, matchesQuery, setRole, deletePerson, createPerson, attachRecord,
-  sendReset, bulkSet,
+  listPeople, matchesQuery, setSoleRole, describeSwitch, deletePerson, createPerson,
+  attachRecord, sendReset, bulkSet, ROLE_LABELS,
 } from "./peopleService";
 
 /**
@@ -14,17 +14,26 @@ import {
  *
  * Before this, /admins was the only role reachable from the app: making someone
  * a judge after they had registered as a competitor meant opening the Firebase
- * console and hand-writing a record. Roles are additive here because they are
- * additive in the database — one account can be an organizer, a judge and a
- * competitor at once, and the app reads all three.
+ * console and hand-writing a record.
+ *
+ * A person holds exactly one role, and it is picked from a dropdown. It used to
+ * be a +/− button per role, which made two clicks look like one action: −
+ * Competitor deletes the record, + Competitor writes a blank one back, and an
+ * account appears to have wiped itself. One dropdown, one confirmation naming
+ * what is about to be lost, one write.
  *
  * The two things this cannot do are stated in the UI rather than hidden, because
  * both surprise people: a browser cannot delete a Firebase Auth account, and it
  * cannot set someone's password.
  */
 
-const ROLE_LABELS = { admin: "Organizer", judge: "Judge", competitor: "Competitor" };
 const ROLE_COLORS = { admin: "error", judge: "primary", competitor: "default" };
+
+/** What the dropdown shows: their one role, or that they still hold several. */
+function roleValue(person) {
+  if (person.roles.length > 1) return "multiple";
+  return person.roles[0] ?? "none";
+}
 
 export default function PeopleSection({ onResult }) {
   const [people, setPeople] = useState([]);
@@ -35,6 +44,7 @@ export default function PeopleSection({ onResult }) {
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [alsoScores, setAlsoScores] = useState(false);
+  const [confirmSwitch, setConfirmSwitch] = useState(null);
 
   const refresh = useCallback(() => {
     listPeople().then(setPeople).catch(() => setPeople([]));
@@ -87,8 +97,9 @@ export default function PeopleSection({ onResult }) {
       </Typography>
 
       <Alert severity="info" sx={{ mb: 2 }}>
-        Roles are additive — one account can be all three. Granting judge or competitor creates a
-        blank record you can then fill in from the dashboards.
+        One account, one role. Changing it deletes the record for the role they are leaving — a
+        copy is archived first — and creates one for the new role, carrying their name and email
+        across. Fill in the rest from the dashboards.
       </Alert>
 
       <Card sx={{ p: 2 }}>
@@ -185,27 +196,25 @@ export default function PeopleSection({ onResult }) {
                 </Stack>
 
                 <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5, flexShrink: 0 }}>
-                  {["admin", "judge", "competitor"].map((role) => {
-                    const has = person.roles.includes(role);
-                    return (
-                      <Button
-                        key={role}
-                        size="small"
-                        variant={has ? "contained" : "outlined"}
-                        color={has ? "primary" : "inherit"}
-                        disabled={busy}
-                        onClick={() =>
-                          run(
-                            () => setRole({ uid: person.uid, name: person.name, role, enabled: !has }),
-                            has ? `${person.name} is no longer a ${ROLE_LABELS[role].toLowerCase()}`
-                                : `${person.name} is now a ${ROLE_LABELS[role].toLowerCase()}`
-                          )
-                        }
-                      >
-                        {has ? `− ${ROLE_LABELS[role]}` : `+ ${ROLE_LABELS[role]}`}
-                      </Button>
-                    );
-                  })}
+                  <TextField
+                    select
+                    size="small"
+                    label="Role"
+                    sx={{ minWidth: 150 }}
+                    disabled={busy}
+                    value={roleValue(person)}
+                    onChange={(event) => setConfirmSwitch({ person, role: event.target.value })}
+                  >
+                    {roleValue(person) === "multiple" && (
+                      // they predate one-role-per-account; the value has to be
+                      // selectable or the field renders blank and looks broken
+                      <MenuItem value="multiple">Multiple — pick one</MenuItem>
+                    )}
+                    <MenuItem value="admin">Organizer</MenuItem>
+                    <MenuItem value="judge">Judge</MenuItem>
+                    <MenuItem value="competitor">Competitor</MenuItem>
+                    <MenuItem value="none">No role</MenuItem>
+                  </TextField>
                   <Tooltip title={person.email ? "Email them a password reset link" : "No email on file"}>
                     <span>
                       <Button size="small" disabled={busy || !person.email}
@@ -241,6 +250,56 @@ export default function PeopleSection({ onResult }) {
         onClose={() => setCreating(false)}
         onDone={(result, message) => { onResult(result, message); refresh(); }}
       />
+
+      <Dialog open={Boolean(confirmSwitch)} onClose={() => setConfirmSwitch(null)} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {confirmSwitch?.role === "none"
+            ? `Remove every role from ${confirmSwitch?.person?.name}?`
+            : `Make ${confirmSwitch?.person?.name} ${
+                confirmSwitch?.role === "admin" ? "an organizer" : `a ${ROLE_LABELS[confirmSwitch?.role]?.toLowerCase()}`
+              }?`}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div">
+            {(() => {
+              const lines = confirmSwitch
+                ? describeSwitch({ person: confirmSwitch.person, role: confirmSwitch.role })
+                : [];
+              if (!lines.length) {
+                return <p>They hold no other role, so nothing is removed.</p>;
+              }
+              return (
+                <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
+                  {lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </Box>
+              );
+            })()}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmSwitch(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={async () => {
+              const target = confirmSwitch;
+              setConfirmSwitch(null);
+              await run(
+                () => setSoleRole({ uid: target.person.uid, name: target.person.name, role: target.role }),
+                target.role === "none"
+                  ? `${target.person.name} now has no role`
+                  : `${target.person.name} is now ${
+                      target.role === "admin" ? "an organizer" : `a ${ROLE_LABELS[target.role].toLowerCase()}`
+                    }`
+              );
+            }}
+          >
+            {confirmSwitch?.role === "none" ? "Remove roles" : "Change role"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(confirmDelete)} onClose={() => setConfirmDelete(null)}>
         <DialogTitle>Delete {confirmDelete?.name}?</DialogTitle>

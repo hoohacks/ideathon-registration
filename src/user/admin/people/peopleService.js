@@ -10,7 +10,7 @@ import {
 import { database, auth, USING_EMULATOR } from "../../../firebase.js";
 import { firebaseConfig } from "../../../firebaseConfig.js";
 import { applyAdminAction } from "../adminAction.js";
-import { grantAdmin, revokeAdmin, revokeGuard } from "../organizers/adminsService.js";
+import { revokeGuard } from "../organizers/adminsService.js";
 
 /**
  * Everything about a person that used to need the Firebase console.
@@ -81,10 +81,11 @@ export function blankCompetitor({ firstName = "", lastName = "", email = "" } = 
  * most need to find -- the organizer you are about to revoke -- is invisible.
  */
 export async function listPeople() {
-  const [adminsSnap, judgesSnap, competitorsSnap] = await Promise.all([
+  const [adminsSnap, judgesSnap, competitorsSnap, archiveSnap] = await Promise.all([
     get(ref(database, "admins")),
     get(ref(database, "judges")),
     get(ref(database, "competitors")),
+    get(ref(database, "archive/people")),
   ]);
 
   const people = new Map();
@@ -108,9 +109,37 @@ export async function listPeople() {
     }
   }
 
+  // Roles are exclusive, and /admins holds nothing but `true` -- so the record
+  // carrying an organizer's name is the one their switch deleted. The archived
+  // copy is where it went, and without this the person you most need to find in
+  // this list is a uid.
+  const archived = archiveSnap.val() ?? {};
+  for (const entry of people.values()) {
+    if (entry.name && entry.email) continue;
+    const record = latestArchivedRecord(archived[entry.uid]);
+    if (!record) continue;
+    const name = [record.firstName, record.lastName].filter(Boolean).join(" ").trim();
+    if (name && !entry.name) entry.name = name;
+    if (record.email && !entry.email) entry.email = record.email;
+  }
+
   return [...people.values()]
     .map((p) => ({ ...p, name: p.name || p.email || `(no profile) ${p.uid.slice(0, 8)}` }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The most recently archived record for one person that carries a name or an
+ * email. Keys are `{timestamp}-{role}`, so a plain descending sort is newest
+ * first for any timestamp of the same width.
+ */
+export function latestArchivedRecord(entries) {
+  for (const key of Object.keys(entries ?? {}).sort().reverse()) {
+    const record = entries[key]?.record;
+    if (!record) continue;
+    if (record.firstName || record.lastName || record.email) return record;
+  }
+  return null;
 }
 
 export function matchesQuery(person, query) {
@@ -188,60 +217,30 @@ export function removalChanges({
 }
 
 async function loadWorld() {
-  const [judgesSnap, teamsSnap, competitorsSnap, scoresSnap, finalSnap] = await Promise.all([
-    get(ref(database, "judges")),
-    get(ref(database, "teams")),
-    get(ref(database, "competitors")),
-    get(ref(database, "scores")),
-    get(ref(database, "finalRound/teams")),
-  ]);
+  const [judgesSnap, teamsSnap, competitorsSnap, scoresSnap, finalSnap, adminsSnap] =
+    await Promise.all([
+      get(ref(database, "judges")),
+      get(ref(database, "teams")),
+      get(ref(database, "competitors")),
+      get(ref(database, "scores")),
+      get(ref(database, "finalRound/teams")),
+      get(ref(database, "admins")),
+    ]);
   return {
     judgesData: judgesSnap.val() ?? {},
     teamsData: teamsSnap.val() ?? {},
     competitorsData: competitorsSnap.val() ?? {},
     scoresData: scoresSnap.val() ?? {},
     finalRoundTeams: finalSnap.val() ?? {},
+    adminUids: Object.keys(adminsSnap.val() ?? {}),
   };
 }
 
-/**
- * Give or take away one role.
- *
- * Granting judge or competitor writes a blank profile if there is not one
- * already; revoking deletes the record and everything that referenced it. The
- * admin role is only a flag, so it goes through the existing lockout guard.
- */
-export async function setRole({ uid, name, role, enabled, includeScores = false }) {
-  if (!ROLE_NODES[role]) return { ok: false, error: `Unknown role "${role}".` };
-  if (!uid) return { ok: false, error: "Pick a person first." };
+export const ROLE_LABELS = { admin: "Organizer", judge: "Judge", competitor: "Competitor" };
 
-  if (role === "admin") {
-    // delegates rather than reimplements: revokeAdmin carries the lockout guard
-    // that stops /admins being emptied, which cannot be undone from inside the
-    // app because writing /admins requires already being an admin
-    return enabled ? grantAdmin({ uid, name }) : revokeAdmin(uid, { name });
-  }
-
-  const world = await loadWorld();
-  const node = ROLE_NODES[role];
-  const existing = role === "judge" ? world.judgesData[uid] : world.competitorsData[uid];
-
-  if (enabled) {
-    if (existing) return { ok: false, error: `${name || uid} is already a ${role}.` };
-    const blank = role === "judge" ? blankJudge({}) : blankCompetitor({});
-    return applyAdminAction({
-      action: "role.grant",
-      summary: `Made ${name || uid} a ${role}`,
-      changes: [{ path: `${node}/${uid}`, before: null, after: blank }],
-    });
-  }
-
-  if (!existing) return { ok: false, error: `${name || uid} is not a ${role}.` };
-
-  // only the paths belonging to THIS role, so revoking judge does not delete a
-  // competitor record for the same person
-  const all = removalChanges({ uid, ...world, includeScores });
-  const changes = all.filter((change) =>
+/** Only the removal paths that belong to one role. */
+function changesForRole(role, all) {
+  return all.filter((change) =>
     role === "judge"
       ? change.path.startsWith("judges/") ||
         change.path.includes("/schedule/judges") ||
@@ -249,10 +248,153 @@ export async function setRole({ uid, name, role, enabled, includeScores = false 
         change.path.includes("/excludedJudges/")
       : change.path.startsWith("competitors/") || change.path.includes("/members/")
   );
+}
+
+/**
+ * The name and email to carry onto the record being created, recovered from
+ * whichever records this person already has.
+ *
+ * A record written with empty identity fields is not merely unhelpful. The app
+ * merges a person's records into one profile at sign-in, so an empty firstName
+ * or email on one of them used to overwrite the real one on another: the person
+ * saw no name, no email, and a password reset that refused for want of an
+ * address. Exclusive roles make it worse, not better -- the record they
+ * registered with is the one being deleted.
+ */
+function identityFrom(records) {
+  const identity = { firstName: "", lastName: "", email: "", company: "" };
+  for (const record of records) {
+    if (!record) continue;
+    for (const key of Object.keys(identity)) {
+      if (!identity[key] && record[key]) identity[key] = record[key];
+    }
+  }
+  return identity;
+}
+
+/**
+ * What an organizer is about to destroy, in plain sentences, for the dialog
+ * that asks them to confirm it. Pure, so the wording can be tested.
+ *
+ * The archived copy is named deliberately. Everything else here is a list of
+ * things that do not come back with the role, and somebody reading a list of
+ * losses needs to know the record itself is recoverable.
+ */
+export function describeSwitch({ person, role }) {
+  const lines = [];
+  const leaving = (person?.roles ?? []).filter((held) => held !== role);
+
+  for (const held of leaving) {
+    if (held === "admin") {
+      lines.push("Removes their organizer access.");
+      continue;
+    }
+    lines.push(`Deletes their ${held} record.`);
+  }
+
+  const competitor = leaving.includes("competitor") ? person?.competitor : null;
+  if (competitor?.teamId) lines.push("Takes them off their team.");
+  if (competitor?.resume) lines.push("Drops the resume on file.");
+
+  const judge = leaving.includes("judge") ? person?.judge : null;
+  const assignments = Object.keys(judge?.teamAssignments ?? {}).length;
+  if (assignments) {
+    lines.push(`Removes ${assignments} judging assignment${assignments === 1 ? "" : "s"}, and their name from those teams' cards.`);
+  }
+  if (judge?.isRound1Judge) lines.push("Clears their first-round judge mark.");
+  if (judge) lines.push("Scores they filed are kept, because they count toward averages.");
+
+  if (leaving.some((held) => held !== "admin")) {
+    lines.push("A copy of the record is archived, and can be put back.");
+  }
+
+  return lines;
+}
+
+/**
+ * Give somebody exactly one role, replacing whatever they hold.
+ *
+ * Roles used to be additive -- one account could be an organizer, a judge and a
+ * competitor at once -- and the control panel offered a +/- button per role.
+ * Two of those buttons in a row is how a record gets deleted and re-created
+ * empty, which reads as an account wiping itself. One role, one dropdown, one
+ * write.
+ *
+ * Everything goes into a single atomic update: the archive copy, the removal
+ * fan-out for the roles being left, and the record for the role being taken.
+ * The archive is written in the SAME update as the delete, so there is no
+ * window in which the record is gone and the copy is not yet there.
+ *
+ * `role` is "admin", "judge", "competitor", or "none".
+ */
+export async function setSoleRole({ uid, name, role, includeScores = false }) {
+  if (!uid) return { ok: false, error: "Pick a person first." };
+  if (role !== "none" && !ROLE_NODES[role]) return { ok: false, error: `Unknown role "${role}".` };
+
+  const world = await loadWorld();
+
+  const held = [];
+  if (world.adminUids.includes(uid)) held.push("admin");
+  if (world.judgesData[uid]) held.push("judge");
+  if (world.competitorsData[uid]) held.push("competitor");
+
+  const label = role === "none" ? "no role" : ROLE_LABELS[role].toLowerCase();
+  if (held.length === 1 && held[0] === role) {
+    return { ok: false, error: `${name || uid} is already ${label === "organizer" ? "an" : "a"} ${label}.` };
+  }
+  if (role === "none" && !held.length) {
+    return { ok: false, error: `${name || uid} has no roles to remove.` };
+  }
+
+  const leaving = held.filter((current) => current !== role);
+
+  // the lockout guard, in the one place it can still be reached from
+  if (leaving.includes("admin")) {
+    const refusal = revokeGuard({
+      uid,
+      currentUid: auth.currentUser?.uid ?? null,
+      adminUids: world.adminUids,
+    });
+    if (refusal) return { ok: false, error: refusal };
+  }
+
+  const changes = [];
+  const stamp = Date.now();
+  const by = auth.currentUser?.uid ?? "admin";
+  const all = removalChanges({ uid, ...world, includeScores });
+
+  for (const current of leaving) {
+    if (current === "admin") {
+      changes.push({ path: `admins/${uid}`, before: true, after: null });
+      continue;
+    }
+    const record = current === "judge" ? world.judgesData[uid] : world.competitorsData[uid];
+    changes.push({
+      path: `archive/people/${uid}/${stamp}-${current}`,
+      before: null,
+      after: { role: current, record, archivedAt: serverTimestamp(), archivedBy: by },
+    });
+    changes.push(...changesForRole(current, all));
+  }
+
+  // A record for the role they are keeping is left exactly as it is. Rewriting
+  // it would blank whatever an organizer or the person had already filled in.
+  if (role !== "none" && !held.includes(role)) {
+    if (role === "admin") {
+      changes.push({ path: `admins/${uid}`, before: null, after: true });
+    } else {
+      const identity = identityFrom([world.judgesData[uid], world.competitorsData[uid]]);
+      const record =
+        role === "judge"
+          ? blankJudge(identity)
+          : blankCompetitor(identity);
+      changes.push({ path: `${ROLE_NODES[role]}/${uid}`, before: null, after: record });
+    }
+  }
 
   return applyAdminAction({
-    action: "role.revoke",
-    summary: `Removed the ${role} record for ${name || uid}`,
+    action: "role.set",
+    summary: role === "none" ? `Removed every role from ${name || uid}` : `Made ${name || uid} ${label === "organizer" ? "an" : "a"} ${label}`,
     changes,
   });
 }
