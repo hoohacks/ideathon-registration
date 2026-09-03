@@ -33,11 +33,21 @@ const EMULATOR_HOST = process.env.REACT_APP_EMULATOR_HOST || "127.0.0.1";
  * succeed and return nothing, which looks exactly like a signed-in user with no
  * roles and is thoroughly confusing to debug.
  *
- * Passing the URL to getDatabase instead pins the namespace explicitly, and
- * `demo-ideathon` is the same one scripts/seed-event.mjs writes and
- * test/rules/ runs against. Keep the three in step.
+ * Passing the URL to getDatabase instead pins the namespace explicitly.
+ *
+ * It must be the project's DEFAULT instance -- `<projectId>-default-rtdb` --
+ * and not the bare project id, because that is the only namespace
+ * `firebase emulators:exec` applies database.rules.json to. A namespace the
+ * emulator has no rules for is created on demand and left WIDE OPEN, so the
+ * whole app ran locally with no authorization at all: every read succeeded,
+ * every write succeeded, and a rules bug was invisible until production.
+ *
+ * That is not hypothetical. `joinTeam` read two paths the rules refuse and
+ * failed for every real user, while working perfectly against the emulator.
+ *
+ * scripts/seed-event.mjs writes the same namespace. Keep the two in step.
  */
-export const EMULATOR_NAMESPACE = "demo-ideathon";
+export const EMULATOR_NAMESPACE = "demo-ideathon-default-rtdb";
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

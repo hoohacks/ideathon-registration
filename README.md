@@ -602,10 +602,32 @@ re-run.
 | `unloadGuard.test.js` | a judge with unsent scores is warned before closing the tab |
 | `hashRedirect.test.js` | a path-shaped URL reaching the hash route it meant, in dev and in production |
 
-The emulator namespace is `demo-ideathon`, pinned in `src/firebase.js`,
-`scripts/seed-event.mjs` and `test/rules/helpers.mjs`. All three must match, or
-the app connects to a real but empty namespace where every read succeeds and
-returns nothing.
+### The emulator namespace, and why it is what it is
+
+`demo-ideathon-default-rtdb`, pinned in `src/firebase.js`, `scripts/seed-event.mjs`
+and `e2e/helpers.mjs`.
+
+It has to be the project's **default instance** and not the bare project id.
+`firebase emulators:exec` applies `database.rules.json` to
+`<projectId>-default-rtdb` and to nothing else; any other namespace is created
+on demand and left **wide open**.
+
+This was wrong for a long time, and it is worth being precise about the damage:
+the whole app ran locally with **no authorization at all**. Every read
+succeeded, every write succeeded, and no amount of clicking through the app
+could reveal a rules bug. `joinTeam` read two paths the rules refuse — it failed
+for every real user and worked perfectly against the emulator.
+
+The rules suite was never affected: `test/rules/helpers.mjs` uploads the rules
+to the emulator itself via `initializeTestEnvironment`, so it always executed
+them. That is why it caught the bug the moment somebody asked it the question.
+
+Two consequences worth knowing:
+
+- Rules **are** enforced in local development now. Something that used to work
+  locally may correctly refuse.
+- Fixtures written over REST need `Authorization: Bearer owner`, the emulator's
+  admin bypass. Without it a write is `auth == null` and gets a 401.
 
 ---
 

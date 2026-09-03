@@ -51,7 +51,14 @@ export async function expectPagePainted(page) {
 /** The emulator endpoints. Same hosts the seed script and the rules tests use. */
 const AUTH = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts";
 const DB = "http://127.0.0.1:9000";
-const NS = "demo-ideathon";
+// the namespace the emulator applies the rules to, and the one the app
+// connects to -- see the note in src/firebase.js
+const NS = "demo-ideathon-default-rtdb";
+
+// The emulator's admin bypass, the same one scripts/seed-event.mjs uses. Rules
+// ARE enforced on this namespace, so a plain unauthenticated write is `auth ==
+// null` and gets a 401 -- fixtures have to say who they are.
+const ADMIN = { Authorization: "Bearer owner" };
 
 /**
  * A competitor who is not on a team yet.
@@ -73,6 +80,7 @@ export async function createTeamlessCompetitor(request) {
   const { localId } = await signUp.json();
 
   const record = await request.put(`${DB}/competitors/${localId}.json?ns=${NS}`, {
+    headers: ADMIN,
     data: {
       firstName: "E2E",
       lastName: "Competitor",
@@ -82,7 +90,8 @@ export async function createTeamlessCompetitor(request) {
       foodCheckIn: false,
     },
   });
-  if (!record.ok()) throw new Error(`could not write the competitor record`);
+  if (!record.ok())
+    throw new Error(`competitor record: ${record.status()} ${await record.text()}`);
 
   return { email, password, uid: localId };
 }
@@ -91,8 +100,9 @@ export async function createTeamlessCompetitor(request) {
 export async function createTeam(request, { name, submitted = false }) {
   const teamId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const res = await request.put(`${DB}/teams/${teamId}.json?ns=${NS}`, {
+    headers: ADMIN,
     data: { name, submitted, createdBy: "e2e" },
   });
-  if (!res.ok()) throw new Error("could not create the team");
+  if (!res.ok()) throw new Error(`team: ${res.status()} ${await res.text()}`);
   return teamId;
 }

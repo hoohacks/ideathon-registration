@@ -27,6 +27,11 @@
  */
 
 const PROJECT_ID = "demo-ideathon";
+
+// The namespace the emulator applies database.rules.json to is the project's
+// default instance, not the bare project id. src/firebase.js connects to this
+// one; seeding anywhere else fills a database the app cannot see.
+const NAMESPACE = `${PROJECT_ID}-default-rtdb`;
 const DB_HOST = process.env.FIREBASE_DATABASE_EMULATOR_HOST ?? "127.0.0.1:9000";
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099";
 
@@ -51,7 +56,7 @@ const MEMBERS_PER_TEAM = 3;
 
 async function ensureEmulator() {
   try {
-    const response = await fetch(`http://${DB_HOST}/.json?ns=${PROJECT_ID}`, {
+    const response = await fetch(`http://${DB_HOST}/.json?ns=${NAMESPACE}`, {
       headers: { Authorization: "Bearer owner" },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -77,7 +82,7 @@ async function ensureEmulator() {
 
 /** Wipe whatever a previous seed left behind, so runs are repeatable. */
 async function resetEmulator() {
-  await fetch(`http://${DB_HOST}/.json?ns=${PROJECT_ID}`, {
+  await fetch(`http://${DB_HOST}/.json?ns=${NAMESPACE}`, {
     method: "DELETE",
     headers: { Authorization: "Bearer owner" },
   });
@@ -101,7 +106,7 @@ async function createAccount(email) {
 }
 
 async function writeDatabase(tree) {
-  const response = await fetch(`http://${DB_HOST}/.json?ns=${PROJECT_ID}`, {
+  const response = await fetch(`http://${DB_HOST}/.json?ns=${NAMESPACE}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: "Bearer owner" },
     body: JSON.stringify(tree),
