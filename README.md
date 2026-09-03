@@ -548,7 +548,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ```
 npm run test:ci     # 39 suites, 862 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
-npm run test:e2e    # 19 journeys in a real browser (needs JDK 17+)
+npm run test:e2e    # 30 journeys in a real browser (needs JDK 17+)
 ```
 
 ### The four layers, and what only the last two can see
@@ -565,6 +565,21 @@ Three bugs shipped because of the two "blind to" rows: joining a team failed on
 a read the rules always refuse, the planner stacked two full-height page frames
 so its content sat below the fold, and the room sheets had no link to them. The
 e2e specs pin all three.
+
+What the browser layer covers: the two public forms and the hash-URL rewrite, a
+competitor joining a team, **a judge opening a card and scoring a team**, an
+organizer building and publishing a schedule through its typed confirmation, and
+the control panel's mutating controls — adding, renaming and removing a room,
+granting admin access, the confirmation a role change puts up, and an export
+that actually produces a file.
+
+Two habits that suite taught, both learned by getting them wrong:
+
+- **Scope every locator to its section.** A page-wide `getByRole("button", {
+  name: "Admin" })` matched the nav's own Admin dropdown and opened the menu
+  instead of toggling anybody.
+- **Wait for the page to settle, do not probe it.** `isVisible()` on a control
+  that has not rendered yet returns false and the step is silently skipped.
 
 `test:e2e` starts the emulators, seeds an event, and runs the app on port
 **3010** — never 3000, and never reusing an existing server. That is deliberate:
