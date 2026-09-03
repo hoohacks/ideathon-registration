@@ -133,7 +133,7 @@ export function describeSupply({
   if (roomCount <= 0) {
     return {
       ok: false,
-      error: "No judging rooms are configured. Add them on the control panel, then generate again.",
+      error: "No judging rooms are configured. Add them on the control panel, then build the plan again.",
       warnings,
       advice,
     };

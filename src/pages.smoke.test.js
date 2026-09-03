@@ -61,6 +61,18 @@ jest.mock("react-zxing", () => ({ useZxing: () => ({ ref: { current: null } }) }
 // chart.js draws to a canvas, which jsdom does not implement
 jest.mock("react-chartjs-2", () => ({ Line: () => null, Bar: () => null }));
 
+// Assignments' "Resume draft" test needs readDraft to resolve a real draft --
+// the generic firebase stub above always reads as not-exists, which is right
+// for every other page here, so only readDraft is overridden. SchedulePreview
+// (rendered by the "schedule preview" test below) imports subscribeDraft,
+// saveDraft and clearDraft from this same module, so those are left as the
+// real implementation rather than replaced with undefined.
+const mockReadDraft = jest.fn();
+jest.mock("./user/judge/draftStore", () => ({
+  ...jest.requireActual("./user/judge/draftStore"),
+  readDraft: (...args) => mockReadDraft(...args),
+}));
+
 // ---- Helpers --------------------------------------------------------------
 
 const baseAuth = {
@@ -107,6 +119,14 @@ const Login = require("./Login").default;
 const ForgotPassword = require("./ForgotPassword").default;
 
 describe("pages render without crashing", () => {
+  // create-react-app's `resetMocks: true` strips the implementation off
+  // every jest.fn before each test, so the module-level mock above needs
+  // re-establishing here.
+  beforeEach(() => {
+    mockReadDraft.mockReset();
+    mockReadDraft.mockResolvedValue(null);
+  });
+
   test("home", async () => {
     renderPage(Home, { userTypes: ["competitor"] });
     expect(await screen.findByText(/Welcome/)).toBeInTheDocument();
@@ -152,6 +172,18 @@ describe("pages render without crashing", () => {
   test("judging as an admin shows the schedule controls", async () => {
     renderPage(Assignments, { userTypes: ["admin"] });
     expect(await screen.findByText("Plan schedule")).toBeInTheDocument();
+  });
+
+  // ---- Finding 7e: a live draft is not invisible from the page an
+  // organizer starts on ----
+  test("judging as an admin with an unpublished draft offers to resume it, not plan a new one", async () => {
+    mockReadDraft.mockResolvedValue({
+      edits: [{ summary: "a" }, { summary: "b" }],
+    });
+    renderPage(Assignments, { userTypes: ["admin"] });
+    expect(await screen.findByText("Resume draft (2 edits)")).toBeInTheDocument();
+    expect(screen.queryByText("Plan schedule")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan a new schedule")).not.toBeInTheDocument();
   });
 
   test("judging progress", async () => {

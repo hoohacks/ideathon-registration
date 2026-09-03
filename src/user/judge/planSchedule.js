@@ -67,8 +67,8 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
         if (!judgesList.length) {
             return fail(
                 onlyCheckedIn && roundOneJudges.length
-                    ? "None of the first round judges have checked in yet. Check them in on the Judge Search page, or generate without the check-in filter."
-                    : "No judges are marked as first round judges. Mark them on the Judge Search page, then generate again."
+                    ? "None of the first round judges have checked in yet. Check them in on the Judge Search page, or build the plan without the check-in filter."
+                    : "No judges are marked as first round judges. Mark them on the Judge Search page, then build the plan again."
             );
         }
 

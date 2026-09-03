@@ -31,6 +31,7 @@ import {
 import { deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
 import { useJudgingSync } from "./useJudgingSync";
 import { clearDraft } from "./scoreDraft";
+import { readDraft } from "./draftStore";
 
 function Section({ title, caption, children }) {
   return (
@@ -61,6 +62,7 @@ function Assignments() {
   }
 
   const [scheduleMeta, setScheduleMeta] = useState(null);
+  const [draft, setDraft] = useState(null);
   const [personalAssignments, setPersonalAssignments] = useState([]);
   const [finalAssignments, setFinalAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
@@ -114,6 +116,16 @@ function Assignments() {
   useEffect(() => {
     if (!canManageSchedule) return;
     readScheduleMeta().then(setScheduleMeta).catch(() => setScheduleMeta(null));
+  }, [canManageSchedule]);
+
+  // A one-shot check, not a live subscription -- this button just needs to
+  // know whether a draft exists when the page loads, so a live draft is not
+  // invisible from the page an organizer starts on. readDraft() already
+  // returns null on any failure (including "no draft yet"), so no .catch is
+  // needed here.
+  useEffect(() => {
+    if (!canManageSchedule) return;
+    readDraft().then(setDraft);
   }, [canManageSchedule]);
 
   function handleActivateFinalRound() {
@@ -244,6 +256,15 @@ function Assignments() {
     };
   }, [selected, currentUserId]);
 
+  // An unpublished draft takes priority over scheduleMeta -- otherwise a
+  // live draft is invisible from the page an organizer starts on, and
+  // "Plan a new schedule" reads as an invitation to lose it.
+  const scheduleButtonLabel = draft
+    ? `Resume draft (${draft.edits?.length ?? 0} edit${(draft.edits?.length ?? 0) === 1 ? "" : "s"})`
+    : scheduleMeta?.generatedAt
+      ? "Plan a new schedule"
+      : "Plan schedule";
+
   return (
     <Layout maxWidth="lg">
       <Stack spacing={3}>
@@ -291,7 +312,7 @@ function Assignments() {
                 Run of show
               </Typography>
               <Button variant="contained" component={Link} to="/user/admin/schedule">
-                {scheduleMeta?.generatedAt ? "Plan a new schedule" : "Plan schedule"}
+                {scheduleButtonLabel}
               </Button>
               {finalRoundActive ? (
                 <Button
@@ -318,7 +339,7 @@ function Assignments() {
                 {scheduleMeta?.generatedAt && (
                   <Typography variant="body2">
                     Schedule generated {new Date(scheduleMeta.generatedAt).toLocaleString()}.
-                    Use Judging progress to move a single judge rather than regenerating.
+                    Use Judging progress to move a single judge instead of rebuilding the plan.
                   </Typography>
                 )}
                 {finalRoundError && <Alert severity="error">{finalRoundError}</Alert>}

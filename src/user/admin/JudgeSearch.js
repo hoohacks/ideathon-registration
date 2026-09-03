@@ -30,7 +30,7 @@ function JudgeSearch() {
 
   const checkedInCount = judges.filter((judge) => judge.checkedIn).length;
   // the scheduler only assigns judges carrying this flag, so the count belongs
-  // where an admin will see it before pressing Generate Schedule
+  // where an admin will see it before building a plan
   const roundOneCount = judges.filter((judge) => judge.isRound1Judge === true).length;
   const percentCheckedIn = judges.length ? (checkedInCount / judges.length) * 100 : 0;
 

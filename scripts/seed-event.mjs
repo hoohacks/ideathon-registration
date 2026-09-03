@@ -128,10 +128,10 @@ const person = (i) => ({
 });
 
 // -------------------------------------------------------------- the schedule
-// Mirrors src/user/judge/getJudgeSchedule.js. Kept deliberately small and
+// Mirrors src/user/judge/planSchedule.js. Kept deliberately small and
 // separate: this only exists so --schedule can hand you an event that is
 // already mid-judging, and it must not become a second implementation anyone
-// relies on. Press Generate Schedule in the app for the real thing.
+// relies on. Build a plan in the app for the real thing.
 
 function splitIntoBatches(items, batchCount) {
   const base = Math.floor(items.length / batchCount);

@@ -4,7 +4,6 @@ import { requireAdmin } from "../../roles.js";
 import { guardWith } from "../admin/snapshots.js";
 import { resolveName } from "../admin/adminAction.js";
 import { checkDrift, readLiveBasis } from "./checkDrift.js";
-import { computeStats } from "./computeStats.js";
 
 /**
  * Publishes a plan: the one place that replaces every judge and team
@@ -35,7 +34,7 @@ import { computeStats } from "./computeStats.js";
  *      multi-path update, so a dropped connection cannot land some of it
  *      without the rest.
  *
- * Returns { ok, error?, drift?, snapshotId?, stats? }. Never throws.
+ * Returns { ok, error?, drift?, snapshotId? }. Never throws.
  */
 export async function publishPlan(plan) {
     try {
@@ -159,7 +158,6 @@ export async function publishPlan(plan) {
             ok: true,
             error: null,
             snapshotId: guard.snapshotId,
-            stats: computeStats(plan),
         };
     } catch (error) {
         console.error("Error publishing the judging schedule:", error);
