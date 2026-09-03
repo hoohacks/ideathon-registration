@@ -56,7 +56,8 @@ const ADMIN = [
     { to: "/user/admin/judges", label: "Judges" },
     { to: "/user/admin/teams", label: "Teams" },
     { to: "/user/admin/judging", label: "Judging progress" },
-    { to: "/user/admin/schedule", label: "Schedule" },
+    // no Schedule entry: the Judging page's own button and the control panel's
+    // Schedule row both lead there, and a third door earns nothing
     { to: "/user/admin/metrics", label: "Metrics" },
     { to: "/user/admin/control", label: "Control panel" },
 ];
