@@ -33,6 +33,14 @@ const LINE_STRONG = "#c8ccd4";
 const SURFACE = "#ffffff";
 const CANVAS = "#f7f8fa";
 
+// The judge and mentor form shares its shell with the competitor form, so at a
+// glance the two were the same page in two sets of words. This is the one thing
+// that tells them apart on sight. It is pulled out of the night chrome below
+// rather than invented, so it belongs to the same palette as everything else,
+// and lightened until it holds its own as text on paper.
+const ACCENT_JUDGE = "#4a3bbf";
+const ACCENT_JUDGE_DARK = "#3a2e9c";
+
 // Chrome. A blue-black rather than a grey-black -- it comes off the original
 // event artwork, and it is what makes the crimson read warm rather than pink.
 const NIGHT = "#0c0a20";
@@ -174,8 +182,24 @@ const theme = createTheme({
   },
 });
 
+/**
+ * The same theme with the accent swapped, for the judge and mentor form.
+ *
+ * A nested ThemeProvider rather than an `accent` prop threaded through
+ * registrationUi: the progress meter, the rail's counters, the submit button
+ * and every focus ring already read `primary.main`, so overriding one palette
+ * entry recolours all of them at once and none of the shared components has to
+ * learn about a second brand.
+ */
+export const judgeTheme = createTheme(theme, {
+  palette: {
+    primary: { main: ACCENT_JUDGE, dark: ACCENT_JUDGE_DARK, contrastText: "#fff" },
+  },
+});
+
 export const tokens = {
   ACCENT,
+  ACCENT_JUDGE,
   ACCENT_DARK,
   ACCENT_WASH,
   INK,

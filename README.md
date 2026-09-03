@@ -89,6 +89,15 @@ URL.
 Locally that is `http://localhost:3000/judge-registration`; in production,
 `hoohacks.github.io/ideathon-registration/judge-registration`.
 
+They share `RegistrationShell` and `Hero`, so the two forms are siblings by
+design. The judge one carries **its own accent** — indigo rather than the
+crimson taken from the logo — through its progress meter, its rail counters and
+its submit button, plus its own tab title, because a judge sent the wrong link
+should be able to tell on sight. That is a nested `ThemeProvider` swapping one
+palette entry (`judgeTheme` in `theme.js`), not a second set of components;
+`theme.test.js` pins that the two accents stay different and that the judge one
+still holds AA as text.
+
 Registering as a judge creates the account and the `/judges/{uid}` record. It
 does **not** mark them as a first-round judge — that is deliberate, and it is
 the one thing the rules will not let a judge set for themselves, since the score
@@ -444,7 +453,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 30 suites, 726 tests, no JVM
+npm run test:ci     # 31 suites, 733 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 

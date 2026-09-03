@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // firebase
@@ -33,6 +33,8 @@ import {
   MIN_PASSWORD,
   useSyncedForm,
 } from "./formKit";
+import { ThemeProvider } from "@mui/material/styles";
+import { judgeTheme } from "./theme";
 import {
   Hero,
   MobileSubmitBar,
@@ -360,6 +362,16 @@ const JudgeRegistration = () => {
     busyLabel: "Signing up…",
   };
 
+  // the tab is a label too, and "Ideathon Registration" on both public pages
+  // is the same problem as two forms that look alike
+  useEffect(() => {
+    const was = document.title;
+    document.title = "Judge & mentor sign-up · Ideathon";
+    return () => {
+      document.title = was;
+    };
+  }, []);
+
   // everything YesNo needs, gathered in one place
   const choiceProps = (name) => ({
     name,
@@ -369,10 +381,11 @@ const JudgeRegistration = () => {
   });
 
   return (
+    <ThemeProvider theme={judgeTheme}>
     <RegistrationShell
       hero={
         <Hero
-          eyebrow={`Mentors and judges · ${EVENT.edition}`}
+          eyebrow={`Judge & mentor sign-up · ${EVENT.edition}`}
           title="Mentor a shift. Judge a pitch. Both, if you can."
           facts={[EVENT.dateLabel, `Judging ${EVENT.judgingHours}`, EVENT.venue]}
         >
@@ -612,6 +625,7 @@ const JudgeRegistration = () => {
         </Grid>
       </Box>
     </RegistrationShell>
+    </ThemeProvider>
   );
 };
 
