@@ -150,6 +150,43 @@ describe("membership", () => {
   });
 });
 
+/**
+ * What somebody joining a team can actually read.
+ *
+ * The answer is: the name, and nothing else. `joinTeam` used to read
+ * `submitted` and `members` up front as well, and both are denied to exactly
+ * the person doing the joining -- so the whole read rejected, the catch fired,
+ * and every join in the app returned "Could not join that team. Please try
+ * again." forever.
+ *
+ * These tests pin the denial rather than wish it away. The client must not
+ * depend on either read; the write rule is where the policy lives, and it is
+ * asserted above.
+ */
+describe("what somebody joining a team can read", () => {
+  test("the name, to confirm the id they were given", async () => {
+    await assertSucceeds(get(ref(db("dave"), "teams/team1/name")));
+  });
+
+  test("not whether it has submitted -- the write rule decides that", async () => {
+    await assertFails(get(ref(db("dave"), "teams/team1/submitted")));
+  });
+
+  test("not the member list, so the size cap cannot be checked in advance", async () => {
+    await assertFails(get(ref(db("dave"), "teams/team1/members")));
+  });
+
+  test("and not the submission or the schedule", async () => {
+    await assertFails(get(ref(db("dave"), "teams/team1/submission")));
+    await assertFails(get(ref(db("dave"), "teams/team1/schedule")));
+  });
+
+  test("a member can read all of it, which is why the reads looked fine", async () => {
+    await assertSucceeds(get(ref(db("alice"), "teams/team1/submitted")));
+    await assertSucceeds(get(ref(db("alice"), "teams/team1/members")));
+  });
+});
+
 describe("the submission", () => {
   test("a member can write it", async () => {
     await assertSucceeds(

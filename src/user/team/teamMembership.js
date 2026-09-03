@@ -86,10 +86,24 @@ export async function createTeam(name) {
 /**
  * Join an existing team by id.
  *
- * Every reason this can fail is checked here so the person gets a sentence
- * rather than a permission error. The closed-after-submission rule is enforced
- * in database.rules.json as well, so it holds even from the console; the size
- * cap cannot be, for the reason given on MAX_TEAM_SIZE.
+ * **Only `name` is readable here.** Everything else about a team -- including
+ * `submitted` and `members` -- is readable by members and the creator only, and
+ * whoever is joining is by definition neither. This function used to read all
+ * three up front in a `Promise.all`; two of the three were denied every time,
+ * the rejection was caught, and every join in the app failed with "Could not
+ * join that team. Please try again." Retrying never helped, because the reads
+ * were never going to succeed.
+ *
+ * So the decision is left where it is actually enforceable: the rules. The
+ * write to `teams/{id}/members/{uid}` is allowed only if the person holds a
+ * competitor record and the team has not submitted, which is the whole of the
+ * policy. What this does is attempt it and turn a refusal back into the
+ * sentence the person needed.
+ *
+ * `submitted` and `members` are still read, opportunistically, purely so a
+ * refusal can be explained *before* the attempt when the reader happens to be
+ * allowed -- an organizer, or somebody rejoining a team they are still on. A
+ * denial there is expected and ignored.
  */
 export async function joinTeam(teamId) {
   const trimmed = String(teamId ?? "").trim();
@@ -108,42 +122,70 @@ export async function joinTeam(teamId) {
       return { ok: false, error: "You are already on a team. Leave it before joining another." };
     }
 
-    // Only the name and these two facts are readable to someone who is not a
-    // member yet, so they are read individually rather than as a team node.
-    const [nameSnap, submittedSnap, membersSnap] = await Promise.all([
-      get(ref(database, `teams/${trimmed}/name`)),
-      get(ref(database, `teams/${trimmed}/submitted`)),
-      get(ref(database, `teams/${trimmed}/members`)),
-    ]);
-
+    // the one thing a non-member may read, and the only one this depends on
+    const nameSnap = await get(ref(database, `teams/${trimmed}/name`));
     if (!nameSnap.exists()) {
       return { ok: false, error: `No team found with the ID "${trimmed}".` };
     }
-    if (submittedSnap.val() === true) {
+    const teamName = nameSnap.val();
+
+    // Best effort. Denied for the person this function is usually for, which is
+    // fine: the rules make the same decision a moment later.
+    const [submitted, members] = await Promise.all([
+      readOrNull(`teams/${trimmed}/submitted`),
+      readOrNull(`teams/${trimmed}/members`),
+    ]);
+
+    if (submitted === true) return { ok: false, error: closedMessage(teamName) };
+
+    if (members && Object.keys(members).length >= MAX_TEAM_SIZE) {
       return {
         ok: false,
-        error: `${nameSnap.val()} has already submitted its project, so it is closed to new members. Ask an organizer if you need to be added.`,
+        error: `${teamName} already has ${MAX_TEAM_SIZE} members, which is the maximum. An organizer can add you from the Competitors dashboard if the team is meant to be larger.`,
       };
     }
 
-    const size = Object.keys(membersSnap.val() ?? {}).length;
-    if (size >= MAX_TEAM_SIZE) {
-      return {
-        ok: false,
-        error: `${nameSnap.val()} already has ${MAX_TEAM_SIZE} members, which is the maximum. An organizer can add you from the Competitors dashboard if the team is meant to be larger.`,
-      };
+    try {
+      await update(ref(database), {
+        // just this member, so joining cannot drop or reorder anyone else
+        [`teams/${trimmed}/members/${uid}`]: true,
+        [`competitors/${uid}/teamId`]: trimmed,
+      });
+    } catch (error) {
+      // The write rule refuses for exactly two reasons, so a refusal is not
+      // ambiguous: either they have no competitor record, or the team is closed.
+      const self = await readOrNull(`competitors/${uid}`);
+      if (!self) {
+        return {
+          ok: false,
+          error:
+            "Only competitors can join a team. Ask an organizer to add a competitor record to your account.",
+        };
+      }
+      return { ok: false, error: closedMessage(teamName) };
     }
 
-    await update(ref(database), {
-      // just this member, so joining cannot drop or reorder anyone else
-      [`teams/${trimmed}/members/${uid}`]: true,
-      [`competitors/${uid}/teamId`]: trimmed,
-    });
-
-    return { ok: true, teamId: trimmed, teamName: nameSnap.val() };
+    return { ok: true, teamId: trimmed, teamName };
   } catch (error) {
     console.error("Error joining team:", error);
     return { ok: false, error: "Could not join that team. Please try again." };
+  }
+}
+
+function closedMessage(teamName) {
+  return (
+    `${teamName} has already submitted its project, so it is closed to new members. ` +
+    `Ask an organizer if you need to be added.`
+  );
+}
+
+/** A read whose denial is expected and means "cannot tell", not "failed". */
+async function readOrNull(path) {
+  try {
+    const snap = await get(ref(database, path));
+    return snap.exists() ? snap.val() : null;
+  } catch {
+    return null;
   }
 }
 

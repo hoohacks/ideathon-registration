@@ -277,6 +277,23 @@ have a record of that role — whatever is there now was made after the archive
 was taken, and losing it to a restore is the failure the archive exists to
 prevent.
 
+### Joining a team
+
+Only `teams/{id}/name` is readable by somebody who is not yet a member — and
+that is exactly who is joining. `submitted` and `members` are member-and-creator
+only, so the app **cannot** check "has this team submitted?" or "is it full?"
+before attempting the join.
+
+The policy therefore lives where it is enforceable: the write rule on
+`teams/{id}/members/{uid}` allows the write only if the person holds a
+competitor record and the team has not submitted. `joinTeam` attempts it and
+turns a refusal back into a sentence. It still reads the two extra paths
+opportunistically — an organizer, or a member rejoining, is allowed — purely to
+explain a refusal before the attempt rather than after.
+
+`test/rules/teams.test.mjs` pins the denial, so nothing re-introduces a
+dependency on a read that cannot succeed.
+
 ### Restore points
 
 Two recovery mechanisms, for different sizes of mistake.
@@ -526,7 +543,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 37 suites, 821 tests, no JVM
+npm run test:ci     # 38 suites, 831 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -543,6 +560,7 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `publishPlan.test.js` | a restore point is written before the schedule |
 | `snapshotDiff.test.js` | named score loss in a restore diff, by team, judge and round |
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
+| `teamMembership.test.js` | joining a team, including the reads the rules refuse |
 | `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
 | `eventReadiness.test.js` | the phase the event is in, what is blocking, and what to do next |
 | `finalStandings.test.js` | the result, and the difference between a running total and one |
