@@ -57,7 +57,9 @@ function TeamCard({ assignment, target, onOpenTeam }) {
 
 export default function PlanGrid({ plan, stats, onOpenTeam }) {
   const target = plan.basis?.target ?? 1;
-  const rooms = plan.basis?.rooms ?? [];
+  // memoised because `?? []` is a new array on every render, which would make
+  // the useMemo below recompute every time and defeat the point of it
+  const rooms = useMemo(() => plan.basis?.rooms ?? [], [plan.basis?.rooms]);
   const batchCount = plan.basis?.batchCount ?? 0;
   const batchTimes = plan.basis?.batchTimes ?? {};
 

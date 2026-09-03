@@ -4,12 +4,18 @@ import { requireAdmin } from "../../roles.js";
 import { READ_LEGACY_SCORE_PATH, FIRST_ROUND } from "./getTeamInfo.js";
 import { compareForRanking, rankingEntry, scoredJudgeCount } from "./scoreRubric.js";
 import { guardWith } from "../admin/snapshots.js";
+import { buildFinalPlan, slotsOf, slotLabel, orphanedIn } from "./finalRoundPlan.js";
+import { checkFinalDrift, blockingOnly, BLOCKING } from "./checkFinalDrift.js";
+import { clearFinalDraft } from "./finalDraftStore.js";
 
 export const FINAL_ROUND_ROOM = "Rice 011";
 
+/** Overridden by config/finalRoundSize. */
+export const DEFAULT_FINAL_ROUND_SIZE = 4;
+
 /**
  * Below this, an average is not really a ranking — it is one person's opinion.
- * Teams under it are still ranked, but activation reports them so an organizer
+ * Teams under it are still ranked, but the plan reports them so an organizer
  * can send a judge round before the cut is made rather than discovering it
  * afterwards.
  */
@@ -68,8 +74,8 @@ export function rankTeams(teamsData, scoresByTeam) {
  * This used to iterate every registered judge, so somebody who signed up in
  * October and never turned up still received finalAssignments -- and that
  * node is what the rules treat as proof of assignment for writing a final
- * score. Shared by the planner (to warn if it is empty) and the publisher
- * (to build assignments), so the two cannot disagree about who counts.
+ * score. Shared by the planner and the publisher, so the two cannot disagree
+ * about who counts.
  */
 function eligibleJudgePool(judgesData) {
   const workingJudges = Object.entries(judgesData)
@@ -82,90 +88,132 @@ function eligibleJudgePool(judgesData) {
 }
 
 /**
- * Which of `finalists` would present to an empty room: every judge in
- * `eligiblePool` already scored them in round one, so excluding conflicted
- * judges leaves nobody. Reachable at small events -- with six teams or fewer
- * every judge sees every team.
+ * Everything the planner and the publisher both need to read.
+ *
+ * Shared so the two cannot disagree about who counts as an eligible judge or
+ * what the room is — the failure mode that lets a plan publish differently
+ * from how it looked.
  */
-function orphanedFinalists(finalists, scoresByTeam, eligiblePool) {
-  return finalists
-    .filter((team) => {
-      const excluded = scoresByTeam[team.teamId] ?? {};
-      return !eligiblePool.some((uid) => !excluded[uid]);
-    })
-    .map((team) => team.name);
+async function readFinalWorld() {
+  const [teamsSnap, judgesSnap, sizeSnap, roomSnap] = await Promise.all([
+    get(ref(database, "teams")),
+    get(ref(database, "judges")),
+    get(ref(database, "config/finalRoundSize")),
+    get(ref(database, "config/finalRoundRoom")),
+  ]);
+
+  const teamsData = teamsSnap.exists() ? teamsSnap.val() ?? {} : {};
+  const judgesData = judgesSnap.exists() ? judgesSnap.val() ?? {} : {};
+  const scoresByTeam = await loadFirstRoundScores(teamsData);
+
+  const size = Number(sizeSnap.val());
+  return {
+    teamsData,
+    judgesData,
+    scoresByTeam,
+    size: Number.isInteger(size) && size > 0 ? size : DEFAULT_FINAL_ROUND_SIZE,
+    // The control panel has always been able to set this. Until now the write
+    // ignored it and used the constant, so changing the room in the control
+    // panel changed the display and nothing else.
+    room: roomSnap.exists() ? String(roomSnap.val()) : FINAL_ROUND_ROOM,
+  };
 }
 
-/** The under-judged-finalist warning, or null. */
-function underJudgedWarning(finalists) {
-  const underJudged = finalists.filter((t) => t.judgeCount < MIN_JUDGES_FOR_CONFIDENCE);
-  if (!underJudged.length) return null;
-  return (
-    `${underJudged.map((t) => t.name).join(", ")} reached the final on fewer than ` +
-    `${MIN_JUDGES_FOR_CONFIDENCE} judges.`
-  );
+/** The eligible pool with display names, in the shape the plan carries. */
+function poolWithNames(judgesData) {
+  return eligibleJudgePool(judgesData).map((uid) => ({
+    judgeId: uid,
+    judgeName:
+      [judgesData[uid]?.firstName, judgesData[uid]?.lastName].filter(Boolean).join(" ").trim() ||
+      "Unnamed Judge",
+  }));
 }
 
 /**
- * The empty-judge-pool and orphaned-finalist warnings for a candidate
- * finalist set, plus the pool itself so a caller building assignments does
- * not have to recompute it. Shared by planFinalRound (against its own cut)
- * and publishFinalRound (against whatever finalist set the organizer
- * actually confirmed).
+ * What an organizer should know about a plan, whether it was just built or
+ * hand-edited since.
+ *
+ * Recomputed on every render rather than frozen at build time, so an edit that
+ * creates a problem — emptying a panel, dropping the wrong team — says so while
+ * there is still time to fix it.
  */
-function poolWarnings(finalists, scoresByTeam, judgesData) {
+export function warningsFor(plan) {
   const warnings = [];
-  const eligiblePool = eligibleJudgePool(judgesData);
+  const ranked = plan?.ranked ?? [];
+  const finalists = slotsOf(plan);
 
-  if (!eligiblePool.length) {
+  if (!finalists.length) return ["No teams are in the cut."];
+
+  const thin = finalists
+    .map((slot) => ranked.find((team) => team.teamId === slot.teamId))
+    .filter((team) => team && team.judgeCount < MIN_JUDGES_FOR_CONFIDENCE);
+  if (thin.length) {
     warnings.push(
-      "No judges are marked as first-round judges, so nobody has been given a final-round assignment."
+      `${thin.map((t) => t.name).join(", ")} reached the final on fewer than ` +
+        `${MIN_JUDGES_FOR_CONFIDENCE} judges.`
     );
   }
 
-  const orphaned = orphanedFinalists(finalists, scoresByTeam, eligiblePool);
+  // a tie straddling the cut line is the one an organizer has to know about
+  const inCut = new Set(finalists.map((slot) => slot.teamId));
+  const lastIn = [...ranked].reverse().find((team) => inCut.has(team.teamId));
+  const firstOut = ranked.find((team) => !inCut.has(team.teamId));
+  if (lastIn && firstOut && lastIn.averageScore === firstOut.averageScore) {
+    warnings.push(
+      `${lastIn.name} and ${firstOut.name} tied on average; the tiebreak put ${lastIn.name} through.`
+    );
+  }
+
+  if (!(plan?.pool ?? []).length) {
+    warnings.push(
+      "No judges are marked as first-round judges, so nobody can be given a final-round assignment."
+    );
+  }
+
+  const orphaned = orphanedIn(plan);
   if (orphaned.length) {
     warnings.push(
-      `${orphaned.join(", ")} reached the final round with no eligible judge — every ` +
-        `available judge already scored them in round one. Add a judge who did not, or ` +
-        `clear an exclusion, or they present to an empty room.`
+      `${orphaned.join(", ")} reached the final round with no eligible judge — every available ` +
+        `judge already scored them in round one. Add a judge who did not, or they present to an ` +
+        `empty room.`
     );
   }
 
-  return { warnings, eligiblePool };
+  const empty = finalists
+    .filter((slot) => !slot.judges.length && !orphaned.includes(slot.teamName))
+    .map((slot) => slot.teamName);
+  if (empty.length) {
+    warnings.push(`${empty.join(", ")} has nobody on its panel and will present to an empty room.`);
+  }
+
+  return warnings;
 }
 
 /**
- * Rank every eligible team and cut the top `limit` into a final-round
- * candidate -- the planner half of the plan/publish split. Writes nothing, so
- * an organizer can review the cut, and override which teams are in it,
- * before anything is saved.
+ * Build the plan an organizer edits, and write nothing.
  *
- * `basis.cardCounts` -- how many score cards each ranked team carried when
- * this plan was built -- is what `publishFinalRound` re-reads and compares
- * against, to refuse publishing a cut whose averages a card that arrived
- * afterwards has since made wrong.
+ * The planner half of the plan/publish split. It used to return a list of
+ * finalists; it now returns a full draft — the cut, the running order, the room
+ * and a panel per team — because everything derived at the moment of the write
+ * was everything an organizer could not correct.
  *
- * Returns { ok, error?, finalists, ranked, warnings, basis }. Never throws.
+ * Returns { ok, error?, plan, warnings }. Never throws.
  */
-export async function planFinalRound({ limit = 4, requireSubmitted = true } = {}) {
-  const empty = { finalists: [], ranked: [], warnings: [], basis: { cardCounts: {} } };
+export async function planFinalRound({ requireSubmitted = true } = {}) {
   try {
     await requireAdmin("plan the final round");
 
-    const [teamsSnap, judgesSnap] = await Promise.all([
-      get(ref(database, "teams")),
-      get(ref(database, "judges")),
-    ]);
-    if (!teamsSnap.exists()) {
-      return { ok: false, error: "No teams found to evaluate for the final round", ...empty };
+    const world = await readFinalWorld();
+    if (!Object.keys(world.teamsData).length) {
+      return {
+        ok: false,
+        error: "No teams found to evaluate for the final round",
+        plan: null,
+        warnings: [],
+      };
     }
 
-    const teamsData = teamsSnap.val() ?? {};
-    const judgesData = judgesSnap.exists() ? judgesSnap.val() ?? {} : {};
-    const scoresByTeam = await loadFirstRoundScores(teamsData);
-
-    const ranked = rankTeams(teamsData, scoresByTeam)
+    const ranked = rankTeams(world.teamsData, world.scoresByTeam)
       // an unsubmitted team has nothing to present; it used to be eligible
       .filter((team) => (requireSubmitted ? team.submitted : true));
 
@@ -173,58 +221,63 @@ export async function planFinalRound({ limit = 4, requireSubmitted = true } = {}
       return {
         ok: false,
         error: "No teams have scores yet. Final round cannot be activated.",
-        ...empty,
+        plan: null,
+        warnings: [],
       };
     }
 
-    const finalists = ranked.slice(0, limit);
-    const warnings = [];
+    const plan = buildFinalPlan({
+      ranked,
+      scoresByTeam: world.scoresByTeam,
+      pool: poolWithNames(world.judgesData),
+      size: world.size,
+      room: world.room,
+    });
 
-    const underJudged = underJudgedWarning(finalists);
-    if (underJudged) warnings.push(underJudged);
-
-    // a tie straddling the cut line is the one an organizer has to know about
-    const firstOut = ranked[limit];
-    if (firstOut && finalists.length === limit) {
-      const lastIn = finalists[limit - 1];
-      if (lastIn.averageScore === firstOut.averageScore) {
-        warnings.push(
-          `${lastIn.name} and ${firstOut.name} tied on average; the tiebreak put ` +
-            `${lastIn.name} through.`
-        );
-      }
-    }
-
-    warnings.push(...poolWarnings(finalists, scoresByTeam, judgesData).warnings);
-
-    // how many cards each ranked team carried right now, so publishFinalRound
-    // can tell a late card apart from a ranking that is simply still current
-    const cardCounts = {};
-    for (const team of ranked) cardCounts[team.teamId] = team.judgeCount;
-
-    return { ok: true, error: null, finalists, ranked, warnings, basis: { cardCounts } };
+    return { ok: true, error: null, plan, warnings: warningsFor(plan) };
   } catch (error) {
     console.error("Error planning the final round:", error);
     return {
       ok: false,
       error: error.message || "Something went wrong planning the final round.",
-      ...empty,
+      plan: null,
+      warnings: [],
     };
   }
 }
 
+/** The live state `checkFinalDrift` compares a plan against. */
+export async function readLiveFinalBasis() {
+  const world = await readFinalWorld();
+  return {
+    cardCounts: Object.fromEntries(
+      Object.keys(world.teamsData).map((teamId) => [
+        teamId,
+        scoredJudgeCount(world.scoresByTeam[teamId]),
+      ])
+    ),
+    eligibleJudges: Object.fromEntries(
+      poolWithNames(world.judgesData).map((judge) => [judge.judgeId, true])
+    ),
+    submitted: Object.fromEntries(
+      Object.entries(world.teamsData).map(([teamId, team]) => [teamId, Boolean(team?.submitted)])
+    ),
+    room: world.room,
+    size: world.size,
+    teamsData: world.teamsData,
+    judgesData: world.judgesData,
+  };
+}
+
 /**
- * Publishes a final-round activation for `finalists`, as given -- so an
- * organizer's override of `planFinalRound`'s cut is honoured rather than
- * recomputed -- checked against `basis` from that same plan.
+ * Publish a planned final round.
  *
- * Before writing anything it re-reads the first-round score cards and
- * compares each finalist's card count against `basis.cardCounts`. A card that
- * arrived since the plan was built moves the average the cut was made from,
- * so any mismatch refuses the publish outright with `staleScores` rather than
- * writing a cut nobody actually reviewed.
+ * Takes the plan as given — the running order, the panels and the room an
+ * organizer actually confirmed — rather than re-deriving any of it. Refuses on
+ * blocking drift, takes a restore point, and only then writes.
  *
- * Writes four things in ONE atomic update, so they cannot drift:
+ * Three things go into ONE atomic update, so they cannot drift apart:
+ *
  *   finalRound/*                        the standings, admin-readable only
  *   teams/{id}/finalSlot                the team's own room and time
  *   judges/{uid}/finalAssignments/{id}  what each judge has to see
@@ -233,112 +286,76 @@ export async function planFinalRound({ limit = 4, requireSubmitted = true } = {}
  * location being queried, and the standings must not be readable. Denormalising
  * is the same answer the first-round schedule already uses.
  *
- * Returns { ok, error?, staleScores?, warnings, snapshotId }. Never throws.
+ * Returns { ok, error?, drift?, warnings, snapshotId }. Never throws.
  */
-export async function publishFinalRound({ finalists, basis }) {
+export async function publishFinalRound(plan) {
   try {
     const user = await requireAdmin("activate the final round");
 
-    if (!finalists?.length) {
+    const finalists = slotsOf(plan);
+    if (!finalists.length) {
       return { ok: false, error: "No finalists to publish.", warnings: [] };
     }
 
-    const [teamsSnap, judgesSnap] = await Promise.all([
-      get(ref(database, "teams")),
-      get(ref(database, "judges")),
-    ]);
-    if (!teamsSnap.exists()) {
-      return { ok: false, error: "No teams found to evaluate for the final round", warnings: [] };
+    const live = await readLiveFinalBasis();
+    const drift = checkFinalDrift(plan, live);
+    if (blockingOnly(drift).length) {
+      return { ok: false, error: null, drift, warnings: [] };
     }
-
-    const teamsData = teamsSnap.val() ?? {};
-    const judgesData = judgesSnap.exists() ? judgesSnap.val() ?? {} : {};
-    const scoresByTeam = await loadFirstRoundScores(teamsData);
-
-    // ---- refuse to publish a cut a late card has made stale ----
-    //
-    // Checked across every team `planFinalRound` ranked, not just `finalists`.
-    // A card landing on a team just below the cut line changes THAT team's
-    // average, not any finalist's -- and can lift it above one. That is the
-    // dangerous half of drift: a team that earned a place in the final round
-    // does not get one, and nothing about `finalists` itself looks wrong.
-    const cardCounts = basis?.cardCounts ?? {};
-    const staleTeamId = Object.keys(cardCounts).find(
-      (teamId) => scoredJudgeCount(scoresByTeam[teamId]) !== cardCounts[teamId]
-    );
-    if (staleTeamId) {
-      const staleName = teamsData[staleTeamId]?.name ?? staleTeamId;
-      return {
-        ok: false,
-        staleScores:
-          `${staleName} has been scored since this ranking was computed. Re-rank before publishing.`,
-        warnings: [],
-      };
-    }
-
-    const warnings = [];
-    const underJudged = underJudgedWarning(finalists);
-    if (underJudged) warnings.push(underJudged);
 
     const updates = {};
     const teamsPayload = {};
 
-    finalists.forEach((team, index) => {
-      const timeslot = `Slot ${index + 1}`;
+    for (const slot of finalists) {
+      const ranked = (plan.ranked ?? []).find((team) => team.teamId === slot.teamId);
+      const timeslot = slotLabel(slot.order);
 
-      // a judge who already saw this team in round one should not judge it again
-      const excludedJudges = Object.keys(scoresByTeam[team.teamId] ?? {}).reduce((acc, uid) => {
-        acc[uid] = true;
-        return acc;
-      }, {});
-
-      teamsPayload[team.teamId] = {
-        name: team.name,
-        averageScore: team.averageScore,
-        fundableVotes: team.fundableVotes,
-        judgeCount: team.judgeCount,
-        excludedJudges,
+      teamsPayload[slot.teamId] = {
+        name: slot.teamName,
+        averageScore: ranked?.averageScore ?? 0,
+        fundableVotes: ranked?.fundableVotes ?? 0,
+        judgeCount: ranked?.judgeCount ?? 0,
+        // still means "scored this team in round one", which is what
+        // peopleService and dangerZone already clean up. The edit layer refuses
+        // to seat an excluded judge, so this and the panel cannot disagree.
+        excludedJudges: plan.excluded?.[slot.teamId] ?? {},
         timeslot,
-        room: FINAL_ROUND_ROOM,
+        room: plan.room,
       };
 
-      updates[`teams/${team.teamId}/finalSlot`] = { room: FINAL_ROUND_ROOM, timeslot };
-    });
+      updates[`teams/${slot.teamId}/finalSlot`] = { room: plan.room, timeslot };
+    }
 
     // clear any slot left over from a previous activation
-    for (const teamId of Object.keys(teamsData)) {
+    for (const teamId of Object.keys(live.teamsData)) {
       if (!(teamId in teamsPayload)) updates[`teams/${teamId}/finalSlot`] = null;
     }
 
-    const { warnings: poolW, eligiblePool } = poolWarnings(finalists, scoresByTeam, judgesData);
-    warnings.push(...poolW);
-
-    for (const judgeUid of Object.keys(judgesData)) {
-      if (!eligiblePool.includes(judgeUid)) {
-        updates[`judges/${judgeUid}/finalAssignments`] = null;
-        continue;
-      }
-      const assignments = {};
-      for (const [teamId, details] of Object.entries(teamsPayload)) {
-        if (details.excludedJudges[judgeUid]) continue;
-        assignments[teamId] = {
-          teamId,
-          teamName: details.name,
-          room: details.room,
-          timeslot: details.timeslot,
+    // each judge gets exactly the teams the plan seats them on, and nobody else
+    // keeps an assignment -- that node is what the rules treat as proof of
+    // assignment for writing a final score
+    const perJudge = {};
+    for (const slot of finalists) {
+      for (const judge of slot.judges) {
+        if (!perJudge[judge.judgeId]) perJudge[judge.judgeId] = {};
+        perJudge[judge.judgeId][slot.teamId] = {
+          teamId: slot.teamId,
+          teamName: slot.teamName,
+          room: plan.room,
+          timeslot: slotLabel(slot.order),
         };
       }
-      updates[`judges/${judgeUid}/finalAssignments`] = Object.keys(assignments).length
-        ? assignments
-        : null;
+    }
+    for (const judgeUid of Object.keys(live.judgesData)) {
+      updates[`judges/${judgeUid}/finalAssignments`] = perJudge[judgeUid] ?? null;
     }
 
     const guard = await guardWith({
-      label: `Before activating the final round (top ${finalists.length})`,
+      label: `Before activating the final round (${finalists.length} teams)`,
       reason: "activation rewrites every judge's final assignments and the standings",
       paths: ["teams", "judges", "finalRound"],
     });
-    if (!guard.ok) return { ok: false, error: guard.error, warnings };
+    if (!guard.ok) return { ok: false, error: guard.error, warnings: [] };
 
     updates["finalRound/active"] = true;
     updates["finalRound/activatedAt"] = serverTimestamp();
@@ -346,8 +363,15 @@ export async function publishFinalRound({ finalists, basis }) {
     updates["finalRound/teams"] = teamsPayload;
 
     await update(ref(database), updates);
+    await clearFinalDraft();
 
-    return { ok: true, error: null, staleScores: null, warnings, snapshotId: guard.snapshotId };
+    return {
+      ok: true,
+      error: null,
+      drift: drift.filter((issue) => issue.level !== BLOCKING),
+      warnings: warningsFor(plan),
+      snapshotId: guard.snapshotId,
+    };
   } catch (error) {
     console.error("Error publishing the final round:", error);
     return {

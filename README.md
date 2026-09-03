@@ -82,8 +82,9 @@ Judging rooms have **no built-in list**. Add them or building a plan refuses.
    review and hand-edit it, then **Publish**.
 3. Judges score from their assignment cards.
 4. Watch **Judging progress** — teams with no scores sort to the top in red.
-5. **Activate Final Round** takes the top four and excludes judges who already
-   saw them.
+5. **Plan final round** on the Judging page, or the Final round tab at
+   `/user/admin/schedule`: build the cut, fix the running order and the panels,
+   then **Publish**.
 
 Scoring is out of 40: problem, innovation and impact are worth 10 each,
 viability and pitch quality 5 each. `fundable` is a tally, not a score.
@@ -298,6 +299,44 @@ remove the need to look at the building.
 
 ---
 
+## Planning the final round
+
+The Final round tab on `/user/admin/schedule`, or **Plan final round** on the
+Judging page.
+
+1. **Build a plan.** Ranks every submitted team on its first-round average,
+   cuts the top `config/finalRoundSize` (default 4), and prefills each
+   finalist's panel with every eligible judge who did **not** score them in
+   round one. It writes nothing.
+2. **Correct it.** Reorder the running order, drop a team or add one from the
+   ranking, and add, remove or swap judges on any panel. Every edit is checked
+   and recorded, and **Undo** walks them back one at a time.
+3. **Publish.** Takes a restore point, then writes the standings, every team's
+   `finalSlot` and every judge's `finalAssignments` in ONE atomic update.
+
+The draft lives at `/finalRoundDraft`, so it survives a reload and two
+organizers see each other's edits.
+
+**A judge who scored a team in round one cannot judge it again.** The panel
+editor does not offer them and the edit is refused if you ask for it another
+way. That is also why seeding at least 8 teams matters: below about six, every
+judge sees every team, so every finalist has an empty pool.
+
+**Publish refuses on drift**, the same way the first round's does:
+
+| What moved | What you get |
+| --- | --- |
+| any ranked team has been scored since the build | **Re-rank** — the averages the cut came from have moved |
+| a finalist withdrew | **Drop** it from the plan |
+| a judge on a panel is no longer a checked-in round-one judge | **Remove** them |
+| the final round room changed in the control panel | **Apply** it — advisory, publishing works either way |
+
+The room comes from `config/finalRoundRoom` and can be overridden on the plan.
+It used to be a hardcoded constant, so setting it in the control panel changed
+the display and nothing else.
+
+---
+
 ## Schema
 
 ```
@@ -318,6 +357,9 @@ remove the need to look at the building.
 /scheduleDraft             the in-progress plan: assignments, basis, edits,
                            version. Admin-only through the root rule — no
                            rule of its own. Deleted on publish
+/finalRoundDraft           the in-progress final round: ranked, assignments
+                           (order + panel), excluded, pool, edits, basis.
+                           Same rule story. Deleted on publish
 /adminLog/{entryId}        what changed, with before and after
 /snapshotIndex, /snapshots restore points
 /archive/people/{uid}/{ts}-{role}   a role record deleted by a role change
@@ -382,7 +424,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 30 suites, 500 tests, no JVM
+npm run test:ci     # 30 suites, 726 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -391,6 +433,8 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `src/schema.test.js` | rules text: deleted clauses, drifting ranges, `numChildren` reappearing |
 | `test/rules/` | rules *behaviour* — executes them and tries the reads |
 | `schedulePlan.test.js` | allocator invariants, across every schedulable event |
+| `applyFinalEdit.test.js` | the final round edit invariants, across 200 randomised edit walks |
+| `finalRoundPlan.test.js` | the cut, the prefill, drift, and what publishing writes |
 | `applyEdit.test.js` | the edit invariants, asserted across 200 randomised edit walks |
 | `checkDrift.test.js` | blocking vs. advisory drift, and that its live read agrees with the planner about who is in scope |
 | `draftStore.test.js` | a stale draft save is refused, naming who moved it |

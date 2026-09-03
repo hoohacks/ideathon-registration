@@ -19,7 +19,6 @@ import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import { hasRole } from "../../roles";
 import { ConfirmDialog } from "../admin/adminUi";
-import FinalRoundPreview from "../admin/schedule/FinalRoundPreview";
 import {
   findTeamIdByName,
   submitScore,
@@ -75,7 +74,6 @@ function Assignments() {
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
-  const [finalRoundPreviewOpen, setFinalRoundPreviewOpen] = useState(false);
 
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
@@ -127,18 +125,6 @@ function Assignments() {
     if (!canManageSchedule) return;
     readDraft().then(setDraft);
   }, [canManageSchedule]);
-
-  function handleActivateFinalRound() {
-    setFinalRoundError(null);
-    setFinalRoundPreviewOpen(true);
-  }
-
-  function handleFinalRoundActivated(result) {
-    setToast({
-      severity: result.warnings?.length ? "warning" : "success",
-      message: result.warnings?.length ? result.warnings.join(" ") : "Final round activated.",
-    });
-  }
 
   async function handleDeactivateFinalRound() {
     setDeactivateConfirmOpen(true);
@@ -325,10 +311,11 @@ function Assignments() {
               ) : (
                 <Button
                   variant="outlined"
-                  onClick={handleActivateFinalRound}
+                  component={Link}
+                  to="/user/admin/schedule?round=final"
                   disabled={togglingFinalRound || finalRoundLoading}
                 >
-                  Activate final round
+                  Plan final round
                 </Button>
               )}
             </Stack>
@@ -458,11 +445,6 @@ function Assignments() {
         onCancel={() => setDeactivateConfirmOpen(false)}
       />
 
-      <FinalRoundPreview
-        open={finalRoundPreviewOpen}
-        onClose={() => setFinalRoundPreviewOpen(false)}
-        onActivated={handleFinalRoundActivated}
-      />
     </Layout>
   );
 }

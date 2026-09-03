@@ -291,6 +291,17 @@ describe("the schedule draft is admin-only", () => {
     expect(RULES.rules.scheduleDraft).toBeUndefined();
   });
 
+  test("/finalRoundDraft has no rule of its own either", () => {
+    // an unpublished final round is who made the cut before it is announced;
+    // any rule written here could only be equal or looser than the root one
+    expect(RULES.rules.finalRoundDraft).toBeUndefined();
+  });
+
+  test("/archive has no rule of its own", () => {
+    // it holds role records deleted by a role change, names and emails included
+    expect(RULES.rules.archive).toBeUndefined();
+  });
+
   test("the root rule is what covers it", () => {
     expect(RULES.rules[".read"]).toContain("admins");
     expect(RULES.rules[".write"]).toContain("admins");
