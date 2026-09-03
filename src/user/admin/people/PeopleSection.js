@@ -107,9 +107,8 @@ export default function PeopleSection({ onResult }) {
       <Alert severity="info" sx={{ mb: 2 }}>
         One account, one role. Changing it deletes the record for the role they are leaving — a
         copy is archived first — and creates one for the new role, carrying their name and email
-        across. Fill in the rest from the dashboards. <strong>Organizer sits on top of the
-        role</strong>, so an organizer who is also a judge can be scheduled and score like
-        anyone else.
+        across. Fill in the rest from the dashboards. <strong>Admin sits on top of the role</strong>,
+        so an admin who is also a judge can be scheduled and score like anyone else.
       </Alert>
 
       <Card sx={{ p: 2 }}>
@@ -128,7 +127,7 @@ export default function PeopleSection({ onResult }) {
               sx={{ minWidth: 160 }}
             >
               <MenuItem value="all">All ({people.length})</MenuItem>
-              <MenuItem value="admin">Organizers ({counts.admin})</MenuItem>
+              <MenuItem value="admin">Admins ({counts.admin})</MenuItem>
               <MenuItem value="judge">Judges ({counts.judge})</MenuItem>
               <MenuItem value="competitor">Competitors ({counts.competitor})</MenuItem>
             </TextField>
@@ -225,10 +224,10 @@ export default function PeopleSection({ onResult }) {
                     <MenuItem value="none">No role</MenuItem>
                   </TextField>
 
-                  <Tooltip title="Organizer access. Sits on top of the role, so an organizer can judge.">
+                  <Tooltip title="Admin access. Sits on top of the role, so an admin can judge.">
                     <FormControlLabel
                       sx={{ mr: 0 }}
-                      label="Organizer"
+                      label="Admin"
                       control={
                         <Switch
                           size="small"
@@ -243,8 +242,8 @@ export default function PeopleSection({ onResult }) {
                                   enabled: event.target.checked,
                                 }),
                               event.target.checked
-                                ? `${person.name} is now an organizer`
-                                : `${person.name} is no longer an organizer`
+                                ? `${person.name} is now an admin`
+                                : `${person.name} is no longer an admin`
                             )
                           }
                         />
@@ -338,7 +337,7 @@ export default function PeopleSection({ onResult }) {
         <DialogContent>
           <DialogContentText component="div">
             <p>
-              This removes their organizer, judge and competitor records, takes them off every
+              This removes their admin, judge and competitor records, takes them off every
               team roster and schedule card, and clears them from the final round exclusions.
             </p>
             <Alert severity="warning" sx={{ my: 1 }}>

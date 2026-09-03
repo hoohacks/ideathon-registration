@@ -19,17 +19,17 @@ import { applyAdminAction } from "../adminAction.js";
 /** The reason this revoke must not happen, or null if it may. Pure. */
 export function revokeGuard({ uid, currentUid, adminUids }) {
   if (!adminUids.includes(uid)) {
-    return "That person is not an organizer.";
+    return "That person is not an admin.";
   }
   if (adminUids.length <= 1) {
     return (
-      "That is the last organizer. Removing them would lock everyone out -- " +
+      "That is the last admin. Removing them would lock everyone out -- " +
       "/admins can only be written by an admin, so nothing in the app could add one back. " +
       "Grant someone else first."
     );
   }
   if (uid === currentUid) {
-    return "You cannot remove your own organizer access. Ask another organizer to do it.";
+    return "You cannot remove your own admin access. Ask another admin to do it.";
   }
   return null;
 }
@@ -44,12 +44,12 @@ export async function grantAdmin({ uid, name }) {
 
   const adminUids = await listAdmins();
   if (adminUids.includes(uid)) {
-    return { ok: false, error: `${name || uid} is already an organizer.` };
+    return { ok: false, error: `${name || uid} is already an admin.` };
   }
 
   return applyAdminAction({
     action: "admin.grant",
-    summary: `Made ${name || uid} an organizer`,
+    summary: `Made ${name || uid} an admin`,
     changes: [{ path: `admins/${uid}`, before: null, after: true }],
   });
 }
@@ -63,7 +63,7 @@ export async function revokeAdmin(uid, { name } = {}) {
 
   return applyAdminAction({
     action: "admin.revoke",
-    summary: `Removed organizer access from ${name || uid}`,
+    summary: `Removed admin access from ${name || uid}`,
     changes: [{ path: `admins/${uid}`, before: true, after: null }],
   });
 }

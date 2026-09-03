@@ -336,7 +336,7 @@ describe("organizer access, on top of the role", () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
     const result = await setOrganizer({ uid: "admin-9", name: "Nine", enabled: false });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/last organizer/);
+    expect(result.error).toMatch(/last admin/);
   });
 
   test("you cannot revoke your own organizer access", async () => {
@@ -354,7 +354,7 @@ describe("describing what a switch costs", () => {
       person: person({ roles: ["admin", "competitor"], competitor: { firstName: "Grace" } }),
       role: "judge",
     });
-    expect(lines.join(" ")).not.toMatch(/organizer/i);
+    expect(lines.join(" ")).not.toMatch(/admin/i);
     expect(lines.join(" ")).toMatch(/competitor record/i);
   });
 
@@ -408,7 +408,7 @@ describe("deleting a person", () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true }, judges: { "admin-9": {} } }));
     const result = await deletePerson({ uid: "admin-9" });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/last organizer/);
+    expect(result.error).toMatch(/last admin/);
   });
 
   test("somebody with nothing recorded is reported, not silently written", async () => {

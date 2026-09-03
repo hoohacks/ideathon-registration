@@ -236,9 +236,9 @@ async function loadWorld() {
   };
 }
 
-export const ROLE_LABELS = { admin: "Organizer", judge: "Judge", competitor: "Competitor" };
+export const ROLE_LABELS = { admin: "Admin", judge: "Judge", competitor: "Competitor" };
 
-/** The roles a person holds one of. Organizer sits on top and is not one. */
+/** The roles a person holds one of. Admin sits on top and is not one. */
 export const PERSON_ROLES = ["judge", "competitor"];
 
 /** Only the removal paths that belong to one role. */
@@ -453,7 +453,7 @@ export async function deletePerson({ uid, name, includeScores = false }) {
  */
 export async function createPerson({ role, firstName, lastName, email, password, company = "" }) {
   if (!ROLE_NODES[role] || role === "admin") {
-    return { ok: false, error: "Create a judge or a competitor; organizer is a flag on top." };
+    return { ok: false, error: "Create a judge or a competitor; admin is a flag on top." };
   }
   if (!String(email ?? "").includes("@")) return { ok: false, error: "Enter a valid email address." };
   if (String(password ?? "").length < 6) {

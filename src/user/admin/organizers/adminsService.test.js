@@ -60,7 +60,7 @@ describe("the two revokes that must never go through", () => {
 
   test("revoking someone who is not an admin is refused", () => {
     expect(revokeGuard({ uid: "nobody", currentUid: "a1", adminUids: ["a1", "a2"] }))
-      .toMatch(/not an organizer/i);
+      .toMatch(/not an admin/i);
   });
 });
 

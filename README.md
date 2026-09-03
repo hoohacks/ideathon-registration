@@ -70,10 +70,30 @@ Everything below is in the app. You should not need the Firebase console.
 | Add the rooms you booked | Control panel → Judging rooms |
 | Set batch count, times, final round room | Control panel → Judging schedule |
 | Set the event date | Control panel → Event |
-| Add organizers, judges, competitors | Control panel → People and roles |
+| Add admins, judges, competitors | Control panel → People and roles |
+| Send judges their sign-up link | `/judge-registration` — see below |
 | Mark first-round judges | People and roles, or Judge Search |
 
 Judging rooms have **no built-in list**. Add them or building a plan refuses.
+
+### The two public pages
+
+Neither needs a login, and neither is linked from anywhere in the app. Send the
+URL.
+
+| Page | Path | Collects |
+| --- | --- | --- |
+| Competitor registration | `/` and `/ideathon-registration` | name, email, major, school year, skills, resume upload, dietary needs |
+| Judge registration | `/judge-registration` | name, email, company, whether they can mentor and which shifts, whether they can judge, skills |
+
+Locally that is `http://localhost:3000/judge-registration`; in production,
+`hoohacks.github.io/ideathon-registration/judge-registration`.
+
+Registering as a judge creates the account and the `/judges/{uid}` record. It
+does **not** mark them as a first-round judge — that is deliberate, and it is
+the one thing the rules will not let a judge set for themselves, since the score
+rules treat an assignment as proof of assignment. Mark them in People and roles
+or Judge Search once they turn up.
 
 ### On the day
 
@@ -131,11 +151,11 @@ A role is membership of a node: `/judges/{uid}` or `/competitors/{uid}`. **One
 account holds exactly one of them**, picked from the dropdown on each row —
 Judge, Competitor, or no role.
 
-**Organizer is a flag on top, not one of them.** `/admins/{uid}` is `true` and
+**Admin is a flag on top, not one of them.** `/admins/{uid}` is `true` and
 nothing else, and it has its own switch on the row. It has to sit on top: an
-organizer who judges needs the judge record, because being scheduled, seeing
+admin who judges needs the judge record, because being scheduled, seeing
 your cards and filing a score under your own name all key off it. Making
-organizer exclusive with the rest silently took judging away from them.
+admin exclusive with the rest silently took judging away from them.
 
 Changing it deletes the record for the role they are leaving and creates one for
 the role they are taking, carrying their name, email and company across. The
@@ -152,7 +172,7 @@ buttons in a row looks like one action — `− Competitor` deletes the record a
 `+ Competitor` writes an empty one back — and the account reads as having wiped
 itself. The dropdown is one action with one confirmation.
 
-An organizer who holds no role has no record and so no name anywhere. The list
+An admin who holds no role has no record and so no name anywhere. The list
 falls back to the most recent archived record for their name and email.
 
 Accounts that predate this hold more than one role. Their dropdown reads
@@ -173,7 +193,7 @@ Moving someone off judge also removes them from every team's schedule card and
 from the final round exclusions — a name left on a card is otherwise unexplainable, and a
 stale exclusion can leave a finalist with nobody eligible to judge it.
 
-Deleting the last organizer is refused. Nothing in the app could add one back.
+Deleting the last admin is refused. Nothing in the app could add one back.
 
 ### Restore points
 
@@ -249,7 +269,7 @@ schedule** once one already exists) on the Judging page.
    ONE atomic update.
 
 The draft lives at `/scheduleDraft`, so it survives a reload or a closed
-laptop, and two organizers with the page open see each other's edits live.
+laptop, and two admins with the page open see each other's edits live.
 **Undo** walks the newest edit back, repeatedly, to what the build produced.
 **Discard draft** throws the whole thing away. **Rebuild the plan** starts
 over from a fresh read of the event and discards every hand edit — it asks
@@ -315,7 +335,7 @@ Judging page.
    `finalSlot` and every judge's `finalAssignments` in ONE atomic update.
 
 The draft lives at `/finalRoundDraft`, so it survives a reload and two
-organizers see each other's edits.
+admins see each other's edits.
 
 **A judge who scored a team in round one cannot judge it again.** The panel
 editor does not offer them and the edit is refused if you ask for it another
@@ -380,7 +400,7 @@ the judges' notes.
 
 **`judgeUid` is whose card it is; `enteredBy` is who typed it.** `judgeUid` is
 pinned to the path key. `enteredBy` is pinned to `auth.uid` for everyone except
-organizers, which is what lets a restore put a card back with its original
+admins, which is what lets a restore put a card back with its original
 author.
 
 ---
@@ -395,7 +415,7 @@ failure is the reminder to republish. Do it before the release, not after.
 
 **Current version: 5. Publish it before the event.** Two clauses changed since
 version 3: a submitted team is closed to new members, and `enteredBy` is no
-longer pinned for organizers. Until the second is published, **restoring a
+longer pinned for admins. Until the second is published, **restoring a
 restore point that contains scores fails and changes nothing.**
 
 **Planning a schedule (above) changed nothing here.** `rulesVersion` stays 5

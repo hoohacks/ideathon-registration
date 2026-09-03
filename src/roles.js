@@ -80,7 +80,7 @@ export async function requireAdmin(action = "perform this action") {
   if (!user) throw new Error(`Must be signed in to ${action}`);
 
   const snap = await get(ref(database, `admins/${user.uid}`));
-  if (!snap.exists()) throw new Error(`Only an organizer can ${action}`);
+  if (!snap.exists()) throw new Error(`Only an admin can ${action}`);
 
   return user;
 }

@@ -58,7 +58,7 @@ function Control() {
         title="Control panel"
         stats={[
           { label: "rooms", value: (config.judgingRooms ?? []).length },
-          { label: "organizers", value: admins.length },
+          { label: "admins", value: admins.length },
           { label: "recent changes", value: log.length },
         ]}
       />

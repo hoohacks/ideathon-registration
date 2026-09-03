@@ -129,23 +129,23 @@ test("clearing writes a null", async () => {
 });
 
 test("a non-admin gets null from readDraft, not a thrown error", async () => {
-  requireAdmin.mockRejectedValueOnce(new Error("Only an organizer can read the schedule draft"));
+  requireAdmin.mockRejectedValueOnce(new Error("Only an admin can read the schedule draft"));
   expect(await readDraft()).toBeNull();
 });
 
 test("a non-admin's save is refused and writes nothing", async () => {
-  requireAdmin.mockRejectedValueOnce(new Error("Only an organizer can save the schedule draft"));
+  requireAdmin.mockRejectedValueOnce(new Error("Only an admin can save the schedule draft"));
   const result = await saveDraft(plan());
   expect(result.ok).toBe(false);
-  expect(result.error).toMatch(/organizer/);
+  expect(result.error).toMatch(/admin/);
   expect(mockUpdate).not.toHaveBeenCalled();
 });
 
 test("a non-admin's clear is refused and writes nothing", async () => {
-  requireAdmin.mockRejectedValueOnce(new Error("Only an organizer can clear the schedule draft"));
+  requireAdmin.mockRejectedValueOnce(new Error("Only an admin can clear the schedule draft"));
   const result = await clearDraft();
   expect(result.ok).toBe(false);
-  expect(result.error).toMatch(/organizer/);
+  expect(result.error).toMatch(/admin/);
   expect(mockUpdate).not.toHaveBeenCalled();
 });
 
