@@ -23,17 +23,19 @@ import { EVENT } from "../../../eventInfo";
  */
 export default function PrintableSchedule() {
   const [teams, setTeams] = useState({});
+  const [judges, setJudges] = useState({});
   const [config, setConfig] = useState({});
 
   useEffect(() => {
     const stop = [
       onValue(ref(database, "teams"), (s) => setTeams(s.val() ?? {})),
+      onValue(ref(database, "judges"), (s) => setJudges(s.val() ?? {})),
       onValue(ref(database, "config"), (s) => setConfig(s.val() ?? {})),
     ];
     return () => stop.forEach((fn) => fn());
   }, []);
 
-  const rooms = useMemo(() => byRoom(teams), [teams]);
+  const rooms = useMemo(() => byRoom(teams, judges), [teams, judges]);
   const batchTimes = config.batchTimes ?? {};
 
   return (
@@ -144,8 +146,19 @@ function Cell({ children, data = false }) {
 /**
  * Teams grouped by the room they present in, each room's slots in batch order.
  * Exported for the test: the grouping is the whole of the logic here.
+ *
+ * Judge names are resolved from the judge record, with the roster's cached copy
+ * as the fallback -- the same rule `judgingStatus` and `exportData` follow. The
+ * roster caches a name at the moment the schedule was published; correcting a
+ * judge record does not rewrite it, so trusting the cache prints a name the
+ * person has already had fixed.
  */
-export function byRoom(teams = {}) {
+export function byRoom(teams = {}, judges = {}) {
+  const liveName = (judge, entry) => {
+    const name = [judge?.firstName, judge?.lastName].filter(Boolean).join(" ").trim();
+    return name || entry.judgeName || entry.judgeId;
+  };
+
   const rooms = new Map();
 
   for (const [teamId, team] of Object.entries(teams)) {
@@ -161,7 +174,7 @@ export function byRoom(teams = {}) {
       teamName: team?.name ?? "Unnamed team",
       batch: schedule.batch ?? null,
       time: schedule.time ?? null,
-      judges: roster.filter(Boolean).map((entry) => entry.judgeName ?? entry.judgeId),
+      judges: roster.filter(Boolean).map((entry) => liveName(judges[entry.judgeId], entry)),
     });
   }
 

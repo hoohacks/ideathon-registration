@@ -135,6 +135,7 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 | --- | --- |
 | A judge did not turn up | **Judges** on the team row → add or swap. Rewrites one team, not the schedule. Spares are listed first. |
 | A team name is wrong | **Edit** on the Teams dashboard. The name is cached on the schedule, on every judge's card for both rounds, and in the standings; renaming rewrites all of them. |
+| A room name is wrong | Control panel → Judging rooms → rename. Reaches the first-round schedule, the final round slots, both sets of judge cards and the standings. |
 | A judge scored on paper | **Record score** on the team row. Filed under them, stamped with you. |
 | A judge says they submitted, nothing shows | Ask if their page says "saved on this device". Queued scores send on reconnect — the page must stay open. **Retry now** forces it. |
 | A team submitted after the schedule was published | Open the team on the Teams dashboard → pick batch, room and judges. **Do not plan and publish a new schedule** — that replaces every assignment and strands collected scores. |
@@ -544,7 +545,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 39 suites, 853 tests, no JVM
+npm run test:ci     # 39 suites, 862 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -580,6 +581,26 @@ the app connects to a real but empty namespace where every read succeeds and
 returns nothing.
 
 ---
+
+## Denormalised copies
+
+Several values are stored in more than one place, because a judge cannot read
+`/teams` and a competitor cannot read the standings. Anything that changes one
+of them has to reach all of them, and the two rules are not the same:
+
+| Value | Copies | Rule |
+| --- | --- | --- |
+| Team name | `teams/{id}/name`, `schedule/teamName`, each judge's `teamAssignments` and `finalAssignments`, `finalRound/teams/{id}/name` | **fanned out** on rename |
+| Room | `config/judgingRooms`, `schedule/room`, `finalSlot/room`, both sets of judge assignments, `finalRound/teams/{id}/room` | **fanned out** on rename and remap |
+| Judge name | `teams/{id}/schedule/judges[].judgeName` | **not** fanned out — every reader resolves from the judge record and treats the cache as a fallback |
+
+The judge name is the odd one out on purpose: it is written into a roster that
+is rewritten wholesale by other operations anyway, so a single source of truth
+is cheaper than a fan-out. `judgingStatus`, `exportData` and the room sheets all
+follow that rule; a new reader must too.
+
+`finalRound/archive` is never rewritten by any of these. It records what the
+standings were when the round closed.
 
 ## Judge resilience
 

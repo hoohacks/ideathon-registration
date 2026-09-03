@@ -37,6 +37,30 @@ test("judges are named, since the sheet is what identifies them in the room", ()
   expect(rooms[0].slots[0].judges).toEqual(["Ada", "Grace"]);
 });
 
+/**
+ * The roster caches a judge name at publish time and correcting the judge
+ * record does not rewrite it. `judgingStatus` and `exportData` both resolve
+ * live and treat the cache as a fallback; the printed sheet has to agree, or it
+ * is the one artifact carrying a name the person already had fixed.
+ */
+describe("a judge whose name was corrected after the schedule was published", () => {
+  const teams = { t1: team("Alpha", "Rice 110", 1, ["Ada"]) };
+
+  test("prints the corrected name, not the cached one", () => {
+    const rooms = byRoom(teams, { Ada: { firstName: "Ada", lastName: "Lovelace" } });
+    expect(rooms[0].slots[0].judges).toEqual(["Ada Lovelace"]);
+  });
+
+  test("falls back to the cached name when the record says nothing", () => {
+    expect(byRoom(teams, { Ada: {} })[0].slots[0].judges).toEqual(["Ada"]);
+  });
+
+  test("and to the id when there is neither", () => {
+    const bare = { t1: { name: "Alpha", schedule: { room: "Rice 110", batch: 1, judges: [{ judgeId: "j9" }] } } };
+    expect(byRoom(bare, {})[0].slots[0].judges).toEqual(["j9"]);
+  });
+});
+
 test("a legacy array-shaped roster prints too", () => {
   const rooms = byRoom({
     t1: { name: "Alpha", schedule: { room: "Rice 110", batch: 1, judges: { 0: { judgeName: "Ada" } } } },

@@ -150,3 +150,60 @@ describe("rooms live only in the database", () => {
     expect(mockUpdate.mock.calls[0][1]["config/judgingRooms"]).toEqual([]);
   });
 });
+
+/**
+ * A room is used by a first-round batch, by the final round, or by both -- and
+ * the final round keeps its own copies on nodes the first round never touches.
+ * Missing them left every finalist and every final-round judge pointed at a
+ * room name that no longer existed.
+ */
+describe("remapping a room the final round is also using", () => {
+  const teamsData = {
+    t1: { schedule: { room: "Rice 110" } },
+    t2: { finalSlot: { room: "Rice 110", timeslot: "Slot 1" } },
+    t3: { schedule: { room: "Rice 011" }, finalSlot: { room: "Rice 110", timeslot: "Slot 2" } },
+  };
+  const judgesData = {
+    j1: {
+      teamAssignments: { t1: { room: "Rice 110" } },
+      finalAssignments: { t2: { room: "Rice 110" }, t9: { room: "Rice 011" } },
+    },
+  };
+  const finalRoundTeams = { t2: { room: "Rice 110" }, t3: { room: "Rice 110" } };
+
+  const paths = () =>
+    remapChanges({ from: "Rice 110", to: "Rice 204", teamsData, judgesData, finalRoundTeams })
+      .map((c) => c.path);
+
+  test("the finalist team slot moves", () => {
+    expect(paths()).toContain("teams/t2/finalSlot/room");
+    expect(paths()).toContain("teams/t3/finalSlot/room");
+  });
+
+  test("the final-round judge card moves", () => {
+    expect(paths()).toContain("judges/j1/finalAssignments/t2/room");
+  });
+
+  test("the standings move, since they carry the room too", () => {
+    expect(paths()).toContain("finalRound/teams/t2/room");
+  });
+
+  test("a team scheduled in that room in the first round still moves", () => {
+    expect(paths()).toContain("teams/t1/schedule/room");
+    expect(paths()).toContain("judges/j1/teamAssignments/t1/room");
+  });
+
+  test("a first-round room that is not this one is left alone", () => {
+    expect(paths()).not.toContain("teams/t3/schedule/room");
+    expect(paths()).not.toContain("judges/j1/finalAssignments/t9/room");
+  });
+
+  test("no final round means no final-round writes", () => {
+    const only = remapChanges({
+      from: "Rice 110", to: "Rice 204",
+      teamsData: { t1: { schedule: { room: "Rice 110" } } },
+      judgesData: {},
+    }).map((c) => c.path);
+    expect(only.some((path) => path.includes("final"))).toBe(false);
+  });
+});

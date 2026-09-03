@@ -37,26 +37,53 @@ export function roomsInUse(teamsData) {
  * Every path that has to move when a room is renamed or vacated. Pure, so the
  * fan-out is testable without a database.
  */
-export function remapChanges({ from, to, teamsData, judgesData }) {
-  const affected = new Set(
+export function remapChanges({ from, to, teamsData, judgesData, finalRoundTeams }) {
+  // Two different sets. A room can be used by a first-round batch, by the final
+  // round, or by both -- and a team in the final is rarely the same team that
+  // was in that room during the first round.
+  const scheduledIn = new Set(
     Object.entries(teamsData ?? {})
       .filter(([, team]) => team?.schedule?.room === from)
+      .map(([teamId]) => teamId)
+  );
+  const finalIn = new Set(
+    Object.entries(teamsData ?? {})
+      .filter(([, team]) => team?.finalSlot?.room === from)
       .map(([teamId]) => teamId)
   );
 
   const changes = [];
 
-  for (const teamId of affected) {
+  for (const teamId of scheduledIn) {
     changes.push({ path: `teams/${teamId}/schedule/room`, before: from, after: to });
+  }
+
+  // The final round keeps its own copies, on nodes the first round never
+  // touches. Missing them left every finalist and every final-round judge
+  // pointed at a room name that no longer existed.
+  for (const teamId of finalIn) {
+    changes.push({ path: `teams/${teamId}/finalSlot/room`, before: from, after: to });
+    if (finalRoundTeams?.[teamId]) {
+      changes.push({ path: `finalRound/teams/${teamId}/room`, before: from, after: to });
+    }
   }
 
   for (const [judgeUid, judge] of Object.entries(judgesData ?? {})) {
     for (const teamId of Object.keys(judge?.teamAssignments ?? {})) {
       // a judge can hold an assignment for a team that no longer exists; the
       // team snapshot is the authority on what is really scheduled
-      if (!affected.has(teamId)) continue;
+      if (!scheduledIn.has(teamId)) continue;
       changes.push({
         path: `judges/${judgeUid}/teamAssignments/${teamId}/room`,
+        before: from,
+        after: to,
+      });
+    }
+
+    for (const teamId of Object.keys(judge?.finalAssignments ?? {})) {
+      if (!finalIn.has(teamId)) continue;
+      changes.push({
+        path: `judges/${judgeUid}/finalAssignments/${teamId}/room`,
         before: from,
         after: to,
       });
@@ -80,15 +107,17 @@ export async function listRooms() {
 }
 
 async function loadWorld() {
-  const [rooms, teamsSnap, judgesSnap] = await Promise.all([
+  const [rooms, teamsSnap, judgesSnap, finalSnap] = await Promise.all([
     listRooms(),
     get(ref(database, "teams")),
     get(ref(database, "judges")),
+    get(ref(database, "finalRound/teams")),
   ]);
   return {
     rooms,
     teamsData: teamsSnap.exists() ? teamsSnap.val() : {},
     judgesData: judgesSnap.exists() ? judgesSnap.val() : {},
+    finalRoundTeams: finalSnap.exists() ? finalSnap.val() : {},
   };
 }
 
@@ -110,11 +139,11 @@ export async function renameRoom(from, to) {
   const next = String(to ?? "").trim();
   if (!next) return { ok: false, error: "Give the room a name." };
 
-  const { rooms, teamsData, judgesData } = await loadWorld();
+  const { rooms, teamsData, judgesData, finalRoundTeams } = await loadWorld();
   if (!rooms.includes(from)) return { ok: false, error: `${from} is not on the list.` };
   if (rooms.includes(next)) return { ok: false, error: `${next} is already on the list.` };
 
-  const scheduled = remapChanges({ from, to: next, teamsData, judgesData });
+  const scheduled = remapChanges({ from, to: next, teamsData, judgesData, finalRoundTeams });
 
   return applyAdminAction({
     action: "room.rename",
@@ -134,7 +163,7 @@ export async function renameRoom(from, to) {
  * no longer on the list.
  */
 export async function removeRoom(name, { moveTo } = {}) {
-  const { rooms, teamsData, judgesData } = await loadWorld();
+  const { rooms, teamsData, judgesData, finalRoundTeams } = await loadWorld();
   if (!rooms.includes(name)) return { ok: false, error: `${name} is not on the list.` };
 
   const inUse = roomsInUse(teamsData)[name] ?? [];
@@ -153,7 +182,9 @@ export async function removeRoom(name, { moveTo } = {}) {
     return { ok: false, error: "Choose a different room to move them to." };
   }
 
-  const moved = inUse.length ? remapChanges({ from: name, to: moveTo, teamsData, judgesData }) : [];
+  const moved = inUse.length
+    ? remapChanges({ from: name, to: moveTo, teamsData, judgesData, finalRoundTeams })
+    : [];
 
   return applyAdminAction({
     action: "room.remove",
