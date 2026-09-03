@@ -7,7 +7,9 @@
  * announce a winner must not be shown a first row that is only first because
  * somebody has not pressed submit yet.
  */
-import { finalStandings, panelsFrom, standingsState, winnerOf } from "./finalStandings";
+import {
+  finalStandings, latestArchive, panelsFrom, standingsState, winnerOf,
+} from "./finalStandings";
 
 const card = (problem) => ({
   problem,
@@ -119,5 +121,54 @@ describe("a running total is not a result", () => {
     expect(finalStandings()).toEqual([]);
     expect(standingsState([]).settled).toBe(false);
     expect(winnerOf([])).toBeNull();
+  });
+});
+
+/**
+ * Closing the round is what an organizer does before announcing, and it clears
+ * both the standings and every judge's assignments. The results page used to go
+ * blank at exactly that moment.
+ */
+describe("after the round is closed", () => {
+  const archive = {
+    "1700000000000": { teams: { t9: { name: "Old", averageScore: 20 } } },
+    "1800000000000": { teams: finalRoundTeams },
+  };
+
+  test("the newest archived standings are the ones that come back", () => {
+    expect(Object.keys(latestArchive(archive))).toEqual(["t1", "t2", "t3"]);
+  });
+
+  test("nothing archived is null, not a throw", () => {
+    expect(latestArchive()).toBeNull();
+    expect(latestArchive({})).toBeNull();
+  });
+
+  test("a closed round is settled even though the panels are gone", () => {
+    // deactivation clears finalAssignments, so nothing knows who was expected
+    const standings = finalStandings({
+      finalRoundTeams,
+      finalScores: { t1: { j1: card(9) }, t2: { j1: card(7) }, t3: { j1: card(5) } },
+      panels: {},
+    });
+
+    expect(standingsState(standings).settled).toBe(false);
+    expect(standingsState(standings, { closed: true }).settled).toBe(true);
+    expect(winnerOf(standings, { closed: true }).name).toBe("Alpha");
+  });
+
+  test("a closed round with no cards at all still has no winner", () => {
+    const standings = finalStandings({ finalRoundTeams, finalScores: {}, panels: {} });
+    expect(standingsState(standings, { closed: true }).settled).toBe(false);
+    expect(winnerOf(standings, { closed: true })).toBeNull();
+  });
+
+  test("an open round is not settled just because nobody is assigned", () => {
+    const standings = finalStandings({
+      finalRoundTeams,
+      finalScores: { t1: { j1: card(9) } },
+      panels: {},
+    });
+    expect(standingsState(standings).settled).toBe(false);
   });
 });

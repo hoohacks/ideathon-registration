@@ -60,6 +60,19 @@ export function finalStandings({ finalRoundTeams = {}, finalScores = {}, panels 
     });
 }
 
+/**
+ * The standings from the most recent closed round, or null.
+ *
+ * Deactivating the final round clears `finalRound/teams` and every judge's
+ * `finalAssignments` -- so closing judging, which is what an organizer does
+ * *before* announcing, used to empty the results page at the moment it mattered
+ * most. The standings are archived rather than deleted, so this reads them back.
+ */
+export function latestArchive(archive = {}) {
+  const [newest] = Object.keys(archive ?? {}).sort().reverse();
+  return newest ? archive[newest]?.teams ?? null : null;
+}
+
 /** Who is expected to score each finalist, read off the judges' assignments. */
 export function panelsFrom(judges = {}) {
   const panels = {};
@@ -78,10 +91,16 @@ export function panelsFrom(judges = {}) {
  * "this is the result" and "this is the result so far", and the gap between
  * them is usually one judge who has not pressed submit.
  */
-export function standingsState(standings) {
+export function standingsState(standings, { closed = false } = {}) {
   const outstanding = standings.filter((team) => !team.complete);
   const cards = standings.reduce((sum, team) => sum + team.received, 0);
   const expected = standings.reduce((sum, team) => sum + team.expected, 0);
+
+  // A closed round is settled by definition: no further card can be written,
+  // because the assignments the rules treat as proof of assignment are gone.
+  if (closed) {
+    return { settled: cards > 0, cards, expected, waitingOn: [] };
+  }
 
   return {
     settled: standings.length > 0 && outstanding.length === 0,
@@ -100,8 +119,8 @@ export function standingsState(standings) {
  * `compareForRanking` is a total order, so there is always a first row -- but a
  * first row and a winner are not the same claim while cards are outstanding.
  */
-export function winnerOf(standings) {
+export function winnerOf(standings, { closed = false } = {}) {
   const [first] = standings;
   if (!first || typeof first.averageScore !== "number") return null;
-  return standingsState(standings).settled ? first : null;
+  return standingsState(standings, { closed }).settled ? first : null;
 }

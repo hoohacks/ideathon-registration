@@ -8,7 +8,9 @@ import { database } from "../../../firebase";
 import Layout from "../../Layout";
 import { PageHeader } from "../adminUi";
 import { SCORE_MAX_TOTAL } from "../../judge/scoreRubric";
-import { finalStandings, panelsFrom, standingsState, winnerOf } from "./finalStandings";
+import {
+  finalStandings, latestArchive, panelsFrom, standingsState, winnerOf,
+} from "./finalStandings";
 
 /**
  * The result of the event.
@@ -28,6 +30,7 @@ export default function Results() {
   const [finalScores, setFinalScores] = useState({});
   const [judges, setJudges] = useState({});
   const [active, setActive] = useState(false);
+  const [archive, setArchive] = useState({});
 
   useEffect(() => {
     const stop = [
@@ -35,16 +38,23 @@ export default function Results() {
       onValue(ref(database, "scores/final"), (s) => setFinalScores(s.val() ?? {})),
       onValue(ref(database, "judges"), (s) => setJudges(s.val() ?? {})),
       onValue(ref(database, "finalRound/active"), (s) => setActive(s.val() === true)),
+      onValue(ref(database, "finalRound/archive"), (s) => setArchive(s.val() ?? {})),
     ];
     return () => stop.forEach((fn) => fn());
   }, []);
 
+  // Deactivating clears the standings and every panel, so a closed round is
+  // read back out of the archive it was moved to.
+  const archived = useMemo(() => latestArchive(archive), [archive]);
+  const closed = !finalRoundTeams && Boolean(archived);
+  const teamsInRound = finalRoundTeams ?? archived;
+
   const standings = useMemo(
-    () => finalStandings({ finalRoundTeams: finalRoundTeams ?? {}, finalScores, panels: panelsFrom(judges) }),
-    [finalRoundTeams, finalScores, judges]
+    () => finalStandings({ finalRoundTeams: teamsInRound ?? {}, finalScores, panels: panelsFrom(judges) }),
+    [teamsInRound, finalScores, judges]
   );
-  const state = standingsState(standings);
-  const winner = winnerOf(standings);
+  const state = standingsState(standings, { closed });
+  const winner = winnerOf(standings, { closed });
 
   return (
     <Layout maxWidth="md">
@@ -56,7 +66,14 @@ export default function Results() {
         ]}
       />
 
-      {!finalRoundTeams && (
+      {closed && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          The final round is closed, so these standings are final. Read back from the archive it
+          was moved to when judging was closed.
+        </Alert>
+      )}
+
+      {!teamsInRound && (
         <Alert severity="info" sx={{ mb: 2 }}>
           The final round has not been activated, so there is nothing to rank yet.{" "}
           <Button size="small" component={RouterLink} to="/user/admin/schedule?round=final">
@@ -65,7 +82,7 @@ export default function Results() {
         </Alert>
       )}
 
-      {finalRoundTeams && !state.settled && (
+      {teamsInRound && !state.settled && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {state.waitingOn.length
             ? `Still scoring. Waiting on ${state.waitingOn
@@ -92,7 +109,8 @@ export default function Results() {
               <Typography variant="data" component="span">
                 {winner.received}
               </Typography>{" "}
-              judges. Every card is in.
+              {winner.received === 1 ? "judge" : "judges"}.{" "}
+              {closed ? "The round is closed." : "Every card is in."}
             </Typography>
           </Box>
         </Card>
@@ -153,7 +171,7 @@ export default function Results() {
         </Card>
       )}
 
-      {finalRoundTeams && (
+      {teamsInRound && (
         <Typography variant="caption" component="p" sx={{ mt: 2 }}>
           Ranked on the final round only, by average, then fundable votes, then judges, then name —
           the same tiebreak the cut used. {active ? "The final round is still open." : "The final round is closed."}

@@ -27,14 +27,22 @@ export function hashTargetFor({ pathname = "/", search = "", hash = "", base = "
   // already a hash route, or the bare "#" a link with href="#" leaves behind
   if (hash && hash !== "#") return null;
 
-  let path = pathname;
-  if (base && path.startsWith(base)) path = path.slice(base.length);
+  // Only strip the base when the URL is actually under it -- and only put it
+  // back in that case. `PUBLIC_URL` is `/ideathon-registration` in development
+  // as well as production (CRA takes it from `homepage` either way), but the
+  // dev server answers on `/`. Prepending it unconditionally sent
+  // localhost:3000/judge-registration to /ideathon-registration/#/... : a
+  // directory that only resolves because the dev server falls back to
+  // index.html, with a phantom folder left in the address bar.
+  const underBase = Boolean(base) && pathname.startsWith(base);
+
+  let path = underBase ? pathname.slice(base.length) : pathname;
   path = path.replace(/^\/+/, "").replace(/\/+$/, "");
 
   // the site root, however it was spelled, is already where it should be
   if (!path || path === "index.html") return null;
 
-  return `${base}/#/${path}${search}`;
+  return `${underBase ? base : ""}/#/${path}${search}`;
 }
 
 /** `homepage` in package.json is a full URL; only its path matters here. */

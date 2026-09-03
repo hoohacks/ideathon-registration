@@ -13,6 +13,11 @@ import { syncPendingScores } from "./getTeamInfo.js";
  *
  * Draining is triggered by the transition into connected, not by a timer, so a
  * judge who walks back into signal syncs immediately rather than on a poll.
+ *
+ * A queued card syncs only while this page is open, which makes closing the tab
+ * the one action that can still lose a score outright -- the card sits on that
+ * device, nobody else can see it, and Judging progress reports the team as
+ * unjudged. The browser gives exactly one tool for that, and this uses it.
  */
 export function useJudgingSync(judgeUid) {
   const [online, setOnline] = useState(true);
@@ -54,6 +59,23 @@ export function useJudgingSync(judgeUid) {
 
     return () => unsubscribe();
   }, [judgeUid, retry]);
+
+  // The only thing standing between a queued card and a lost score. Registered
+  // only while something is actually queued, so a judge who owes nothing is
+  // never asked whether they meant to leave.
+  useEffect(() => {
+    if (!pending.length) return undefined;
+
+    const warn = (event) => {
+      event.preventDefault();
+      // browsers ignore the text and show their own, but a value must be set
+      event.returnValue = "";
+      return "";
+    };
+
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending.length]);
 
   return {
     online,

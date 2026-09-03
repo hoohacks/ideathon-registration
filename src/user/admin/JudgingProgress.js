@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { Link } from "react-router-dom";
 import { onValue, ref } from "firebase/database";
 import { database } from "../../firebase";
 import Layout from "../Layout";
@@ -269,16 +270,23 @@ function JudgingProgress() {
           { label: "judges checked in", value: `${totals.checkedIn}/${totals.judges}` },
         ]}
       >
-        <TextField
-          select
-          size="small"
-          value={round}
-          onChange={(e) => setRound(e.target.value)}
-          sx={{ minWidth: 150 }}
-        >
-          <MenuItem value={FIRST_ROUND}>First round</MenuItem>
-          <MenuItem value={FINAL_ROUND}>Final round</MenuItem>
-        </TextField>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <TextField
+            select
+            size="small"
+            value={round}
+            onChange={(e) => setRound(e.target.value)}
+            sx={{ minWidth: 150 }}
+          >
+            <MenuItem value={FIRST_ROUND}>First round</MenuItem>
+            <MenuItem value={FINAL_ROUND}>Final round</MenuItem>
+          </TextField>
+          {/* the paper fallback, reachable from where an organizer is standing
+              when the network gives out */}
+          <Button variant="outlined" component={Link} to="/user/admin/print">
+            Room sheets
+          </Button>
+        </Stack>
       </PageHeader>
 
       {error && (

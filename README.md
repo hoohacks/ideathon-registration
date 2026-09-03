@@ -526,7 +526,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 36 suites, 809 tests, no JVM
+npm run test:ci     # 37 suites, 821 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -551,6 +551,8 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `roles.test.js` | the profile merge, so a second role cannot blank the first |
 | `exportData.test.js` | CSV quoting and formula defusing |
 | `resilience.test.js` | the judge outbox surviving a reload |
+| `unloadGuard.test.js` | a judge with unsent scores is warned before closing the tab |
+| `hashRedirect.test.js` | a path-shaped URL reaching the hash route it meant, in dev and in production |
 
 The emulator namespace is `demo-ideathon`, pinned in `src/firebase.js`,
 `scripts/seed-event.mjs` and `test/rules/helpers.mjs`. All three must match, or
@@ -569,8 +571,10 @@ Judges need no instructions — their side degrades on its own:
 - the queue survives a refresh and sends on reconnect
 
 One caveat: **a queued score only syncs while that page is open.** If a judge
-closes the tab, the card sits on their device and nobody else can see it.
-Judging progress will show the team as unjudged.
+closes the tab, the card sits on their device and nobody else can see it, and
+Judging progress shows the team as unjudged. The browser's leave warning is
+armed whenever something is queued — and only then, since a page that asks "are
+you sure?" for nothing teaches people to dismiss it.
 
 ---
 

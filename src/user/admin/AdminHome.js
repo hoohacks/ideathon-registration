@@ -109,8 +109,12 @@ export default function AdminHome() {
             </Stack>
           </Stack>
 
-          {/* the planner's own refusal, asked early enough to act on */}
-          {!state.supply.ok && state.supply.error && (
+          {/* The planner's own refusal, asked early enough to act on -- but not
+              before anyone has submitted, when every downstream number is
+              trivially zero and the checklist below already says so. A warning
+              that is always on from the day the site opens is one people learn
+              to read past. */}
+          {counts.teams.submitted > 0 && !state.supply.ok && state.supply.error && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               {state.supply.error}
             </Alert>

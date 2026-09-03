@@ -40,6 +40,27 @@ describe("locally, where the app is served from the root", () => {
   });
 });
 
+describe("in development, where the server answers on the root", () => {
+  // PUBLIC_URL is /ideathon-registration here too, but localhost:3000 serves
+  // the app from /. Prepending the base anyway pointed at a directory that only
+  // resolves through the dev server's index.html fallback.
+  const at = (pathname, extra = {}) =>
+    hashTargetFor({ pathname, base: "/ideathon-registration", ...extra });
+
+  test("a path outside the base does not have the base invented for it", () => {
+    expect(at("/judge-registration")).toBe("/#/judge-registration");
+  });
+
+  test("a deep path likewise stays where it was served from", () => {
+    expect(at("/user/admin/schedule", { search: "?round=final" }))
+      .toBe("/#/user/admin/schedule?round=final");
+  });
+
+  test("the root is still left alone", () => {
+    expect(at("/")).toBeNull();
+  });
+});
+
 describe("in production, where it is served from a subdirectory", () => {
   const base = "/ideathon-registration";
   const at = (pathname, extra = {}) => hashTargetFor({ pathname, base, ...extra });
@@ -71,7 +92,13 @@ describe("reading the base out of package.json's homepage", () => {
       .toBe("/ideathon-registration");
   });
 
-  test("development, where PUBLIC_URL is empty, has no base", () => {
+  test("no homepage at all has no base", () => {
     expect(basePath("")).toBe("");
+  });
+
+  test("development gets the same base as production, because CRA derives both from homepage", () => {
+    // react-scripts sets PUBLIC_URL to paths.publicUrlOrPath.slice(0, -1), and
+    // in development that is the homepage's *pathname* -- not an empty string
+    expect(basePath("/ideathon-registration")).toBe("/ideathon-registration");
   });
 });
