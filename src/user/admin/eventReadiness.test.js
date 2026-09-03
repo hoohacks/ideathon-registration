@@ -87,6 +87,11 @@ describe("what is blocking, before it blocks", () => {
       expect(check.to).toMatch(/^\/user\//);
     }
   });
+
+  test("a control panel check lands on the tab that fixes it, not the top", () => {
+    const state = readEventState({});
+    expect(state.checks.find((c) => c.id === "rooms").to).toContain("tab=setup");
+  });
 });
 
 describe("what to do next", () => {
@@ -105,7 +110,7 @@ describe("what to do next", () => {
   test("an unschedulable event is sent to fix it instead", () => {
     const state = readEventState({ ...ready, config: { batchCount: 3 } });
     expect(labels(state)).not.toContain("Plan the schedule");
-    expect(labels(state)).toContain("Open the control panel");
+    expect(labels(state)).toContain("Finish event setup");
   });
 
   test("once judging starts, the final round becomes reachable", () => {

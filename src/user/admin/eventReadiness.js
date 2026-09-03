@@ -118,7 +118,7 @@ function checksFor({ rooms, judge, team, config, supply }) {
       label: "Judging rooms added",
       done: rooms > 0,
       detail: rooms ? `${rooms} room${rooms === 1 ? "" : "s"}` : "None yet — a plan cannot be built without them",
-      to: "/user/admin/control",
+      to: "/user/admin/control?tab=setup",
     },
     {
       id: "judges",
@@ -134,7 +134,7 @@ function checksFor({ rooms, judge, team, config, supply }) {
       label: "Event date set",
       done: Boolean(config.eventStart),
       detail: config.eventStart ? "Set" : "Using the built-in date",
-      to: "/user/admin/control",
+      to: "/user/admin/control?tab=setup",
     },
     {
       id: "submissions",
@@ -171,9 +171,9 @@ function actionsFor({ phase, hasDraft, supply, team, judge, scoredTeams }) {
 
   if (phase === SETUP) {
     if (!supply.ok) {
-      actions.push({ label: "Open the control panel", to: "/user/admin/control", primary: !hasDraft });
+      actions.push({ label: "Finish event setup", to: "/user/admin/control?tab=setup", primary: !hasDraft });
     }
-    actions.push({ label: "Add people and roles", to: "/user/admin/control" });
+    actions.push({ label: "Add people and roles", to: "/user/admin/control?tab=people" });
   }
 
   if (phase === READY && !hasDraft) {

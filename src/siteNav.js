@@ -9,6 +9,7 @@ import {
     Drawer,
     IconButton,
     ListItemButton,
+    ListSubheader,
     Menu,
     MenuItem,
     Stack,
@@ -50,17 +51,43 @@ const PRIMARY = [
     { to: "/user/checkin", label: "Check in", roles: ["competitor", "judge"] },
 ];
 
-const ADMIN = [
-    { to: "/user/admin/scan", label: "Scan check-in" },
-    { to: "/user/admin/search", label: "Competitors" },
-    { to: "/user/admin/judges", label: "Judges" },
-    { to: "/user/admin/teams", label: "Teams" },
-    { to: "/user/admin/judging", label: "Judging progress" },
-    // no Schedule entry: the Judging page's own button and the control panel's
-    // Schedule row both lead there, and a third door earns nothing
-    { to: "/user/admin/metrics", label: "Metrics" },
-    { to: "/user/admin/control", label: "Control panel" },
+/**
+ * Grouped by what an organizer is doing, not listed alphabetically.
+ *
+ * A flat list of seven destinations gave no clue that rooms come before a
+ * schedule, or that a schedule comes before judges see anything at all. The
+ * order of the day is now on the dashboard; these groups are the same idea in
+ * the place people actually navigate from.
+ *
+ * There is deliberately no Schedule entry: the Judging page's own button and
+ * the control panel both lead there, and a third door earns nothing.
+ */
+const ADMIN_GROUPS = [
+    {
+        id: "people",
+        label: "People and teams",
+        links: [
+            { to: "/user/admin/scan", label: "Scan check-in" },
+            { to: "/user/admin/search", label: "Competitors" },
+            { to: "/user/admin/judges", label: "Judges" },
+            { to: "/user/admin/teams", label: "Teams" },
+        ],
+    },
+    {
+        id: "judging",
+        label: "Judging",
+        links: [{ to: "/user/admin/judging", label: "Judging progress" }],
+    },
+    {
+        id: "setup",
+        label: "Setup and data",
+        links: [
+            { to: "/user/admin/control", label: "Control panel" },
+            { to: "/user/admin/metrics", label: "Registration metrics" },
+        ],
+    },
 ];
+
 
 function initialsOf(userData) {
     const first = userData?.firstName?.[0] ?? "";
@@ -286,15 +313,32 @@ function Nav({ variant = "app" }) {
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
                 PaperProps={menuPaper}
             >
-                {ADMIN.map((link) => (
-                    <MenuItem
-                        key={link.to}
-                        selected={pathname.startsWith(link.to)}
-                        onClick={() => go(link.to)}
+                {ADMIN_GROUPS.flatMap((group, index) => [
+                    index > 0 ? <Divider key={`${group.id}-rule`} sx={{ my: 0.5 }} /> : null,
+                    <ListSubheader
+                        key={group.id}
+                        disableSticky
+                        sx={{
+                            bgcolor: "transparent",
+                            lineHeight: 2,
+                            fontSize: "0.6875rem",
+                            fontWeight: 600,
+                            letterSpacing: "0.07em",
+                            textTransform: "uppercase",
+                        }}
                     >
-                        {link.label}
-                    </MenuItem>
-                ))}
+                        {group.label}
+                    </ListSubheader>,
+                    ...group.links.map((link) => (
+                        <MenuItem
+                            key={link.to}
+                            selected={pathname.startsWith(link.to)}
+                            onClick={() => go(link.to)}
+                        >
+                            {link.label}
+                        </MenuItem>
+                    )),
+                ])}
             </Menu>
 
             <Menu
@@ -354,20 +398,24 @@ function Nav({ variant = "app" }) {
                 {isAdmin && (
                     <>
                         <Divider sx={{ borderColor: tokens.NIGHT_LINE }} />
-                        <Typography
-                            variant="overline"
-                            sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, color: tokens.ON_NIGHT_MUTED }}
-                        >
-                            Admin
-                        </Typography>
                         <Box sx={{ px: 1, pb: 1 }}>
-                            {ADMIN.map((link) => (
-                                <DrawerLink
-                                    key={link.to}
-                                    label={link.label}
-                                    active={pathname.startsWith(link.to)}
-                                    onClick={() => go(link.to)}
-                                />
+                            {ADMIN_GROUPS.map((group) => (
+                                <Box key={group.id} sx={{ mb: 0.5 }}>
+                                    <Typography
+                                        variant="overline"
+                                        sx={{ display: "block", px: 1, pt: 1, color: tokens.ON_NIGHT_MUTED }}
+                                    >
+                                        {group.label}
+                                    </Typography>
+                                    {group.links.map((link) => (
+                                        <DrawerLink
+                                            key={link.to}
+                                            label={link.label}
+                                            active={pathname.startsWith(link.to)}
+                                            onClick={() => go(link.to)}
+                                        />
+                                    ))}
+                                </Box>
                             ))}
                         </Box>
                     </>

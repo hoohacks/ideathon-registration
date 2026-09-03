@@ -145,6 +145,21 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 
 ---
 
+## The organizer dashboard
+
+`/user/home`, for anyone with the admin role. It answers three questions the
+nav could not:
+
+- **Where the day is** — `Setting up` → `Ready to schedule` → `Schedule
+  published` → `Judging in progress` → `Final round`, derived from the data
+  rather than from a flag, so it cannot drift out of step with reality.
+- **What is not ready** — five checks with the real number beside each, and a
+  link to the page that fixes it. The blocking one reuses `describeSupply`, the
+  planner's own refusal logic, asked early enough to act on rather than at the
+  moment a build refuses.
+- **What to do next** — at most three actions. An unpublished draft outranks
+  everything, because judges see nothing until it is published.
+
 ## The control panel
 
 `/user/admin/control`. Everything that used to need the Firebase console.
@@ -159,6 +174,12 @@ viability and pitch quality 5 each. `fundable` is a tally, not a score.
 | Export | schedule, scores, standings, judges, full JSON backup |
 | Restore points | recover from a bad publish or wipe |
 | Advanced | create an empty team, write any config key |
+
+The sections are grouped into four tabs — **Event setup**, **People**, **Data
+and activity**, **Recovery** — and the tab is in the URL (`?tab=recovery`), so a
+readiness check can send someone straight to the section that fixes it and one
+organizer can tell another where to look. They were one scroll before, which put
+the danger zone three flicks below whatever you came for.
 | Recent activity | what changed, with undo |
 | Danger zone | clear the schedule, optionally with every score |
 
@@ -464,7 +485,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ### Testing
 
 ```
-npm run test:ci     # 32 suites, 745 tests, no JVM
+npm run test:ci     # 33 suites, 776 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 ```
 
@@ -482,6 +503,7 @@ npm run test:rules  # the rules, against the emulator (needs JDK 17+)
 | `snapshotDiff.test.js` | named score loss in a restore diff, by team, judge and round |
 | `dangerZone.test.js` | a wipe cannot proceed without a restore point |
 | `peopleService.test.js` | the one-role switch, its archive copy and the removal fan-out |
+| `eventReadiness.test.js` | the phase the event is in, what is blocking, and what to do next |
 | `roles.test.js` | the profile merge, so a second role cannot blank the first |
 | `exportData.test.js` | CSV quoting and formula defusing |
 | `resilience.test.js` | the judge outbox surviving a reload |

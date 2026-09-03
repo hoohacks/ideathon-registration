@@ -315,25 +315,57 @@ describe("pages render without crashing", () => {
    * zone. Asserting the whole sequence is what stops a later import being
    * dropped into the middle of the list by accident.
    */
-  test("control panel sections read in the intended order", async () => {
+  /**
+   * Nine sections on one scroll was four unrelated jobs stacked: event setup,
+   * managing people, exporting data, and recovering from a bad write. They are
+   * tabs now, and the danger zone is no longer three flicks below whatever you
+   * came for.
+   */
+  const sectionsOn = () =>
+    screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+
+  test("the control panel opens on event setup", async () => {
     renderPage(Control, { userTypes: ["admin"] });
     await screen.findByRole("heading", { name: "Control panel" });
 
-    const sections = screen
-      .getAllByRole("heading", { level: 2 })
-      .map((heading) => heading.textContent);
+    expect(sectionsOn()).toEqual(["Judging rooms", "Judging schedule", "Event", "Advanced"]);
+  });
 
-    expect(sections).toEqual([
-      "Judging rooms",
-      "Judging schedule",
-      "Event",
-      "People and roles",
-      "Export",
-      "Restore points",
-      "Advanced",
-      "Recent activity",
-      "Danger zone",
-    ]);
+  test("recovery is its own tab, not the bottom of the page", async () => {
+    renderPage(Control, { userTypes: ["admin"] });
+    await screen.findByRole("heading", { name: "Control panel" });
+
+    // not reachable by scrolling past everything else
+    expect(sectionsOn()).not.toContain("Danger zone");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Recovery" }));
+    expect(sectionsOn()).toEqual(["Restore points", "Danger zone"]);
+  });
+
+  test("people and data each get their own tab", async () => {
+    renderPage(Control, { userTypes: ["admin"] });
+    await screen.findByRole("heading", { name: "Control panel" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "People" }));
+    expect(sectionsOn()).toEqual(["People and roles"]);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Data and activity" }));
+    expect(sectionsOn()).toEqual(["Export", "Recent activity"]);
+  });
+
+  test("a tab can be linked to, so a check can send someone straight to it", async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <AuthContext.Provider value={{ ...baseAuth, userTypes: ["admin"] }}>
+          <MemoryRouter initialEntries={["/user/admin/control?tab=recovery"]}>
+            <Control />
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </ThemeProvider>
+    );
+
+    await screen.findByRole("heading", { name: "Control panel" });
+    expect(sectionsOn()).toContain("Danger zone");
   });
 
   test("metrics with no registrations invites rather than showing empty axes", async () => {

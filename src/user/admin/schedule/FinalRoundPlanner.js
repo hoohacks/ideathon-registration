@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Alert, Box, Button, Card, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, IconButton, MenuItem, Snackbar, Stack, TextField, Tooltip, Typography,
@@ -36,6 +37,9 @@ export default function FinalRoundPlanner() {
   const [drift, setDrift] = useState(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // publishing clears the draft, so without this the page would drop straight
+  // back to "Build a final round plan" -- reading as though nothing happened
+  const [published, setPublished] = useState(null);
 
   useEffect(() => subscribeFinalDraft((next) => setPlan(next)), []);
 
@@ -101,7 +105,7 @@ export default function FinalRoundPlanner() {
       setError(result.error);
       return;
     }
-    setToast(`Final round published: ${slots.length} teams in ${plan.room}.`);
+    setPublished({ teams: slots.length, room: plan.room, warnings: result.warnings ?? [] });
   }
 
   async function discard() {
@@ -114,6 +118,42 @@ export default function FinalRoundPlanner() {
 
   if (plan === undefined) {
     return <Typography variant="body2">Loading the final round plan…</Typography>;
+  }
+
+  if (published) {
+    return (
+      <Stack spacing={2}>
+        <Alert severity="success">
+          Final round published. Judges can see their assignments now.
+        </Alert>
+
+        <Card sx={{ p: 2.5 }}>
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="overline" component="p">
+                Published
+              </Typography>
+              <Typography variant="h3" sx={{ mt: 0.25 }}>
+                {published.teams} team{published.teams === 1 ? "" : "s"} in {published.room}
+              </Typography>
+            </Box>
+
+            {published.warnings.map((warning) => (
+              <Alert key={warning} severity="warning">
+                {warning}
+              </Alert>
+            ))}
+
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+              <Button variant="contained" component={RouterLink} to="/user/admin/judging">
+                Watch final round progress
+              </Button>
+              <Button onClick={() => setPublished(null)}>Plan it again</Button>
+            </Stack>
+          </Stack>
+        </Card>
+      </Stack>
+    );
   }
 
   if (plan === null) {
