@@ -106,3 +106,58 @@ export async function createTeam(request, { name, submitted = false }) {
   if (!res.ok()) throw new Error(`team: ${res.status()} ${await res.text()}`);
   return teamId;
 }
+
+/**
+ * First-round score cards, written past the rules.
+ *
+ * The final round ranks teams on their first-round averages, so it cannot be
+ * planned at all until somebody has scored. Seeding them here keeps the final
+ * round spec independent of whatever the judge spec happened to do first.
+ */
+export async function seedFirstRoundScores(request, { teams = 6, perTeam = 2 } = {}) {
+  const read = async (path) => {
+    const res = await request.get(`${DB}/${path}.json?ns=${NS}`, { headers: ADMIN });
+    return res.ok() ? (await res.json()) ?? {} : {};
+  };
+
+  const teamIds = Object.entries(await read("teams"))
+    .filter(([, team]) => team?.submitted)
+    .map(([id]) => id)
+    .slice(0, teams);
+
+  const judgeIds = Object.entries(await read("judges"))
+    .filter(([, judge]) => judge?.isRound1Judge)
+    .map(([id]) => id);
+
+  if (!teamIds.length || !judgeIds.length) {
+    throw new Error(`nothing to score: ${teamIds.length} teams, ${judgeIds.length} judges`);
+  }
+
+  const cards = {};
+  teamIds.forEach((teamId, index) => {
+    judgeIds.slice(0, perTeam).forEach((judgeId) => {
+      // a descending spread, so the ranking has an unambiguous order
+      const value = Math.max(1, 10 - index);
+      cards[`${teamId}/${judgeId}`] = {
+        problem: value,
+        innovation: value,
+        impact: value,
+        viability: Math.max(1, Math.round(value / 2)),
+        pitch_quality: Math.max(1, Math.round(value / 2)),
+        fundable: index < 3,
+        judgeUid: judgeId,
+        teamId,
+        enteredBy: judgeId,
+        submittedAt: Date.now(),
+      };
+    });
+  });
+
+  const res = await request.patch(`${DB}/scores/first.json?ns=${NS}`, {
+    headers: ADMIN,
+    data: cards,
+  });
+  if (!res.ok()) throw new Error(`could not seed scores: ${res.status()} ${await res.text()}`);
+
+  return teamIds;
+}

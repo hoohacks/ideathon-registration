@@ -548,7 +548,7 @@ un-listed path does — and `src/schema.test.js` asserts it stays that way.
 ```
 npm run test:ci     # 39 suites, 862 tests, no JVM
 npm run test:rules  # the rules, against the emulator (needs JDK 17+)
-npm run test:e2e    # 30 journeys in a real browser (needs JDK 17+)
+npm run test:e2e    # 38 journeys in a real browser (needs JDK 17+)
 ```
 
 ### The four layers, and what only the last two can see
@@ -566,12 +566,15 @@ a read the rules always refuse, the planner stacked two full-height page frames
 so its content sat below the fold, and the room sheets had no link to them. The
 e2e specs pin all three.
 
-What the browser layer covers: the two public forms and the hash-URL rewrite, a
-competitor joining a team, **a judge opening a card and scoring a team**, an
-organizer building and publishing a schedule through its typed confirmation, and
-the control panel's mutating controls — adding, renaming and removing a room,
+What the browser layer covers: the two public forms and the hash-URL rewrite; a
+competitor joining a team, writing a pitch and uploading a deck; **a judge
+opening a card and scoring a team**; an organizer building and publishing a
+schedule through its typed confirmation; the final round cut being built,
+reordered, undone and published, and the results page refusing to name a winner
+while cards are outstanding; restore points being taken and previewed; and the
+control panel's mutating controls — adding, renaming and removing a room,
 granting admin access, the confirmation a role change puts up, and an export
-that actually produces a file.
+that produces a file.
 
 Two habits that suite taught, both learned by getting them wrong:
 
@@ -580,6 +583,8 @@ Two habits that suite taught, both learned by getting them wrong:
   instead of toggling anybody.
 - **Wait for the page to settle, do not probe it.** `isVisible()` on a control
   that has not rendered yet returns false and the step is silently skipped.
+- **An input's value is not text on the page.** `getByText` cannot see it;
+  `toHaveValue` can. A whole afternoon went into that one.
 
 `test:e2e` starts the emulators, seeds an event, and runs the app on port
 **3010** — never 3000, and never reusing an existing server. That is deliberate:
@@ -674,6 +679,13 @@ Judges need no instructions — their side degrades on its own:
 - a submit that cannot reach the database is queued, not lost
 - a hung write times out after eight seconds
 - the queue survives a refresh and sends on reconnect
+
+The pitch form is seeded from the database **once per team**, not on every
+snapshot. It is a live subscription, so it fires again whenever anything about
+the team changes — a teammate joining, an organizer fixing the name, the
+schedule being published — and re-seeding on each of those overwrote whatever
+the person was in the middle of typing. Somebody writing their problem statement
+lost it the moment a teammate pressed Join.
 
 One caveat: **a queued score only syncs while that page is open.** If a judge
 closes the tab, the card sits on their device and nobody else can see it, and

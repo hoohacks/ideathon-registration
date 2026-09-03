@@ -1,5 +1,5 @@
 import Layout from "../Layout";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../../App";
 import { ref, get, set, onValue } from "firebase/database";
 import { auth, database, storage } from "../../firebase";
@@ -146,6 +146,10 @@ function Team() {
         navigate('/user/team');
     }
 
+    // Which team the form fields were last filled in from, so a later snapshot
+    // does not overwrite what somebody is typing. See below.
+    const seededFor = useRef(null);
+
     // Fetch team data from Firebase if teamId is available
     useEffect(() => {
         if (!teamId) return;
@@ -167,10 +171,23 @@ function Team() {
             }));
             const teamData = { ...snapshot.val(), memberNames };
 
-            setIdeaName(teamData.submission?.ideaName || "");
-            setProblemStatement(teamData.submission?.problemStatement || "");
-            setTargetIndustry(teamData.submission?.targetIndustry || "");
-            setPitchDeckName(teamData.submission?.pitchDeckName || "");
+            // Seed the form from the database ONCE per team, not on every
+            // snapshot.
+            //
+            // This is a live subscription: it fires again whenever anything
+            // about the team changes -- a teammate joining, an organizer fixing
+            // the name, the schedule being published. Re-seeding on each of
+            // those overwrote whatever the person was in the middle of typing,
+            // with no warning and nothing to undo it. Somebody writing their
+            // problem statement lost it the moment a teammate pressed Join.
+            if (seededFor.current !== teamId) {
+                seededFor.current = teamId;
+                setIdeaName(teamData.submission?.ideaName || "");
+                setProblemStatement(teamData.submission?.problemStatement || "");
+                setTargetIndustry(teamData.submission?.targetIndustry || "");
+                setPitchDeckName(teamData.submission?.pitchDeckName || "");
+            }
+
             setTeamData(teamData);
         });
         return () => unsubscribe();

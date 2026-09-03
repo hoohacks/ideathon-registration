@@ -102,8 +102,13 @@ test("judging progress shows the first round, and the final round separately", a
   await page.getByRole("option", { name: "Final round" }).click();
 
   await expectPagePainted(page);
-  await expect(page.getByText(/final round has not been activated|No judges have final/i).first())
-    .toBeVisible();
+
+  // Either state is correct depending on whether the final round has been
+  // published yet; what must never happen is the first round's teams staying
+  // on screen with their first-round rooms, which is what this used to do.
+  await expect(
+    page.getByText(/final round has not been activated|Slot \d|\d+\/\d+ in/i).first()
+  ).toBeVisible({ timeout: 20_000 });
 });
 
 test("a judge sees only their own page, not the organizer's", async ({ page }) => {
