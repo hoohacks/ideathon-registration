@@ -1,7 +1,7 @@
 {
-  "name": "ideathon-registration",
+  "name": "ideax",
   "version": "0.1.0",
-  "homepage": "https://hoohacks.github.io/ideathon-registration",
+  "homepage": "https://hoohacks.github.io/IdeaX",
   "private": false,
   "dependencies": {
     "@emotion/react": "^11.11.1",

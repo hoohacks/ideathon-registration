@@ -109,7 +109,7 @@ URL.
 
 | Page | Path | Collects |
 | --- | --- | --- |
-| Competitor registration | `/` and `/ideathon-registration` | name, email, major, school year, skills, resume upload, dietary needs |
+| Competitor registration | `/` and `/IdeaX` | name, email, major, school year, skills, resume upload, dietary needs |
 | Judge registration | `/judge-registration` | name, email, company, whether they can mentor and which shifts, whether they can judge, skills |
 
 **The app is a HashRouter, so every route lives after a `#`:**
@@ -117,7 +117,7 @@ URL.
 | | URL |
 | --- | --- |
 | Local | `http://localhost:3000/#/judge-registration` |
-| Production | `https://hoohacks.github.io/ideathon-registration/#/judge-registration` |
+| Production | `https://hoohacks.github.io/IdeaX/#/judge-registration` |
 
 The same URL without the `#` used to serve the **competitor** form — an empty
 hash matches `/` — so a judge sent the tidy-looking link signed up as a
@@ -742,7 +742,7 @@ you sure?" for nothing teaches people to dismiss it.
 
 ## Deploying
 
-Served from the `gh-pages` branch at `hoohacks.github.io/ideathon-registration`.
+Served from the `gh-pages` branch at `hoohacks.github.io/IdeaX`.
 
 **Publishing a GitHub Release deploys.** Pushing to `main` does not. Every push
 runs CI; only a release builds and pushes to `gh-pages`. There is a

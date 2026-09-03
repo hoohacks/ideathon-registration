@@ -20,7 +20,7 @@
  * The URL to send this location to, or null to leave it alone.
  *
  * Pure, so the base-path arithmetic — the part that differs between
- * `localhost:3000/x` and `hoohacks.github.io/ideathon-registration/x` — can be
+ * `localhost:3000/x` and `hoohacks.github.io/IdeaX/x` — can be
  * tested without a browser.
  */
 export function hashTargetFor({ pathname = "/", search = "", hash = "", base = "" }) {
@@ -28,10 +28,10 @@ export function hashTargetFor({ pathname = "/", search = "", hash = "", base = "
   if (hash && hash !== "#") return null;
 
   // Only strip the base when the URL is actually under it -- and only put it
-  // back in that case. `PUBLIC_URL` is `/ideathon-registration` in development
+  // back in that case. `PUBLIC_URL` is `/IdeaX` in development
   // as well as production (CRA takes it from `homepage` either way), but the
   // dev server answers on `/`. Prepending it unconditionally sent
-  // localhost:3000/judge-registration to /ideathon-registration/#/... : a
+  // localhost:3000/judge-registration to /IdeaX/#/... : a
   // directory that only resolves because the dev server falls back to
   // index.html, with a phantom folder left in the address bar.
   const underBase = Boolean(base) && pathname.startsWith(base);

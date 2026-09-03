@@ -41,11 +41,11 @@ describe("locally, where the app is served from the root", () => {
 });
 
 describe("in development, where the server answers on the root", () => {
-  // PUBLIC_URL is /ideathon-registration here too, but localhost:3000 serves
+  // PUBLIC_URL is /IdeaX here too, but localhost:3000 serves
   // the app from /. Prepending the base anyway pointed at a directory that only
   // resolves through the dev server's index.html fallback.
   const at = (pathname, extra = {}) =>
-    hashTargetFor({ pathname, base: "/ideathon-registration", ...extra });
+    hashTargetFor({ pathname, base: "/IdeaX", ...extra });
 
   test("a path outside the base does not have the base invented for it", () => {
     expect(at("/judge-registration")).toBe("/#/judge-registration");
@@ -62,34 +62,34 @@ describe("in development, where the server answers on the root", () => {
 });
 
 describe("in production, where it is served from a subdirectory", () => {
-  const base = "/ideathon-registration";
+  const base = "/IdeaX";
   const at = (pathname, extra = {}) => hashTargetFor({ pathname, base, ...extra });
 
   test("the base path is not mistaken for part of the route", () => {
-    expect(at("/ideathon-registration/judge-registration"))
-      .toBe("/ideathon-registration/#/judge-registration");
+    expect(at("/IdeaX/judge-registration"))
+      .toBe("/IdeaX/#/judge-registration");
   });
 
   test("the site root is left alone, with or without its trailing slash", () => {
-    expect(at("/ideathon-registration/")).toBeNull();
-    expect(at("/ideathon-registration")).toBeNull();
+    expect(at("/IdeaX/")).toBeNull();
+    expect(at("/IdeaX")).toBeNull();
   });
 
   test("a deep path keeps the base and the route separate", () => {
-    expect(at("/ideathon-registration/user/admin/control"))
-      .toBe("/ideathon-registration/#/user/admin/control");
+    expect(at("/IdeaX/user/admin/control"))
+      .toBe("/IdeaX/#/user/admin/control");
   });
 });
 
 describe("reading the base out of package.json's homepage", () => {
   test("a full URL contributes only its path", () => {
-    expect(basePath("https://hoohacks.github.io/ideathon-registration"))
-      .toBe("/ideathon-registration");
+    expect(basePath("https://hoohacks.github.io/IdeaX"))
+      .toBe("/IdeaX");
   });
 
   test("a trailing slash is dropped, so paths do not double up", () => {
-    expect(basePath("https://hoohacks.github.io/ideathon-registration/"))
-      .toBe("/ideathon-registration");
+    expect(basePath("https://hoohacks.github.io/IdeaX/"))
+      .toBe("/IdeaX");
   });
 
   test("no homepage at all has no base", () => {
@@ -99,6 +99,6 @@ describe("reading the base out of package.json's homepage", () => {
   test("development gets the same base as production, because CRA derives both from homepage", () => {
     // react-scripts sets PUBLIC_URL to paths.publicUrlOrPath.slice(0, -1), and
     // in development that is the homepage's *pathname* -- not an empty string
-    expect(basePath("/ideathon-registration")).toBe("/ideathon-registration");
+    expect(basePath("/IdeaX")).toBe("/IdeaX");
   });
 });

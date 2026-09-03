@@ -47,3 +47,7 @@ scripts/backups/
 /test-results
 /blob-report
 /playwright/.cache
+
+# Working notes: specs and plans that live on the machine they were
+# written on, not in the repo.
+/docs/superpowers/
