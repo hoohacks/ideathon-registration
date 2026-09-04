@@ -34,6 +34,28 @@ export function roomsInUse(teamsData) {
 }
 
 /**
+ * Which teams would end up sharing a room if everyone in `from` moved to `to`.
+ * Pure.
+ *
+ * Emptying a room asks the organizer where its teams should go, and then took
+ * the answer at face value. Two rooms both busy in batch 1 merge into one room
+ * with two teams in it at five o'clock -- the single thing a judging schedule
+ * exists to prevent, produced by the tool for fixing a room problem.
+ *
+ * Batch, not time: the batch is what the schedule is actually keyed on, and a
+ * time is a label an organizer can retype.
+ */
+export function moveCollisions({ from, to, teamsData }) {
+  const byRoom = roomsInUse(teamsData);
+  const moving = byRoom[from] ?? [];
+  const sitting = byRoom[to] ?? [];
+
+  return moving
+    .map((team) => ({ team, blockedBy: sitting.find((other) => other.batch === team.batch) }))
+    .filter((pair) => pair.blockedBy);
+}
+
+/**
  * Every path that has to move when a room is renamed or vacated. Pure, so the
  * fan-out is testable without a database.
  */
@@ -180,6 +202,20 @@ export async function removeRoom(name, { moveTo } = {}) {
   }
   if (moveTo === name) {
     return { ok: false, error: "Choose a different room to move them to." };
+  }
+
+  const collisions = moveTo ? moveCollisions({ from: name, to: moveTo, teamsData }) : [];
+  if (collisions.length) {
+    const [first] = collisions;
+    return {
+      ok: false,
+      collisions,
+      error:
+        `${moveTo} is not free: ${first.blockedBy.teamName} is already there in batch ` +
+        `${first.team.batch}` +
+        (collisions.length > 1 ? `, and ${collisions.length - 1} more would clash` : "") +
+        `. Pick a room that is empty when these teams present.`,
+    };
   }
 
   const moved = inUse.length
