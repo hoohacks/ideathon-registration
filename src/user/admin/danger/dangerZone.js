@@ -50,15 +50,44 @@ export function overrideSlotChanges({ teamId, room, time, teamData, judgesData }
 }
 
 export async function overrideTeamSlot({ teamId, teamName, room, time }) {
-  const [teamSnap, judgesSnap] = await Promise.all([
+  const [teamSnap, teamsSnap, judgesSnap] = await Promise.all([
     get(ref(database, `teams/${teamId}`)),
+    get(ref(database, "teams")),
     get(ref(database, "judges")),
   ]);
   if (!teamSnap.exists()) return { ok: false, error: "That team no longer exists." };
 
+  const teamData = teamSnap.val();
+  const batch = teamData?.schedule?.batch;
+
+  /*
+   * Two teams cannot present in one room at one time.
+   *
+   * A move changes the room and the label, never the batch, so this is the only
+   * thing it can break -- and it is the one check this path did not have. Both
+   * other ways into a slot refuse it: the planner's moveTeam, and
+   * scheduleTeamIntoBatch. This is the one an organizer uses during the event,
+   * off a team's record, which makes it the worst of the three to leave open.
+   *
+   * Only when the room actually changes. Editing just the time on an event that
+   * already has a clash somewhere should not be blocked by that clash.
+   */
+  if (room && batch && room !== teamData?.schedule?.room) {
+    const clash = Object.entries(teamsSnap.val() ?? {}).find(
+      ([id, other]) =>
+        id !== teamId && other?.schedule?.batch === batch && other?.schedule?.room === room
+    );
+    if (clash) {
+      return {
+        ok: false,
+        error: `${clash[1]?.name ?? "Another team"} is already in ${room} in batch ${batch}.`,
+      };
+    }
+  }
+
   const changes = overrideSlotChanges({
     teamId, room, time,
-    teamData: teamSnap.val(),
+    teamData,
     judgesData: judgesSnap.exists() ? judgesSnap.val() : {},
   });
 

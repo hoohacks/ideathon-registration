@@ -21,10 +21,15 @@ jest.mock("firebase/database", () => ({
   serverTimestamp: () => 0,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
-jest.mock("../../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
+// only requireAdmin is stubbed; the rest of the module is plain helpers
+jest.mock("../../../roles.js", () => ({
+  ...jest.requireActual("../../../roles.js"),
+  requireAdmin: jest.fn(async () => ({ uid: "admin-1" })),
+}));
 
 const {
   overrideSlotChanges,
+  overrideTeamSlot,
   deleteScore,
   setTeamSubmitted,
   clearSchedule,
@@ -297,5 +302,72 @@ describe("clearing scores as well, to start from scratch", () => {
     mockGet.mockImplementation(world());
     await clearSchedule({ includeScores: true });
     expect(mockUpdate.mock.calls.at(-1)[1]["adminLog/entry-1"].summary).toMatch(/score/i);
+  });
+});
+
+
+/**
+ * Two teams cannot present in one room at one time.
+ *
+ * The planner's moveTeam refuses it and so does scheduleTeamIntoBatch, but the
+ * slot override -- reached from a team's record, which is the one an organizer
+ * uses once the event is running -- did not. Typing a room another team already
+ * had in that batch double-booked the room and reported success.
+ */
+describe("moving a team that is already scheduled", () => {
+  const world = {
+    "teams/team-clearing": {
+      name: "Clearing",
+      schedule: { id: "team-clearing", teamName: "Clearing", room: "Rice 344", time: "5:00 PM", batch: 1 },
+    },
+    teams: {
+      "team-clearing": { name: "Clearing", schedule: { room: "Rice 344", time: "5:00 PM", batch: 1 } },
+      "team-rootstock": { name: "Rootstock", schedule: { room: "Rice 342", time: "5:00 PM", batch: 1 } },
+      // same room, different batch: not a clash, they never overlap
+      "team-almanac": { name: "Almanac", schedule: { room: "Rice 341", time: "5:15 PM", batch: 2 } },
+    },
+    judges: { j1: { teamAssignments: { "team-clearing": { room: "Rice 344", time: "5:00 PM" } } } },
+  };
+
+  beforeEach(() => {
+    mockGet.mockImplementation(async (r) => {
+      const data = world[r.path];
+      return { exists: () => data !== undefined, val: () => data };
+    });
+  });
+
+  const move = (room, time = "5:00 PM") =>
+    overrideTeamSlot({ teamId: "team-clearing", teamName: "Clearing", room, time });
+
+  test("refuses a room another team holds in the same batch", async () => {
+    const result = await move("Rice 342");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Rootstock is already in Rice 342 in batch 1/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("allows a room only taken in a different batch", async () => {
+    const result = await move("Rice 341");
+
+    expect(result.ok).toBe(true);
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  test("allows a free room", async () => {
+    expect((await move("Rice 999")).ok).toBe(true);
+  });
+
+  /**
+   * The check is on the room changing, not on every save. An event that already
+   * has a clash somewhere should not have its time edits blocked by it.
+   */
+  test("editing only the time is not blocked", async () => {
+    const result = await move("Rice 344", "5:05 PM");
+
+    expect(result.ok).toBe(true);
+    const paths = Object.keys(mockUpdate.mock.calls[0][1]);
+    expect(paths).toContain("teams/team-clearing/schedule/time");
+    expect(paths).not.toContain("teams/team-clearing/schedule/room");
   });
 });
