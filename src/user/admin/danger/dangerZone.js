@@ -124,11 +124,10 @@ export async function setTeamSubmitted({ teamId, teamName, submitted }) {
  * Losing them because you wanted to redo the rooms would be a bad trade.
  *
  * `includeScores` is the deliberate, louder choice: a real start from scratch.
- * It has to clear two places, not one. READ_LEGACY_SCORE_PATH is still true, so
- * pre-migration cards live at teams/{id}/scores and teams/{id}/finalScores as
- * well as under /scores, and both are still read -- by the Teams dashboard and
- * by the averages the final round is picked from. Clearing only /scores would
- * leave those behind, which is precisely not starting from scratch.
+ * It clears the pre-migration locations too -- teams/{id}/scores and
+ * teams/{id}/finalScores -- even though nothing reads them any more. A project
+ * old enough to hold them would otherwise keep them through a wipe, and "start
+ * from scratch" has to mean it. Each is only touched if it is actually there.
  *
  * Admins already hold the permission for this: the root rule reaches /scores,
  * and a delete skips .validate, so the card shape never gets to reject a null.

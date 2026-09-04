@@ -489,11 +489,9 @@ with `--rollback <file> --apply`.
 record rejects all of it, and Realtime Database reports `PERMISSION_DENIED` for
 the lot.
 
-**Outstanding:** `READ_LEGACY_SCORE_PATH` in `src/user/judge/getTeamInfo.js` is
-still `true`, so pre-migration scores at `teams/{id}/scores` are still read and
-every average comes from two places. Run the migration, verify, then set it to
-`false` and delete the branches it guards. The dashboard counts the teams that
-still have legacy cards.
+The app reads scores only from `/scores`. On a database that predates
+`migrate-scores`, cards under `teams/{id}/scores` count for nothing until they
+are moved — the control panel blocks the event and counts the teams affected.
 
 ---
 

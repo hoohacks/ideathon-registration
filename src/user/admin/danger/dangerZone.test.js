@@ -175,11 +175,10 @@ describe("clearing scores as well, to start from scratch", () => {
    * team and judge, so they survive a regeneration and re-attach. Starting over
    * for real is a separate, louder choice.
    *
-   * The part that is easy to miss: READ_LEGACY_SCORE_PATH is still true, so
-   * pre-migration cards live at teams/{id}/scores as well as under /scores.
-   * A reset that only cleared /scores would leave cards that still show in the
-   * dashboard and still count toward the averages the final round is picked
-   * from -- which is exactly not starting from scratch.
+   * The part that is easy to miss: cards used to live at teams/{id}/scores as
+   * well, on any database old enough to predate the migration. Nothing reads
+   * them now, but a reset that only cleared /scores would leave them sitting
+   * there -- which is exactly not starting from scratch.
    */
   const world = (extra = {}) => async (r) => {
     const data = {
