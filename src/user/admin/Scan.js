@@ -7,6 +7,7 @@ import { database } from "../../firebase";
 import { ref, get, update } from "firebase/database";
 import { Box, Container, Stack, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import { tokens } from "../../theme";
+import { personName } from "../../roles";
 
 /**
  * The check-in desk.
@@ -67,7 +68,9 @@ function AdminScan() {
 
                 const person = snapshot.val();
                 const role = competitor.exists() ? "competitors" : "judges";
-                const name = `${person.firstName} ${person.lastName}`;
+                // a record an organizer created has empty name fields, and a blank
+                // verdict is no use to somebody confirming who they just scanned
+                const name = personName(person, "Name not on file");
 
                 if (person[field] === true) {
                     setResult({

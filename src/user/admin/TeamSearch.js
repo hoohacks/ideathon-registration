@@ -33,6 +33,7 @@ import {
 import { IoChevronDown } from "react-icons/io5";
 import Layout from "../Layout";
 import { memberIds } from "../team/teamMembers";
+import { personName } from "../../roles";
 import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
 import { deleteScore } from "./danger/dangerZone";
 import { FIRST_ROUND, FINAL_ROUND } from "../judge/getTeamInfo";
@@ -194,7 +195,7 @@ function TeamSearch() {
             if (nameCache.has(uid)) return nameCache.get(uid);
             const userSnapshot = await get(ref(database, `competitors/${uid}`));
             const userInfo = userSnapshot.exists() ? userSnapshot.val() : null;
-            const name = userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : "Unknown user";
+            const name = userInfo ? personName(userInfo, "Unnamed competitor") : "Unknown user";
             nameCache.set(uid, name);
             return name;
           })

@@ -21,7 +21,13 @@ jest.mock("firebase/database", () => ({
   serverTimestamp: () => 1700000000000,
 }));
 jest.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
-jest.mock("../../roles.js", () => ({ requireAdmin: jest.fn(async () => ({ uid: "admin-1" })) }));
+// only requireAdmin is stubbed: the rest of the module is plain helpers this
+// code genuinely uses, and replacing them wholesale made a name render as
+// "personName is not a function" the first time one was added
+jest.mock("../../roles.js", () => ({
+  ...jest.requireActual("../../roles.js"),
+  requireAdmin: jest.fn(async () => ({ uid: "admin-1" })),
+}));
 
 const { publishPlan } = require("./publishPlan");
 const { planSchedule } = require("./planSchedule");
