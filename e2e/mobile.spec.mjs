@@ -92,6 +92,27 @@ test("the score dialog is usable at phone width", async ({ page }) => {
   await expect(dialog.getByRole("button", { name: "Submit score" })).toBeVisible();
   await expectNoSidewaysScroll(page);
 
+  /*
+   * The footer has to be inside the card, not hanging off the bottom of it.
+   *
+   * `toBeVisible` does not catch this: the buttons were rendered and on screen,
+   * they were just painted outside the dialog, over the page behind. The rubric
+   * is taller than a phone, so the form between the paper and its sections has
+   * to be the flex column that scrolls -- otherwise the sections stack at full
+   * height and push the actions out.
+   */
+  const inside = await page.evaluate(() => {
+    const paper = document.querySelector(".MuiDialog-paper").getBoundingClientRect();
+    const actions = document.querySelector(".MuiDialogActions-root").getBoundingClientRect();
+    const content = document.querySelector(".MuiDialogContent-root");
+    return {
+      overhang: Math.round(actions.bottom - paper.bottom),
+      contentScrolls: content.scrollHeight > content.clientHeight,
+    };
+  });
+  expect(inside.overhang, "the dialog footer hangs outside the card").toBeLessThanOrEqual(1);
+  expect(inside.contentScrolls, "the rubric should scroll inside the card").toBe(true);
+
   await dialog.getByRole("button", { name: /cancel|close/i }).first().click();
 });
 
