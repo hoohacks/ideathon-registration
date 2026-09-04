@@ -1,139 +1,93 @@
-
 import React, { useState } from "react";
 import {
-    Button,
-    TextField,
-    Link,
+    Alert,
     Box,
+    Button,
+    Card,
+    CardContent,
+    Link,
+    Stack,
+    TextField,
     Typography,
-    Container,
-    CssBaseline,
 } from "@mui/material";
-
-import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "./firebase";
-import Popup from "reactjs-popup";
-import "reactjs-popup/dist/index.css";
+import { PublicShell } from "./registrationUi";
 
 export default function ForgotPasswordPage() {
     const [sentReset, setSentReset] = useState(false);
-
-    const theme = createTheme({
-        palette: {
-            secondary: {
-                main: "#f82249",
-            },
-            primary: {
-                main: "#ff9daf",
-            },
-            warning: {
-                main: "#f82249",
-            },
-            error: {
-                main: "#f82249",
-            },
-            info: {
-                main: "#f82249",
-            },
-        },
-    });
-
-    const [formData, setFormData] = useState({
-        email: "",
-    });
-
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: type === "checkbox" ? checked : value,
-        }));
-    };
+    const [error, setError] = useState("");
+    const [sending, setSending] = useState(false);
+    const [email, setEmail] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (sending) return;
+        setSending(true);
+        setError("");
         try {
-            await sendPasswordResetEmail(auth, formData.email);
+            await sendPasswordResetEmail(auth, email);
             setSentReset(true);
-        } catch (error) {
-            console.error("Error sending password reset email:", error);
+        } catch (err) {
+            // this used to only reach the console, so a failed reset looked
+            // exactly like a successful one from the outside
+            console.error("Error sending password reset email:", err);
+            setError(
+                err.code === "auth/invalid-email"
+                    ? "That does not look like a valid email address."
+                    : "Could not send the reset email. Please check the address and try again."
+            );
+        } finally {
+            setSending(false);
         }
     };
 
     return (
-        <ThemeProvider theme={theme}>
-            <Popup open={sentReset} modal>
-                <Box
-                    sx={{
-                        borderRadius: "5px",
-                        textAlign: "center",
-                        padding: "15px",
-                        display: "flex",
-                        flexFlow: "column",
-                        gap: "8px",
-                    }}
-                >
-                    <Typography>Sent password reset email!</Typography>
-                    <Link href="#/login">
-                        <Button
-                            sx={{
-                                backgroundColor: "#f82249",
-                                color: "#fff",
-                                boxShadow: 2,
-                                "&:hover": {
-                                    transform: "scale3d(1.05, 1.05, 1)",
-                                    backgroundColor: "#fff",
-                                    color: "#f82249",
-                                    border: "1px solid",
-                                    borderColor: "#f82249",
-                                },
-                            }}
-                            type="button"
-                        >
-                            Go to Login Page
-                        </Button>
-                    </Link>
-                </Box>
-            </Popup>
-            <Container component="main" maxWidth="xs">
-                <CssBaseline />
-                <Box
-                    sx={{
-                        marginTop: 8,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                    }}
-                >
-                    <Typography component="h1" variant="h5">
-                        Reset Password
-                    </Typography>
-                    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            id="email"
-                            label="Email Address"
-                            name="email"
-                            autoComplete="email"
-                            autoFocus
-                            value={formData.email}
-                            onChange={handleChange}
-                        />
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            sx={{ mt: 3, mb: 2 }}
-                        >
-                            Send Reset Link
-                        </Button>
-                    </Box>
-                </Box>
-            </Container>
-        </ThemeProvider>
+        <PublicShell maxWidth="xs" pad>
+            <Card>
+                <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
+                    <Typography variant="h1">Reset password</Typography>
+
+                    {sentReset ? (
+                        <Stack spacing={2} sx={{ mt: 2 }}>
+                            <Alert severity="success">
+                                Reset email sent to <strong>{email}</strong>. Check your inbox and
+                                spam folder.
+                            </Alert>
+                            <Button variant="contained" fullWidth href="#/login">
+                                Back to sign in
+                            </Button>
+                        </Stack>
+                    ) : (
+                        <Box component="form" onSubmit={handleSubmit}>
+                            <Stack spacing={2} sx={{ mt: 2 }}>
+                                <Typography variant="body2">
+                                    We will email you a link to set a new password.
+                                </Typography>
+                                <TextField
+                                    required
+                                    fullWidth
+                                    id="email"
+                                    label="Email address"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    autoFocus
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                                {error && <Alert severity="error">{error}</Alert>}
+                                <Button type="submit" fullWidth variant="contained" disabled={sending}>
+                                    {sending ? "Sending…" : "Send reset link"}
+                                </Button>
+                                <Link href="#/login" variant="body2" sx={{ textAlign: "center" }}>
+                                    Back to sign in
+                                </Link>
+                            </Stack>
+                        </Box>
+                    )}
+                </CardContent>
+            </Card>
+        </PublicShell>
     );
 }
-

@@ -1,5 +1,5 @@
 import { Navigate, Routes, Route } from "react-router-dom"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import Registration from "./Registration"
 import Search from "./user/admin/Search.js"
 import RegisteredAtDisplay from "./RegisteredAtDisplay"
@@ -22,6 +22,12 @@ import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.js"
 import TeamDashboard from "./user/admin/TeamSearch.js"
+import JudgingProgress from "./user/admin/JudgingProgress.js"
+import Control from "./user/admin/Control.js"
+import SchedulePlanner from "./user/admin/schedule/SchedulePlanner.js"
+import Results from "./user/admin/results/Results.js"
+import PrintableSchedule from "./user/admin/schedule/PrintableSchedule.js"
+import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
 
 const AuthContext = createContext(null);
 
@@ -45,10 +51,8 @@ function ProtectedRoute({ children, requiredRoles }) {
   if (!userCredential) {
     return <Navigate to="/login" replace />;
   }
-  console.log("User types:", userTypes);
-  console.log("Required roles:", requiredRoles);
 
-  if (requiredRoles && !requiredRoles.some(role => userTypes.includes(role))) {
+  if (requiredRoles && !requiredRoles.some(role => hasRole(userTypes, role))) {
     return <Navigate to="/user/home" replace />;
   }
 
@@ -64,57 +68,74 @@ function AuthProvider({ children }) {
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log("Auth state changed:", user);
-      setUserCredential(user ? { user } : null);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // keep the same object identity when the signed-in uid has not changed so
+      // downstream effects do not re-run for every token refresh
+      setUserCredential((prev) =>
+        prev?.user?.uid === user?.uid ? prev : (user ? { user } : null)
+      );
       setLoadingAuth(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const refreshUserData = async () => {
-    if (!userCredential)
-      return;
-
-    const idToken = await userCredential.user.getIdToken();
-    setToken(idToken);
-
-    // Check if user exists in /competitors or /judges
-    const userTypes = ["competitor", "judge", "admin"];
-    let userFound = false;
-
-    for (const userType of userTypes) {
-      try {
-        const userRef = ref(database, `/${userType}s/${userCredential.user.uid}`);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-          setUserData(snapshot.val());
-          setUserTypes(userTypes => [...userTypes, userType]);
-          userFound = true;
-        }
-      } catch (error) {
-        console.log(`Checked ${userType} data`);
-      }
-    }
-
-    if (!userFound) {
+  const refreshUserData = useCallback(async () => {
+    if (!userCredential) {
+      // signed out: clear every trace of the previous user so roles cannot leak
+      // into the next session on this tab
+      setToken(null);
       setUserData(null);
+      setUserTypes([]);
+      setLoadingUserData(false);
+      return;
     }
 
-    setLoadingUserData(false);
-  };
+    setLoadingUserData(true);
+
+    try {
+      const idToken = await userCredential.user.getIdToken();
+      setToken(idToken);
+
+      const foundRoles = [];
+      const records = [];
+
+      for (const role of ROLES) {
+        try {
+          const userRef = ref(database, `/${role}s/${userCredential.user.uid}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            foundRoles.push(role);
+            records.push(snapshot.val());
+          }
+        } catch (error) {
+          console.warn(`Could not read ${role} data:`, error);
+        }
+      }
+
+      // merged rather than spread, so the record for a role granted later does
+      // not blank the name and email on the one they registered with
+      // replace rather than append, otherwise roles accumulate across logins
+      setUserData(mergeRoleProfiles(records));
+      setUserTypes(foundRoles);
+    } finally {
+      setLoadingUserData(false);
+    }
+  }, [userCredential]);
 
   useEffect(() => {
+    // wait for firebase to report the initial auth state, otherwise a signed-in
+    // user is briefly treated as signed out and bounced to /login
+    if (loadingAuth) return;
     refreshUserData();
-  }, [userCredential]);
+  }, [loadingAuth, refreshUserData]);
 
   const handleLogin = async (email, password, remember = false) => {
     try {
       if (remember)
         await auth.setPersistence(browserLocalPersistence);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      setUserCredential(userCredential);
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      setUserCredential({ user: credential.user });
       return true;
     } catch (error) {
       console.error("Login failed:", error);
@@ -135,14 +156,13 @@ function App() {
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
-        <Route path="/RegisteredAtDisplay" element={<RegisteredAtDisplay />} />
         <Route path="/judge-registration" element={<JudgeRegistration />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/login" element={<Login />} />
         <Route path="/user">
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge"]}><Assignments /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
           <Route path="team">
             <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><Team /></ProtectedRoute>} />
@@ -150,17 +170,27 @@ function App() {
             <Route path="create" element={<ProtectedRoute requiredRoles={["competitor"]}><CreateTeam /></ProtectedRoute>} />
           </Route>
           <Route path="admin">
+            <Route path="metrics" element={<ProtectedRoute requiredRoles={["admin"]}><RegisteredAtDisplay /></ProtectedRoute>} />
             <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
             <Route path="judges" element={<ProtectedRoute requiredRoles={["admin"]}><JudgeDashboard /></ProtectedRoute>} />
             <Route path="teams" element={<ProtectedRoute requiredRoles={["admin"]}><TeamDashboard /></ProtectedRoute>} />
+            <Route path="judging" element={<ProtectedRoute requiredRoles={["admin"]}><JudgingProgress /></ProtectedRoute>} />
+            <Route path="schedule" element={<ProtectedRoute requiredRoles={["admin"]}><SchedulePlanner /></ProtectedRoute>} />
+            <Route path="print" element={<ProtectedRoute requiredRoles={["admin"]}><PrintableSchedule /></ProtectedRoute>} />
+            <Route path="results" element={<ProtectedRoute requiredRoles={["admin"]}><Results /></ProtectedRoute>} />
+            <Route path="control" element={<ProtectedRoute requiredRoles={["admin"]}><Control /></ProtectedRoute>} />
           </Route>
         </Route>
+
+        {/* an unmatched hash route rendered nothing at all, which reads as the
+            app being broken rather than the address being wrong */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
   )
 }
 
-export { AuthContext, useAuth };
+export { AuthContext, useAuth, ProtectedRoute };
 
 export default App

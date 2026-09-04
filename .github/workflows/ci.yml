@@ -1,0 +1,130 @@
+name: CI
+
+# Runs on pull requests, and on demand. Deliberately NOT on every push: a branch
+# somebody is still working on does not need the whole suite on each commit, and
+# the gate that matters is the one before code merges.
+#
+# The consequence worth knowing: a direct push to main runs nothing. Merging
+# through a pull request is what keeps that from being a gap.
+#
+# `workflow_dispatch` runs everything by hand from the Actions tab, on any
+# branch: useful before cutting a release, or to re-run a suite that failed for
+# an environmental reason rather than a real one.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The Realtime Database emulator, which the security rules suite runs
+      # against, is a Java jar.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Firebase emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      # `npm ci` honours the lockfile. The previous workflow used
+      # `npm install --force`, which ignores it and resolves peer conflicts by
+      # picking something -- so CI could build against different versions than
+      # anyone had tested locally.
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      # These execute database.rules.json against the emulator. The rules are
+      # the only real authorization in this app -- there is no server -- so a
+      # change here is a change to who can read what.
+      - name: Security rules
+        run: npm run test:rules
+
+      - name: Build
+        run: npm run build
+        env:
+          # warnings do not fail the build; `npm run test:ci` above runs with
+          # CI=true, so lint problems still surface, just not as a hard failure
+          # on a branch someone is still working on
+          CI: false
+
+  e2e:
+    # The slowest suite here, and the only layer that can see a permission
+    # denial and a layout at the same time.
+    name: Browser journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The Realtime Database emulator is a Java jar, and these specs run
+      # against it rather than against the real project.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Firebase emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Install
+        run: npm ci
+
+      # Pinned to the installed @playwright/test so the cache is not reused
+      # across a version bump, which is how a browser and its driver drift apart.
+      - name: Cache the browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      # Starts the emulators, seeds an event, starts the app on port 3010 and
+      # drives it. Nothing here can reach the real project.
+      - name: Browser journeys
+        run: npm run test:e2e
+
+      # The report carries a trace, a screenshot and the DOM at the moment of
+      # failure, which is the difference between "a test went red" and knowing
+      # why without reproducing it locally.
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

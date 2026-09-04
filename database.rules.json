@@ -1,0 +1,291 @@
+{
+  // rulesVersion: 5 -- bump this whenever anything below changes, and republish
+  // in the Firebase console. `npm test` fails if the rules change without it,
+  // because nothing else in this project can tell you the deployed rules have
+  // drifted from the ones in git. See "Publishing the rules" in the README.
+  "rules": {
+    // Admins read and write everything. Every rule below grants some narrower
+    // slice to a specific actor. Remember that Realtime Database rules CASCADE:
+    // granting .read or .write at a path grants it for everything underneath,
+    // and a deeper rule can never take it back. That is why there is no
+    // blanket ".read": "auth != null" on /teams, /competitors or /scores.
+    ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+    ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+
+    "admins": {
+      // Anyone signed in may check whether they themselves are an admin, and
+      // nothing more. The app probes this on every login to build the role
+      // list; without it every non-admin login logs a permission error.
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid"
+      }
+    },
+
+    // Judging room list and event start date. Admin-writable via the root rule.
+    "config": {
+      ".read": "auth != null"
+    },
+
+    // There is deliberately no ".read" at this level. One here would cascade
+    // into finalRound/teams and hand every signed-in user the standings --
+    // team names and averageScore -- before they are announced. The two
+    // scalars the whole app needs are granted individually instead.
+    //
+    // Everything a non-admin sees about the final round is denormalised, the
+    // same way the first round schedule is: teams/{id}/finalSlot for the team,
+    // judges/{uid}/finalAssignments for the judge. Both are written in the same
+    // atomic update as this node, so they cannot drift.
+    "finalRound": {
+      "active": {
+        ".read": "auth != null"
+      },
+      "activatedAt": {
+        ".read": "auth != null"
+      }
+
+      // activatedBy, deactivatedAt, deactivatedBy, teams and archive have no
+      // rule, so they are reachable only through the admin rule at the root.
+    },
+
+    "judges": {
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid",
+
+        // A judge writes their own record once, at registration. isRound1Judge,
+        // checkedIn, teamAssignments and finalAssignments are set by admins
+        // through the root rule, so a judge cannot add themselves to the
+        // judging pool, check themselves in, or hand themselves extra teams.
+        //
+        // finalAssignments is the load-bearing one: the /scores write rule
+        // treats an entry there as proof of assignment, so a judge who could
+        // seed it at registration could file a final-round score for any team.
+        ".write": "auth != null && $uid === auth.uid && !data.exists() && !newData.hasChild('isRound1Judge') && !newData.hasChild('teamAssignments') && !newData.hasChild('finalAssignments') && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false",
+
+        // Final round assignments, denormalised the same way teamAssignments
+        // is, so a judge can load them from a node they already read. Keyed by
+        // team id, never an array: the score rules address one by
+        // hasChild($teamId), and hasChild cannot see into an array.
+        "finalAssignments": {
+          "$teamId": {
+            ".validate": "newData.hasChildren(['teamName','room','timeslot'])",
+            "teamId":   { ".validate": "newData.isString() && newData.val() === $teamId" },
+            "teamName": { ".validate": "newData.isString()" },
+            "room":     { ".validate": "newData.isString()" },
+            "timeslot": { ".validate": "newData.isString()" },
+            "$other":   { ".validate": false }
+          }
+        }
+      }
+    },
+
+    "competitors": {
+      "$uid": {
+        // Yourself, or someone on your team. The teamId comparison is guarded
+        // on the reader having a team at all: without that guard two
+        // competitors who are both teamless compare null === null and every
+        // unteamed competitor becomes readable by every other one.
+        ".read": "auth != null && ($uid === auth.uid || (root.child('competitors').child(auth.uid).child('teamId').exists() && root.child('competitors').child($uid).child('teamId').val() === root.child('competitors').child(auth.uid).child('teamId').val()))",
+
+        // Own record only, and never your own check-in state.
+        ".write": "auth != null && $uid === auth.uid && ((!data.exists() && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false) || (data.exists() && newData.child('checkedIn').val() === data.child('checkedIn').val() && newData.child('foodCheckIn').val() === data.child('foodCheckIn').val()))"
+      }
+    },
+
+    "teams": {
+      ".indexOn": ["name"],
+
+      "$teamId": {
+        // Your own team only. Reading /teams as a whole stays admin-only, so
+        // one team can never enumerate another team's submission. Scores are
+        // no longer stored here at all -- see /scores.
+        ".read": "auth != null && (data.child('members').hasChild(auth.uid) || data.child('createdBy').val() === auth.uid)",
+
+        // Creating a team, and only with yourself as creator and first member.
+        // schedule and finalSlot are admin-written, so they cannot be seeded
+        // here. Edits to an existing team go through the per-field rules below.
+        ".write": "auth != null && !data.exists() && root.child('competitors').child(auth.uid).exists() && newData.child('createdBy').val() === auth.uid && newData.child('members').hasChild(auth.uid) && !newData.hasChild('schedule') && !newData.hasChild('finalSlot')",
+
+        // Readable by anyone signed in so a competitor can confirm a team id
+        // before joining it, which they must do before they can read the team.
+        "name": {
+          ".read": "auth != null"
+        },
+
+        "members": {
+          "$memberUid": {
+            // Add or remove yourself, nobody else. Storing members as a keyed
+            // set rather than an array is what makes this expressible at all.
+            //
+            // Leaving (!newData.exists()) is always allowed, so nobody is
+            // trapped on a team. Joining a team that has already submitted is
+            // not: the schedule is built from submitted teams, and someone who
+            // joins after the deck is in did not work on it.
+            //
+            // There is deliberately NO team size cap here. Realtime Database
+            // rules cannot count children -- numChildren() is a client SDK
+            // method, and a rule using it fails to load at all. MAX_TEAM_SIZE
+            // in src/user/team/teamMembership.js is therefore advisory: it
+            // stops the ordinary path, and someone determined can bypass it
+            // from the console. Capping it properly would mean routing joins
+            // through an admin or a server, which this project does not have.
+            //
+            // Admins are unaffected by any of this: the root rule grants them
+            // write here, so an organizer can still add someone to a closed team.
+            ".write": "auth != null && $memberUid === auth.uid && root.child('competitors').child(auth.uid).exists() && (!newData.exists() || root.child('teams').child($teamId).child('submitted').val() !== true)"
+          }
+        },
+
+        "submission": {
+          // A judge reads the deck and the problem statement for the teams they
+          // are actually going to see, in either round. This grants the
+          // submission subtree and nothing else: a read granted at a child
+          // never confers the parent, so an assigned judge still cannot see the
+          // team's members, its schedule, its slot, or the team node as a whole.
+          ".read": "auth != null && (root.child('judges').child(auth.uid).child('teamAssignments').hasChild($teamId) || root.child('judges').child(auth.uid).child('finalAssignments').hasChild($teamId))",
+          ".write": "auth != null && root.child('teams').child($teamId).child('members').hasChild(auth.uid)"
+        },
+
+        "submitted": {
+          ".write": "auth != null && root.child('teams').child($teamId).child('members').hasChild(auth.uid)"
+        },
+
+        // The finalist slot, denormalised so a team can see it through the team
+        // read they already hold. $other is false on purpose: it makes it
+        // structurally impossible for averageScore or the standings to be
+        // copied into a member-readable node by a later change to
+        // activateFinalRound.
+        "finalSlot": {
+          ".validate": "newData.hasChildren(['room','timeslot'])",
+          "room":     { ".validate": "newData.isString()" },
+          "timeslot": { ".validate": "newData.isString()" },
+          "$other":   { ".validate": false }
+        }
+      }
+    },
+
+    // Scores live here, not under /teams, because rules cascade: a team member
+    // holds .read on teams/$teamId and that would grant everything beneath it,
+    // including the judges' free-text notes. There is no read grant anywhere on
+    // the path /scores -> $round -> $teamId, so the only ways in are the leaf
+    // rule below (your own card) and the admin rule at the root.
+    "scores": {
+      "$round": {
+        // Only fires for a write at or above this node, which in practice means
+        // an admin writing the tree wholesale. The leaf .write below is what
+        // actually confines a judge to a real round.
+        ".validate": "$round === 'first' || $round === 'final'",
+
+        "$teamId": {
+          "$judgeUid": {
+            // Reading back your own card. Deliberately NOT gated on still being
+            // assigned: regenerating the schedule rewrites every judge's
+            // teamAssignments, and a judge should not lose sight of a score
+            // they already filed because an admin pressed Regenerate.
+            ".read": "auth != null && auth.uid === $judgeUid",
+
+            // Own card only, only for a team you are actually assigned to, and
+            // only in the round that assignment belongs to. newData.exists()
+            // means a judge can revise a score but never delete one; admins
+            // still can, through the root rule.
+            ".write": "auth != null && auth.uid === $judgeUid && newData.exists() && root.child('judges').child(auth.uid).exists() && (($round === 'first' && root.child('judges').child(auth.uid).child('teamAssignments').hasChild($teamId)) || ($round === 'final' && root.child('judges').child(auth.uid).child('finalAssignments').hasChild($teamId)))",
+
+            // Scores decide who wins, so the shape is pinned down rather than
+            // trusted. Deletes skip validation, so an admin can still clear one.
+            ".validate": "newData.hasChildren(['problem','innovation','impact','viability','pitch_quality','fundable','judgeUid','teamId','enteredBy','submittedAt'])",
+
+            "problem":       { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "innovation":    { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "impact":        { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10" },
+            "viability":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "pitch_quality": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+            "fundable":      { ".validate": "newData.isBoolean()" },
+            "notes":         { ".validate": "newData.isString() && newData.val().length <= 2000" },
+
+            // The card is filed under the judge it belongs to, pinned to the
+            // key rather than to auth.uid. Pinning it to auth.uid -- as this
+            // rule used to -- silently made the paper fallback impossible: the
+            // root rule let an admin write here, and then validation rejected
+            // it with an undiagnosable PERMISSION_DENIED.
+            "judgeUid":      { ".validate": "newData.val() === $judgeUid" },
+
+            // Who actually pressed the button. Equal to judgeUid when the judge
+            // filed it themselves, an admin uid when it was entered from paper.
+            //
+            // Pinned to auth.uid for everyone EXCEPT an organizer. That is
+            // where the "a judge cannot file under another judge" guarantee
+            // lives, and the exemption does not weaken it: the alternative
+            // branch requires being in /admins, which a judge is not.
+            //
+            // The exemption exists because pinning it absolutely made restoring
+            // impossible. A restore point holds cards whose enteredBy is some
+            // judge's uid; an admin writing them back failed this validation,
+            // which rejected the entire multi-path update -- so a restore of
+            // the schedule silently did nothing either. Rewriting enteredBy to
+            // the restoring admin was the other option, and it would have made
+            // every restored card claim the wrong author.
+            //
+            // Admins already hold root write over /scores and can delete any
+            // card, so this grants no capability they did not have; it only
+            // lets them put back what was there. The log is a forensics aid,
+            // not a ledger -- see adminAction.js.
+            "enteredBy":     { ".validate": "newData.val() === auth.uid || root.child('admins').child(auth.uid).exists()" },
+
+            // Provenance, so the admin view can tell a paper entry from a
+            // migrated one without inferring it from enteredBy.
+            "source":        { ".validate": "newData.isString() && (newData.val() === 'judge' || newData.val() === 'paper' || newData.val() === 'migrated')" },
+
+            "teamId":        { ".validate": "newData.isString() && newData.val() === $teamId" },
+            "teamName":      { ".validate": "newData.isString()" },
+            "room":          { ".validate": "newData.isString()" },
+            "time":          { ".validate": "newData.isString()" },
+            "submittedAt":   { ".validate": "newData.isNumber() && newData.val() <= now" },
+
+            "$other":        { ".validate": false }
+          }
+        }
+      }
+    },
+
+    // Who changed what, from the admin control panel. Rules cascade, so the
+    // root admin grant at the top already covers read and write here; this
+    // block only pins the shape. It is NOT tamper-proof -- an admin can delete
+    // entries, and deletes skip .validate. It is a forensics aid, not a ledger.
+    "adminLog": {
+      "$entryId": {
+        ".validate": "newData.hasChildren(['at','by','action','summary'])",
+
+        "at":       { ".validate": "newData.isNumber() && newData.val() <= now" },
+
+        // Pinned to the caller, the same way enteredBy is on a score card, so
+        // one admin cannot write history under another admin's name.
+        "by":       { ".validate": "newData.val() === auth.uid" },
+
+        "byName":   { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "action":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "summary":  { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "undoable": { ".validate": "newData.isBoolean()" },
+
+        // before/after are JSON strings, not live values: Realtime Database
+        // drops nulls on write, so a literal null before-value would vanish
+        // from the entry and an undo would restore the wrong thing.
+        "changes": {
+          "$i": {
+            ".validate": "newData.hasChild('path')",
+            "path":   { ".validate": "newData.isString() && newData.val().length <= 300" },
+            "before": { ".validate": "newData.isString()" },
+            "after":  { ".validate": "newData.isString()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "undone": {
+          "at":     { ".validate": "newData.isNumber() && newData.val() <= now" },
+          "by":     { ".validate": "newData.val() === auth.uid" },
+          "$other": { ".validate": false }
+        },
+
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

@@ -1,254 +1,235 @@
-import "./ScheduleCard.css";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  MenuItem,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { IoInformationCircleOutline } from "react-icons/io5";
+import { RUBRIC, SCORE_MAX_TOTAL, NOTES_MAX_LENGTH } from "./scoreRubric";
+import { loadDraft, saveDraft } from "./scoreDraft";
 
-const rubric = {
-  problem: {
-    label: "Problem",
-    range: 10,
-    desc: `• Does the submission identify and describe an addressable need, want, problem, and/or opportunity in society?
-• Does the submission identify a target customer base?`,
-  },
-  innovation: {
-    label: "Innovation",
-    range: 10,
-    desc: `• Does the submission present a novel, original, and compelling solution, whether product or service, for addressing some need, want, problem, and/or opportunity in the world?
-• Does the submission describe the alternative solutions while making a compelling case on how their idea is an improvement over these alternatives?`,
-  },
-  impact: {
-    label: "Impact",
-    range: 10,
-    desc: `• Does the submission discuss the impact it will make? How large of an impact?
-• How strongly did the submission discuss how stakeholders and potential users/customers/beneficiaries could potentially benefit from this idea`,
-  },
-  viability: {
-    label: "Viability",
-    range: 5,
-    desc: `• Is the submission feasible? How hard would it be to implement?
-• How strongly did the submission understand, address, and incorporate risks, cost, timeframe, or measures of success?`,
-  },
-  pitch_quality: {
-    label: "Pitch Quality",
-    range: 5,
-    desc: `• How well did they present? Were they confident? Did they have a professional presentation?
-• Did they have appropriate evidence and information to support their idea?`,
-  },
-  fundable: {
-    label: "Fundable",
-    yesNo: true,
-    desc: `Is this an idea that would greatly benefit from funding given by HooHacks?`,
-  },
+const CRITERIA = Object.keys(RUBRIC);
+
+/**
+ * Nothing is pre-selected. The form used to open on 5/5/5/3/3/Yes, which meant
+ * an untouched card was a complete, submittable score — a mis-tap filed a
+ * middling score for a team nobody had watched, indistinguishable afterwards
+ * from a real one. An unfilled criterion now blocks submission instead.
+ */
+const EMPTY = {
+  ...Object.fromEntries(CRITERIA.map((field) => [field, ""])),
+  fundable: "",
+  notes: "",
 };
 
+function Criterion({ field, spec, value, onChange }) {
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+        <Typography variant="body1">{spec.label}</Typography>
+        <Tooltip title={spec.desc} enterTouchDelay={0}>
+          <Box
+            component="span"
+            sx={{ display: "flex", color: "text.secondary", cursor: "help", fontSize: "1rem" }}
+          >
+            <IoInformationCircleOutline />
+          </Box>
+        </Tooltip>
+      </Stack>
+
+      <TextField
+        select
+        name={field}
+        value={value}
+        onChange={onChange}
+        sx={{ width: 104 }}
+        // the maximum sits under the field, so a 5-point criterion cannot be
+        // mistaken for a 10-point one at a glance
+        helperText={`of ${spec.range}`}
+        FormHelperTextProps={{ sx: { textAlign: "right", mr: 0 } }}
+      >
+        {Array.from({ length: spec.range }, (_, i) => String(i + 1)).map((n) => (
+          <MenuItem key={n} value={n}>
+            {n}
+          </MenuItem>
+        ))}
+      </TextField>
+    </Stack>
+  );
+}
 
 function ScoreSubmission({
-  teamName = "Team Name",
-  room = "Room 101",
-  time = "10:00 AM",
+  teamName = "Team",
+  room = "TBD",
+  time = "TBD",
+  submitting = false,
+  // { round, teamId, judgeUid } — identifies the draft. Omitted in tests.
+  draftTarget = null,
+  // true when this judge has already filed a card for this team
+  isOverwrite = false,
   onClose = () => {},
   onSubmit = () => {},
 }) {
-  const [values, setValues] = useState({
-    problem: "5",
-    innovation: "5",
-    impact: "5",
-    viability: "5",
-    pitch_quality: "5",
-    fundable: "yes",
-    notes: "",
-  });
-  const dialogRef = useRef(null);
-  const oneToTen = useMemo(() => Array.from({ length: 10 }, (_, i) => `${i + 1}`), []);
-  const scoreOptions = (n) => Array.from({ length: n }, (_, i) => String(i + 1));
+  const [values, setValues] = useState(EMPTY);
+  const [restored, setRestored] = useState(false);
 
-  const [submitted, setSubmitted] = useState(false);
+  // Restoring has to happen before the first save, or the effect below writes
+  // the empty form over a draft the judge is about to get back.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    const draft = draftTarget ? loadDraft(draftTarget) : null;
+    if (draft) {
+      setValues({ ...EMPTY, ...draft });
+      setRestored(true);
+    }
+  }, [draftTarget]);
+
+  // Persist on every change. The dialog is unmounted on close, so without this
+  // a cancel, a refresh or a dead battery loses everything typed.
+  useEffect(() => {
+    if (!hydrated.current || !draftTarget) return;
+    if (values === EMPTY) return;
+    saveDraft(draftTarget, values);
+  }, [values, draftTarget]);
+
+  const [busy, setBusy] = useState(false);
+  const inFlight = submitting || busy;
+
+  const missing = useMemo(
+    () => CRITERIA.filter((field) => values[field] === "").length + (values.fundable === "" ? 1 : 0),
+    [values]
+  );
+
+  const runningTotal = CRITERIA.reduce((sum, field) => sum + Number(values[field] || 0), 0);
 
   function handleChange(e) {
     const { name, value } = e.target;
     setValues((v) => ({ ...v, [name]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    // the write is async, so without this guard a double click writes twice
+    if (inFlight || missing) return;
+
     const score = {
-      problem: Number(values.problem),
-      innovation: Number(values.innovation),
-      impact: Number(values.impact),
-      viability: Number(values.viability),
-      pitch_quality: Number(values.pitch_quality),
+      ...Object.fromEntries(CRITERIA.map((field) => [field, Number(values[field])])),
       fundable: values.fundable === "yes",
       notes: values.notes,
       teamName,
       room,
       time,
     };
-    onSubmit(score);
-    setSubmitted(true);
+
+    setBusy(true);
+    try {
+      await onSubmit(score);
+    } finally {
+      // if the parent failed it keeps the dialog open, so re-enable the button
+      setBusy(false);
+    }
   }
 
   return (
-    <div
-      className="score-modal-overlay"
-      aria-hidden="false"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="score-modal-title"
-    >
-      <div className="score-modal__dialog" ref={dialogRef}>
-        <header className="score-modal__header">
-          <h2 id="score-modal-title" className="score-modal__title">
-            Score Submission
-          </h2>
-          <button
-            className="score-modal__close"
-            onClick={onClose}
-            aria-label="Close"
-            type="button"
-          >
-            ×
-          </button>
-        </header>
+    <Dialog open onClose={inFlight ? undefined : onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Typography variant="h3" component="div">
+          {teamName}
+        </Typography>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+          <Chip label={time} size="small" variant="outlined" />
+          <Chip label={room} size="small" variant="outlined" />
+        </Stack>
+      </DialogTitle>
 
-        <div className="score-modal__body">
-          <div className="score-modal-team-info">
-            <span className="score-chip">{teamName}</span>
-            <span className="score-chip">{room}</span>
-            <span className="score-chip">{time}</span>
-          </div>
+      <Box component="form" onSubmit={handleSubmit}>
+        <DialogContent dividers sx={{ py: 2 }}>
+          <Stack spacing={1.75}>
+            {restored && (
+              <Alert severity="info" sx={{ py: 0.25 }}>
+                Picked up where you left off on this device.
+              </Alert>
+            )}
+            {isOverwrite && (
+              <Alert severity="warning" sx={{ py: 0.25 }}>
+                You have already scored this team. Submitting replaces that score.
+              </Alert>
+            )}
 
-          <form className="score-modal__form" onSubmit={handleSubmit}>
-            <label className="score-field">
-              <span>{rubric.problem.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.problem.desc}</div>
-              </details>              
-              <select
-                name="problem"
-                value={values.problem}
+            {Object.entries(RUBRIC).map(([field, spec]) => (
+              <Criterion
+                key={field}
+                field={field}
+                spec={spec}
+                value={values[field]}
                 onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.problem.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.innovation.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.innovation.desc}</div>
-              </details>
-              <select
-                name="innovation"
-                value={values.innovation}
-                onChange={handleChange}
-                required
-              >
-                {scoreOptions(rubric.innovation.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.impact.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.impact.desc}</div>
-              </details>              
-              <select
-                name="impact"
-                value={values.impact}
-                onChange={handleChange}
-                required
-              >
-                {scoreOptions(rubric.impact.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.viability.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.viability.desc}</div>
-              </details>
-              <select
-                name="viability"
-                value={values.viability}
-                onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.viability.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.pitch_quality.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.pitch_quality.desc}</div>
-              </details>
-              <select
-                name="pitch_quality"
-                value={values.pitch_quality}
-                onChange={handleChange}
-                required
-              >
-              {scoreOptions(rubric.pitch_quality.range).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-
-            <label className="score-field">
-              <span>{rubric.fundable.label}</span>
-              <details className="score-help-collapsible">
-                <summary>What to consider</summary>
-                <div className="score-help">{rubric.fundable.desc}</div>
-              </details>
-              <div role="radiogroup" aria-label="Fundable" style={{ display: "flex", gap: 12 }}>
-                <label>
-                  <input
-                    type="radio"
-                    name="fundable"
-                    value="yes"
-                    checked={values.fundable === "yes"}
-                    onChange={handleChange}
-                  />{" "}
-                  Yes
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="fundable"
-                    value="no"
-                    checked={values.fundable === "no"}
-                    onChange={handleChange}
-                  />{" "}
-                  No
-                </label>
-              </div>
-            </label>
-            <label className="score-field score-field--textarea">
-              <span>Notes</span>
-              <textarea
-                name="notes"
-                value={values.notes}
-                onChange={handleChange}
-                placeholder="Optional notes for judges…"
-                rows={4}
               />
-            </label>
+            ))}
 
-            <div className="score-modal__actions">
-              <button type="button" className="btn btn--ghost" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn--primary">
-                Submit Score
-              </button>
-            </div>
-          </form>
-        </div>
+            <Divider />
 
-      </div>
-    </div>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="body1">Worth funding?</Typography>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={values.fundable}
+                onChange={(_, next) => next && setValues((v) => ({ ...v, fundable: next }))}
+              >
+                <ToggleButton value="yes" sx={{ px: 2 }}>
+                  Yes
+                </ToggleButton>
+                <ToggleButton value="no" sx={{ px: 2 }}>
+                  No
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
+
+            <TextField
+              name="notes"
+              label="Notes (optional)"
+              value={values.notes}
+              onChange={handleChange}
+              multiline
+              minRows={2}
+              fullWidth
+              // the rules reject anything longer, so stop the judge at the
+              // limit rather than losing the card on submit
+              inputProps={{ maxLength: NOTES_MAX_LENGTH }}
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+          <Typography variant="body2">
+            {missing ? `${missing} left to fill in` : `Total ${runningTotal} / ${SCORE_MAX_TOTAL}`}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={onClose} disabled={inFlight} variant="outlined">
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={inFlight || missing > 0}>
+              {inFlight ? "Submitting…" : "Submit score"}
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Box>
+    </Dialog>
   );
 }
 

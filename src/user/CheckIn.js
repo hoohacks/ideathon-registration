@@ -1,29 +1,46 @@
 import Layout from "./Layout";
 import { useAuth } from "../App";
 import { QRCodeCanvas } from "qrcode.react";
-import { Navigate } from "react-router-dom";
+import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 
 function CheckIn() {
-  
-  const { userCredential } = useAuth();
-  const uid = userCredential.user.uid;
+  const { userCredential, userData } = useAuth();
+  const uid = userCredential?.user?.uid;
 
   return (
-    <Layout>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          textAlign: "center"
-        }}
-      >
-        <h1 >Check In with the QR Code Below:</h1>
-        <br />
-        <QRCodeCanvas value={uid} size={350} style = {{border: "8px solid #1976d2", borderRadius: "20px", padding: "10px", backgroundColor: "white" }} />
-      </div>
+    <Layout maxWidth="xs">
+      <Stack spacing={2} alignItems="center">
+        <Box sx={{ textAlign: "center" }}>
+          <Typography variant="h1">Check in</Typography>
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
+            Show this code at the desk
+          </Typography>
+        </Box>
+
+        <Card sx={{ width: "100%" }}>
+          <CardContent
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1.5,
+              py: 3,
+              "&:last-child": { pb: 3 },
+            }}
+          >
+            {uid ? (
+              <QRCodeCanvas value={uid} size={220} />
+            ) : (
+              <Typography variant="body2">No account found.</Typography>
+            )}
+            {userData?.firstName && (
+              <Typography variant="h5">
+                {userData.firstName} {userData.lastName}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      </Stack>
     </Layout>
   );
 }

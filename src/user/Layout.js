@@ -1,18 +1,41 @@
-import Nav from "./Nav";
+import { Box, Container } from "@mui/material";
+import Nav from "../siteNav";
+import PageFooter from "../siteFooter";
 
-function Layout({ children }) {
+/**
+ * Page frame for the signed-in portal. The old version pinned main to a fixed
+ * 800px, which left the admin tables cramped on a laptop and the short forms
+ * adrift on a wide screen. Pages now pick their own width via `maxWidth`.
+ *
+ * `bleed` is for the one page that wants the whole viewport: the check-in
+ * scanner runs edge to edge and dark.
+ */
+function Layout({ children, maxWidth = "md", bleed = false }) {
     return (
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <header>
-                <Nav />
-            </header>
-            <main style={{ flex: 1, padding: "20px", width: "800px", maxWidth: "100%", margin: "0 auto" }}>
-                {children}
-            </main>
-            <footer className="text-center p-3 mt-4">
-                <p>&copy; 2025 HooHacks</p>
-            </footer>
-        </div>
+        <Box
+            sx={{
+                minHeight: "100vh",
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "background.default",
+            }}
+        >
+            <Nav />
+            {bleed ? (
+                <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    {children}
+                </Box>
+            ) : (
+                <Container
+                    component="main"
+                    maxWidth={maxWidth}
+                    sx={{ flex: 1, width: "100%", py: { xs: 3, sm: 4 } }}
+                >
+                    {children}
+                </Container>
+            )}
+            {!bleed && <PageFooter maxWidth={maxWidth} />}
+        </Box>
     );
 }
 

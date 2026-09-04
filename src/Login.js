@@ -1,45 +1,40 @@
 import React, { useState } from "react";
 import { useAuth } from "./App.js";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Button,
-  TextField,
-  FormControlLabel,
-  Checkbox,
-  Link,
-  Grid,
+  Alert,
   Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  FormControlLabel,
+  Link,
+  Stack,
+  TextField,
   Typography,
-  Container,
-  CssBaseline,
 } from "@mui/material";
-
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { EVENT } from "./eventInfo";
+import { PublicShell } from "./registrationUi";
+import { REGISTRATION_OPEN, isStaffEntrance } from "./registrationWindow";
+import ClosedNotice from "./ClosedNotice";
 
 export default function LoginPage() {
+  // Organizers still have to reach the control panel while the doors are shut,
+  // and signing in is how. `#/login?staff` is the way through.
+  const { search } = useLocation();
+  if (!REGISTRATION_OPEN && !isStaffEntrance(search)) {
+    return <ClosedNotice what="Sign-in" />;
+  }
+
+  return <SignInForm />;
+}
+
+function SignInForm() {
   const { handleLogin } = useAuth();
   const navigate = useNavigate();
-  const [showErrorMessage, setShowErrorMessage] = useState("");
-
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -57,95 +52,90 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await handleLogin(formData.email, formData.password, formData.remember);
-
-    console.log("here");
-    if (success) {
-      navigate("/user/home")
-    }
-    else {
-      setShowErrorMessage(true);
-    }
-    console.log("Form submitted:", formData);
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    const success = await handleLogin(
+      formData.email,
+      formData.password,
+      formData.remember
+    );
+    setBusy(false);
+    if (success) navigate("/user/home");
+    else setError("We could not sign you in. Check your email and password, or reset it below.");
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <Container component="main" maxWidth="xs">
-        <CssBaseline />
-        <Box
-          sx={{
-            marginTop: 8,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <Typography component="h1" variant="h5">
-            Sign In
+    <PublicShell maxWidth="xs" pad>
+      <Card>
+        <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
+          {/* the bar carries the wordmark, so the page says what it is for */}
+          <Typography variant="h1" gutterBottom>
+            Sign in
           </Typography>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={formData.email}
-              onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={handleChange}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  name="remember"
-                  checked={formData.remember}
-                  onChange={handleChange}
-                  color="primary"
-                />
-              }
-              label="Remember me"
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-            >
-              Sign In
-            </Button>
-            <Grid container>
-              <Grid item xs>
+          <Typography variant="body2">{EVENT.dateLabel}</Typography>
+
+          <Box component="form" onSubmit={handleSubmit}>
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <TextField
+                required
+                fullWidth
+                id="email"
+                label="Email address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={formData.email}
+                onChange={handleChange}
+              />
+              <TextField
+                required
+                fullWidth
+                name="password"
+                label="Password"
+                type="password"
+                id="password"
+                autoComplete="current-password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+
+              {error && <Alert severity="error">{error}</Alert>}
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    name="remember"
+                    size="small"
+                    checked={formData.remember}
+                    onChange={handleChange}
+                  />
+                }
+                label={<Typography variant="body2">Keep me signed in</Typography>}
+                sx={{ mr: 0 }}
+              />
+
+              <Button type="submit" fullWidth variant="contained" disabled={busy}>
+                {busy ? "Signing in…" : "Sign in"}
+              </Button>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                sx={{ pt: 0.5 }}
+              >
                 <Link href="#/forgot-password" variant="body2">
                   Forgot password?
                 </Link>
-              </Grid>
-              <Grid item>
                 <Link href="#/ideathon-registration" variant="body2">
-                  {"Don't have an account? Sign Up"}
+                  Create an account
                 </Link>
-              </Grid>
-            </Grid>
+              </Stack>
+            </Stack>
           </Box>
-        </Box>
-        {showErrorMessage ? <Typography sx={{ mt: 3 }} color="error" component="p">Error logging in, please try again or consider resetting your password.</Typography> :
-          null}
-      </Container>
-    </ThemeProvider>
+        </CardContent>
+      </Card>
+    </PublicShell>
   );
 }
-

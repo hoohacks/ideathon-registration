@@ -1,851 +1,633 @@
-import React, { isValidElement, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 // firebase
-import firebase from "firebase/compat/app";
-import "firebase/compat/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { database, storage, auth } from "./firebase";
-import { ref, push, child, update } from "firebase/database";
+import { ref, update, serverTimestamp } from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { ref as storageRef } from "firebase/storage"; // avoid naming issues
+import { ref as storageRef } from "firebase/storage";
 
-// react pop up
-import { Popup } from "reactjs-popup";
-import "reactjs-popup/dist/index.css";
-
-// import mui styling
 import {
+  Alert,
   Box,
-  Card,
-  Typography,
-  InputLabel,
-  TextField,
-  Select,
-  MenuItem,
-  LinearProgress,
   Button,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
   FormControl,
-  Grid,
-  Link,
-  RadioGroup,
-  Radio,
   FormHelperText,
+  Grid,
+  InputLabel,
+  LinearProgress,
+  Link,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
 } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
 
-// import logo
-import Logo from "./images/logo.png";
-import { maxWidth } from "@mui/system";
+import { EVENT, GRADUATION_YEARS } from "./eventInfo";
+import { REGISTRATION_OPEN } from "./registrationWindow";
+import ClosedNotice from "./ClosedNotice";
+import {
+  cleanName,
+  focusField,
+  isEmail,
+  isFilled,
+  outstandingMessage,
+  MIN_PASSWORD,
+  useSyncedForm,
+} from "./formKit";
+import {
+  Hero,
+  MobileSubmitBar,
+  Question,
+  RegistrationShell,
+  ResultDialog,
+  Section,
+  SubmitRail,
+} from "./registrationUi";
 
-// email format
-const mailformat = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+const SCHOOLS = [
+  ["college", "College of Arts and Sciences"],
+  ["engineering", "School of Engineering and Applied Science"],
+  ["commerce", "McIntire School of Commerce"],
+  ["architecture", "School of Architecture"],
+  ["wise", "UVA's College at Wise"],
+  ["medicine", "School of Medicine"],
+  ["law", "School of Law"],
+  ["business", "Darden School of Business"],
+  ["education", "School of Education and Human Development"],
+  ["professional", "School of Continuing & Professional Studies"],
+  ["other", "I don't go to UVA"],
+];
+
+const GENDERS = [
+  ["female", "Female"],
+  ["male", "Male"],
+  ["other", "Other"],
+  ["prefer-not-to-say", "Prefer not to say"],
+];
+
+const DIETARY = [
+  ["none", "No restrictions"],
+  ["vegetarian", "Vegetarian"],
+  ["vegan", "Vegan"],
+  ["gluten-free", "Gluten free"],
+];
+
+// The storage rules cap uploads at 5 MB and accept Word and PDF only. Checking
+// here means an oversized file is refused with a sentence rather than an
+// opaque permission failure two minutes later at submit.
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+const RESUME_ACCEPT =
+  ".pdf,.doc,.docx,application/pdf,application/msword," +
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+const INITIAL = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  password: "",
+  major: "",
+  gender: "",
+  skills: "",
+  learn: "",
+  schoolYear: String(GRADUATION_YEARS[0]),
+  uvaSchool: "college",
+  dietaryRestriction: "none",
+};
+
+/**
+ * The fields that stop a submission, each with the message shown under the
+ * field and the noun the rail uses when it lists what is outstanding.
+ *
+ * Selects that ship with a sensible default -- school, graduation year,
+ * dietary restrictions -- are answered from the moment the page loads, so they
+ * are not counted here. Counting them would open the form at "3 of 11" and
+ * teach people to distrust the number.
+ */
+const SECTIONS = [
+  {
+    id: "account",
+    label: "Account",
+    required: ["firstName", "lastName", "email", "password"],
+  },
+  { id: "studies", label: "Studies", required: ["major"] },
+  { id: "bring", label: "Skills and interests", required: ["skills", "learn"] },
+  { id: "details", label: "Additional details", required: ["gender"] },
+];
+
+const REQUIRED = SECTIONS.flatMap((section) => section.required);
+
+function problemsFor(values) {
+  const problems = {};
+  const fail = (name, message, noun) => {
+    problems[name] = { message, noun };
+  };
+
+  if (!isFilled(values.firstName)) fail("firstName", "Enter your first name", "your first name");
+  if (!isFilled(values.lastName)) fail("lastName", "Enter your last name", "your last name");
+
+  if (!isFilled(values.email)) {
+    fail("email", "Enter your email address", "your email address");
+  } else if (!isEmail(values.email)) {
+    fail("email", "Enter a complete address, like you@virginia.edu", "a valid email address");
+  }
+
+  if (!isFilled(values.password)) {
+    fail("password", "Choose a password", "a password");
+  } else if (values.password.length < MIN_PASSWORD) {
+    fail("password", `Use at least ${MIN_PASSWORD} characters`, "a longer password");
+  }
+
+  if (!isFilled(values.major)) {
+    fail("major", "Enter your major, or the one you plan to declare", "your major");
+  }
+  if (!isFilled(values.gender)) fail("gender", "Choose an option", "your gender");
+  if (!isFilled(values.skills)) {
+    fail("skills", "Name one skill, or write N/A", "your skills");
+  }
+  if (!isFilled(values.learn)) {
+    fail("learn", "Name one thing, or write N/A", "what you want to learn");
+  }
+
+  return problems;
+}
 
 const Registration = () => {
-  // theme
-  const theme = createTheme({
-    palette: {
-      secondary: {
-        main: "#f82249",
-      },
-      primary: {
-        main: "#ff9daf",
-      },
-      warning: {
-        main: "#f82249",
-      },
-      error: {
-        main: "#f82249",
-      },
-      info: {
-        main: "#f82249",
-      },
-    },
-  });
+  // the site is live weeks before sign-ups are; see registrationWindow.js
+  if (!REGISTRATION_OPEN) return <ClosedNotice />;
 
-  // text-fields
-  const [firstName, setFirstName] = useState("");
-  const [firstNameCheck, setFirstNameCheck] = useState(false);
+  return <RegistrationForm />;
+};
 
-  const [lastName, setLastName] = useState("");
-  const [lastNameCheck, setLastNameCheck] = useState(false);
+const RegistrationForm = () => {
+  const navigate = useNavigate();
+  const { formRef, values, handleChange, collect } = useSyncedForm(INITIAL);
 
-  const [email, setEmail] = useState("");
-  const [emailCheck, setEmailCheck] = useState(false);
-
-  const [password, setPassword] = useState("");
-  const [passwordCheck, setPasswordCheck] = useState(false);
-  const [isValidPassword, setIsValidPassword] = useState(true);
-
-  const [skills, setSkills] = useState("");
-  const [skillsCheck, setSkillsCheck] = useState(false);
-
-  const [major, setMajor] = useState("");
-  const [majorCheck, setMajorCheck] = useState(false);
-
-  const [learn, setLearn] = useState("");
-  const [learnCheck, setLearnCheck] = useState(false);
-
-  // gender
-  const [gender, setGender] = useState(null);
-  const [genderCheck, setGenderCheck] = useState(false);
-
-  // email check
-  const [isValidEmail, setIsValidEmail] = useState(true);
-
-  // dietary restrictions
-  const [dietaryRestriction, setDietaryRestriction] = useState([]);
-  const [otherDietaryRestriction, setOtherDietaryRestriction] = useState("");
-  const [otherDietaryRestrictionCheck, setOtherDietaryRestrictionCheck] =
-    useState(false);
-
-  // year
-  const [selectYear, setSelectYear] = useState(2026);
-  const [otherSelectYear, setOtherSelectYear] = useState("");
-  const [otherSelectYearCheck, setOtherSelectYearCheck] = useState("");
-
-  // school
-  const [selectSchool, setSelectedSchool] = useState("college");
+  const [touched, setTouched] = useState({});
+  const [showErrors, setShowErrors] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [registered, setRegistered] = useState(false);
+  const [failure, setFailure] = useState("");
 
   // resume upload
-  const [resumeName, setResumeName] = useState();
-  const [uploadResume, setUploadResume] = useState();
-  const [isResumePicked, setIsResumePicked] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [resumeName, setResumeName] = useState("");
+  const [resumeError, setResumeError] = useState("");
+  const [resumeTask, setResumeTask] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const [skipResume, setSkipResume] = useState(false);
 
-  // successful registration upload
-  const [successRegistration, setSuccessRegistration] = useState(false);
+  const problems = useMemo(() => problemsFor(values), [values]);
 
-  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const sections = SECTIONS.map((section) => ({
+    id: section.id,
+    label: section.label,
+    remaining: section.required.filter((name) => problems[name]).length,
+  }));
+  const answered = REQUIRED.length - Object.keys(problems).length;
 
-  const changeResumeHandle = (event) => {
-    if (!event.target.files[0]) return;
+  const markTouched = (event) =>
+    setTouched((prev) => ({ ...prev, [event.target.name]: true }));
 
-    const storageReference = storageRef(
-      storage,
-      `/ideathon-resume-2025/${selectYear}/${event.target.files[0].name}`
-    );
-    const uploadResumeToDB = uploadBytesResumable(
-      storageReference,
-      event.target.files[0]
-    );
+  // A field shows its message once it has been left, or once submit has been
+  // pressed. An untouched form does not open covered in red.
+  const errorFor = (name) =>
+    showErrors || touched[name] ? problems[name]?.message : undefined;
 
-    uploadResumeToDB.on("state_changed", (snapshot) => {
-      setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-      setUploadResume(uploadResumeToDB);
-    });
+  const fieldProps = (name) => ({
+    name,
+    id: name,
+    value: values[name],
+    onChange: handleChange,
+    onBlur: markTouched,
+    error: Boolean(errorFor(name)),
+    helperText: errorFor(name),
+  });
 
-    setResumeName(event.target.files[0].name);
-    setIsResumePicked(true);
-  };
+  const chooseResume = (event) => {
+    const file = event.target.files?.[0];
+    // reset so picking the same file twice still fires a change
+    event.target.value = "";
+    if (!file) return;
 
-  // add multiple dietary restrictions
-  const selectRestrictions = (event) => {
-    if (dietaryRestriction.includes(event.target.value)) {
-      setDietaryRestriction((current) =>
-        current.filter((diet) => diet !== event.target.value)
-      );
-    } else {
-      setDietaryRestriction((current) => [...current, event.target.value]);
-    }
-  };
-
-  async function handleSubmit() {
-    // form validation
-    if (!isValidEmail || !isValidPassword) {
-      setShowErrorPopup(true);
+    if (file.size > MAX_RESUME_BYTES) {
+      setResumeError("That file is over 5 MB. Upload a smaller PDF or Word file.");
       return;
     }
 
-    // update dietary restrictions with other value
-    var dietRestriction = dietaryRestriction;
-    if (otherDietaryRestriction !== "") {
-      dietRestriction.push(otherDietaryRestriction);
+    // a shared filename would overwrite someone else's resume, and nothing
+    // about the upload path is private
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const task = uploadBytesResumable(
+      storageRef(
+        storage,
+        `ideathon-resumes/${EVENT.year}/${values.schoolYear}/${unique}-${file.name}`
+      ),
+      file
+    );
+
+    task.on(
+      "state_changed",
+      (snapshot) => setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+      (error) => {
+        console.error("Resume upload failed:", error);
+        setProgress(null);
+        setResumeError("That upload did not finish. Try again, or submit without it.");
+      }
+    );
+
+    // set synchronously: waiting for the first progress event meant a quick
+    // submit saw no upload task at all
+    setResumeTask(task);
+    setResumeName(file.name);
+    setResumeError("");
+    setSkipResume(false);
+    setProgress(0);
+  };
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (submitting) return;
+
+    // The DOM gets the last word. If Chrome filled these in before React was
+    // listening, `values` is still empty and everything below would refuse a
+    // form the person can see is complete.
+    const current = collect();
+    const found = problemsFor(current);
+    const outstanding = REQUIRED.filter((name) => found[name]);
+
+    if (outstanding.length) {
+      setShowErrors(true);
+      setFormError(outstandingMessage(outstanding.map((name) => found[name].noun)));
+      focusField(formRef, outstanding[0]);
+      return;
     }
 
-    // Sign in user with email and password
-    let user = null;
+    setFormError("");
+    setSubmitting(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      user = userCredential.user;
-    } catch (error) {
-      alert("Error signing up. User already exists or email is invalid.");
-      return;
-    }
+      // Wait for the resume upload to finish rather than checking whether a
+      // progress counter happened to reach 100 by now. Submitting quickly used
+      // to fall through to the no-resume branch and silently store "none".
+      let resumeUrl = "none";
+      if (resumeTask && !skipResume) {
+        try {
+          await resumeTask;
+          resumeUrl = await getDownloadURL(resumeTask.snapshot.ref);
+        } catch (error) {
+          // the resume is optional, so a failed upload must not block signing
+          // up -- but it must not vanish without a word either. Say so once,
+          // then let a second press go through without it.
+          console.error("Resume upload failed:", error);
+          setSkipResume(true);
+          setResumeError(
+            "Your resume did not upload. Press Register again to sign up without it, or choose a different file first."
+          );
+          return;
+        }
+      }
 
-    // checks if resume has been uploaded yet or not
-    if (progress === 100 && isResumePicked) {
-      // download url
-      const url = await getDownloadURL(uploadResume.snapshot.ref);
+      let user = null;
+      try {
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          current.email.trim(),
+          current.password
+        );
+        user = credential.user;
+      } catch (error) {
+        console.error("Could not create the account:", error);
+        setFormError(
+          error?.code === "auth/email-already-in-use"
+            ? "An account already uses that email address. Sign in instead, or reset the password."
+            : "That account could not be created. Check the email address and try again."
+        );
+        focusField(formRef, "email");
+        return;
+      }
 
-      let applicant = {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
-        uvaSchool: selectSchool,
-        resume: url,
-        skills: skills,
-        gender: gender,
-        learn: learn,
-        major: major,
-        registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
+      const applicant = {
+        firstName: cleanName(current.firstName),
+        lastName: cleanName(current.lastName),
+        email: current.email.trim(),
+        schoolYear: Number(current.schoolYear),
+        uvaSchool: current.uvaSchool,
+        resume: resumeUrl,
+        skills: current.skills.trim(),
+        gender: current.gender,
+        learn: current.learn.trim(),
+        major: current.major.trim(),
+        registeredAt: serverTimestamp(),
         checkedIn: false,
         foodCheckIn: false,
-        dietaryRestriction:
-          dietRestriction.length === 0 ? "none" : dietRestriction,
+        dietaryRestriction: current.dietaryRestriction || "none",
       };
 
-      const updates = {};
-      updates["/competitors/" + user.uid] = applicant;
-      return update(ref(database), updates)
-        .then(() => setSuccessRegistration(true))
-        .catch((error) => {
-          console.warn(error);
-        });
-    } else {
-      // for when no resume is selected
-
-      let applicant = {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        schoolYear: selectYear === 0 ? otherSelectYear : selectYear,
-        uvaSchool: selectSchool,
-        resume: "none",
-        skills: skills,
-        gender: gender,
-        learn: learn,
-        major: major,
-        registeredAt: firebase.firestore.Timestamp.now().toDate().toString(),
-        checkedIn: false,
-        foodCheckIn: false,
-        dietaryRestriction:
-          dietRestriction.length === 0 ? "none" : dietRestriction,
-      };
-
-      const updates = {};
-      updates["/competitors/" + user.uid] = applicant;
-      return update(ref(database), updates)
-        .then(() => setSuccessRegistration(true))
-        .catch((error) => {
-          console.warn(error);
-        });
+      try {
+        await update(ref(database), { ["/competitors/" + user.uid]: applicant });
+        setRegistered(true);
+      } catch (error) {
+        // the account exists at this point, so failing quietly here left people
+        // able to sign in with no profile and no idea why
+        console.error("Could not save registration:", error);
+        setFailure(
+          "Your account was created but your registration could not be saved. Email hackathon.virginia@gmail.com before trying again."
+        );
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  function Copyright() {
-    return (
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        align="center"
-        sx={{ marginTop: "10px" }}
-      >
-        {"Copyright © "}
-        <Link color="inherit" href="https://ideathon.hoohacks.io">
-          Hoohacks Ideathon
-        </Link>{" "}
-        {new Date().getFullYear()}
-      </Typography>
-    );
-  }
+  const rail = {
+    sections,
+    answered,
+    total: REQUIRED.length,
+    error: formError,
+    busy: submitting,
+    submitLabel: "Register",
+    busyLabel: "Registering…",
+  };
 
   return (
-    <>
-      <ThemeProvider theme={theme}>
-        <Popup open={successRegistration} modal>
-          <Box
-            sx={{
-              borderRadius: "5px",
-              textAlign: "center",
-              padding: "15px",
-              display: "flex",
-              flexFlow: "column",
-              gap: "8px",
-            }}
-          >
-            <Typography>Successfully signed up for Ideathon 25!</Typography>
-            <Link href="https://ideathon.hoohacks.io">
-              <Button
-                sx={{
-                  backgroundColor: "#f82249",
-                  color: "#fff",
-                  boxShadow: 2,
-                  "&:hover": {
-                    transform: "scale3d(1.05, 1.05, 1)",
-                    backgroundColor: "#fff",
-                    color: "#f82249",
-                    border: "1px solid",
-                    borderColor: "#f82249",
-                  },
-                }}
-                type="button"
-              >
-                View Schedule
-              </Button>
-            </Link>
-          </Box>
-        </Popup>
-        <Popup open={showErrorPopup} modal>
-          <Box
-            sx={{
-              borderRadius: "5px",
-              textAlign: "center",
-              padding: "15px",
-              display: "flex",
-              flexFlow: "column",
-              gap: "8px",
-            }}
-          >
-            <Typography>
-              Please enter a valid email and ensure your password is at least 6
-              characters.
-            </Typography>
-            <Button
-              sx={{
-                backgroundColor: "#f82249",
-                color: "#fff",
-                boxShadow: 2,
-                "&:hover": {
-                  transform: "scale3d(1.05, 1.05, 1)",
-                  backgroundColor: "#fff",
-                  color: "#f82249",
-                  border: "1px solid",
-                  borderColor: "#f82249",
-                },
-              }}
-              onClick={() => setShowErrorPopup(false)}
-            >
-              Close
-            </Button>
-          </Box>
-        </Popup>
-        <Grid
-          container
-          spacing={0}
-          direction="column"
-          alignItems="center"
-          justifyContent="center"
-          style={{ minHeight: "100vh", minWidth: "100wh" }}
+    <RegistrationShell
+      hero={
+        <Hero
+          eyebrow="Student registration"
+          title={`${EVENT.name} ${EVENT.year}`}
+          facts={[EVENT.dateLabel, EVENT.hours, EVENT.venue]}
         >
-          <Box
-            sx={{
-              width: "100%",
-              justifyContent: "center",
-              alignItems: "center",
-              marginLeft: "auto",
-              marginRight: "auto",
-              display: "flex",
-            }}
-          >
-            <Card
-              sx={{
-                boxShadow: 4,
-                display: "flex",
-                flexFlow: "column nowrap",
-                margin: "24px",
-                width: "582px",
-                alignItems: "center",
-                backgroundColor: "#fff",
-                padding: "22px 22px",
-                gap: "16px",
-                border: "none",
-                boxShadow: "none",
-                [theme.breakpoints.down("md")]: {
-                  margin: "0",
-                },
-              }}
-            >
-              {/* IDEATHON LOGO */}
-              <Link
-                href="https://ideathon.hoohacks.io"
-                sx={{
-                  maxWidth: "582px",
-                  [theme.breakpoints.down("md")]: {
-                    maxWidth: "402px",
-                  },
-                }}
-              >
-                <img
-                  src={Logo}
-                  style={{
-                    borderRadius: "5px",
-                    width: "582px",
-                    objectFit: "cover",
-                    [theme.breakpoints.down("md")]: {
-                      width: "402px",
-                    },
-                  }}
-                />
-              </Link>
+          A one-day event for students from technical and business backgrounds, working in
+          teams on a single idea. The day includes workshops on pitching, valuation and
+          prototyping, one-to-one time with industry mentors, and a two-hour judged pitch
+          event with funding awarded at the end.
+        </Hero>
+      }
+    >
+      <ResultDialog
+        open={registered}
+        title="Registration complete"
+        actions={
+          <>
+            <Button href={EVENT.siteUrl} variant="outlined">
+              View the schedule
+            </Button>
+            <Button variant="contained" onClick={() => navigate("/user/home")}>
+              Go to dashboard
+            </Button>
+          </>
+        }
+      >
+        {`Your place is confirmed and you are signed in. Join or create a team before ${EVENT.dayLabel}.`}
+      </ResultDialog>
 
-              <Typography sx={{ textAlign: "center" }}>
-                The fifth annual Ideathon,{" "}
-                <span style={{ fontWeight: "bold" }}>
-                  Sunday, October 19, 2025
-                </span>
-                , is a networking, team-building, and pitching event designed to
-                help students with technical experience and students with
-                business experience build their technical business ideas.
-                Student teams can meet 1:1 with industry experts about their
-                ideas and form long lasting relationships with them as they
-                continue to grow their ideas. Corporate sponsors will be holding
-                workshops to teach students about pitching their ideas, valuing
-                their potential businesses, and building technical prototypes.
-                There will be a two hour pitch event, where teams will pitch to
-                a board of sponsors for funding. Teams will have the opportunity
-                to win thousands of dollars in funding in order to bring their
-                idea to fruition!
-              </Typography>
+      <ResultDialog
+        open={Boolean(failure)}
+        title="Registration not saved"
+        onClose={() => setFailure("")}
+        actions={
+          <Button variant="contained" onClick={() => setFailure("")}>
+            Close
+          </Button>
+        }
+      >
+        {failure}
+      </ResultDialog>
 
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  justifyContent: "center",
-                  gap: "8px",
-                }}
-              >
-                <TextField
-                  fullWidth={true}
-                  required
-                  id="first-name"
-                  name="first-name"
-                  label="First Name"
-                  variant="outlined"
-                  value={firstName}
-                  type="text"
-                  size="large"
-                  autoComplete="first-name"
-                  onChange={(e) => {
-                    setFirstName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setFirstNameCheck(firstName !== "");
-                  }}
-                  helperText={
-                    firstName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your first name
-                      </Typography>
-                    )
-                  }
-                />
-                <TextField
-                  fullWidth={true}
-                  required
-                  id="last-name"
-                  name="last-name"
-                  variant="outlined"
-                  label="Last Name"
-                  size="large"
-                  value={lastName}
-                  type="text"
-                  autoComplete="last-name"
-                  onChange={(e) => {
-                    setLastName(e.target.value.replace(/[^a-z]/gi, ""));
-                    setLastNameCheck(lastName !== "");
-                  }}
-                  helperText={
-                    lastName === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your last name
-                      </Typography>
-                    )
-                  }
-                />
-              </Box>
-              <TextField
-                fullWidth={true}
-                required
-                id="Email"
-                label="Email Address"
-                name="Email"
-                variant="outlined"
-                size="large"
-                value={email}
-                type="email"
-                autoComplete="email"
-                error={!isValidEmail}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setEmailCheck(email !== "");
-                  setIsValidEmail(mailformat.test(email));
-                }}
-                helperText={
-                  email === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your email
-                    </Typography>
-                  )
-                }
-              />
-              <TextField
-                fullWidth={true}
-                required
-                id="Password"
-                label="Password"
-                name="Password"
-                variant="outlined"
-                size="large"
-                value={password}
-                type="password"
-                autoComplete="current-password"
-                error={!isValidPassword}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setPasswordCheck(password !== "");
-                  setIsValidPassword(password.length >= 6);
-                }}
-                helperText={
-                  password === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your password (6 characters minimum)
-                    </Typography>
-                  )
-                }
-              />
-              <TextField
-                fullWidth={true}
-                required
-                id="major"
-                label="Major/Intended Major"
-                name="major"
-                variant="outlined"
-                value={major}
-                size="large"
-                type="text"
-                autoComplete="major"
-                onChange={(e) => {
-                  setMajor(e.target.value);
-                  setMajorCheck(e.target.value !== "");
-                }}
-                helperText={
-                  major === "" && (
-                    <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                      Enter your major
-                    </Typography>
-                  )
-                }
-              />
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "8px",
-                }}
-              >
-                <FormControl size="large">
-                  <InputLabel>Gender</InputLabel>
-                  <Select
-                    labelId="gender-select"
-                    label="Gender"
-                    value={gender}
-                    size="large"
-                    onChange={(e) => {
-                      setGender(e.target.value);
-                      setGenderCheck(e.target.value !== null);
-                    }}
-                  >
-                    <MenuItem value="male">Male</MenuItem>
-                    <MenuItem value="female">Female</MenuItem>
-                    <MenuItem value="other">Other</MenuItem>
-                    <MenuItem value="prefer-not-to-say">
-                      Prefer not to say
-                    </MenuItem>
-                  </Select>
-                  {gender === null ? (
-                    <FormHelperText sx={{ color: "red", fontSize: "11px" }}>
-                      Please select an option
-                    </FormHelperText>
-                  ) : null}
-                </FormControl>
-              </Box>
-
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "8px",
-                }}
-              >
-                <FormControl size="small">
-                  <InputLabel>Expected Graduation Date</InputLabel>
-                  <Select
-                    labelId="school-year-select"
-                    label="Expected Graduation Year"
-                    value={selectYear}
-                    size="large"
-                    onChange={(e) => setSelectYear(e.target.value)}
-                  >
-                    <MenuItem value={2025}>2025</MenuItem>
-                    <MenuItem value={2026}>2026</MenuItem>
-                    <MenuItem value={2027}>2027</MenuItem>
-                    <MenuItem value={2028}>2028</MenuItem>
-                    <MenuItem value={2029}>2029</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
-              >
-                <FormControl size="small">
-                  <InputLabel id="school-select">
-                    University of Virginia School
-                  </InputLabel>
-                  <Select
-                    labelId="school-select"
-                    label="University of Virginia School"
-                    value={selectSchool}
-                    size="large"
-                    onChange={(e) => setSelectedSchool(e.target.value)}
-                  >
-                    <MenuItem value={"college"}>
-                      College of Arts and Science
-                    </MenuItem>
-                    <MenuItem value={"engineering"}>
-                      School of Engineering and Applied Science
-                    </MenuItem>
-                    <MenuItem value={"commerce"}>
-                      McIntire School of Commerce
-                    </MenuItem>
-                    <MenuItem value={"architecture"}>
-                      School of Architecture
-                    </MenuItem>
-                    <MenuItem value={"wise"}>UVA's College at Wise</MenuItem>
-                    <MenuItem value={"medicine"}>School of Medicine</MenuItem>
-                    <MenuItem value={"law"}>School of Law</MenuItem>
-                    <MenuItem value={"business"}>
-                      Darden School of Business
-                    </MenuItem>
-                    <MenuItem value={"education"}>
-                      School of Education and Human Development
-                    </MenuItem>
-                    <MenuItem value={"professional"}>
-                      School of Continuing & Professional Studies
-                    </MenuItem>
-                    <MenuItem value={"other"}>Don't go to UVA</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "4px",
-                }}
-              >
-                <Button
-                  variant="contained"
-                  component="label"
-                  sx={{
-                    backgroundColor: "#f82249",
-                    color: "#fff",
-                    "&:hover": {
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                    },
-                  }}
-                >
-                  {progress < 100 ? "Optional - Upload Resume" : resumeName}
-                  <input
-                    type="file"
-                    size="large"
-                    hidden={true}
-                    accept="application/msword, application/pdf"
-                    onChange={(e) => changeResumeHandle(e)}
+      <Box component="form" ref={formRef} onSubmit={handleSubmit} noValidate>
+        <Grid container spacing={{ xs: 4, md: 6 }}>
+          <Grid item xs={12} md={7} lg={8}>
+            <Stack spacing={5}>
+              <Section id="account" label="Account">
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <TextField
+                    {...fieldProps("firstName")}
+                    label="First name"
+                    autoComplete="given-name"
+                    required
+                    fullWidth
                   />
-                </Button>
-                <LinearProgress variant="determinate" value={progress} />
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
-              >
-                <Typography id="skills">
-                  What are some skills that you possess that you think would be
-                  helpful for Ideathon participants? This will be used primarily
-                  for team building. *
-                </Typography>
+                  <TextField
+                    {...fieldProps("lastName")}
+                    label="Last name"
+                    autoComplete="family-name"
+                    required
+                    fullWidth
+                  />
+                </Stack>
 
                 <TextField
-                  fullWidth={true}
+                  {...fieldProps("email")}
+                  label="Email address"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   required
-                  id="skills"
-                  name="skills"
-                  variant="outlined"
-                  size="large"
-                  label="My skills are..."
-                  multiline
-                  type="text"
-                  maxRows={Infinity}
-                  value={skills}
-                  autoComplete="skills"
-                  onChange={(e) => {
-                    setSkills(e.target.value);
-                    setSkillsCheck(e.target.value !== "");
-                  }}
-                  helperText={
-                    skills === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter your skills or N/A
-                      </Typography>
-                    )
-                  }
+                  fullWidth
+                  helperText={errorFor("email") ?? "You will sign in with this address."}
                 />
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column",
-                  gap: "8px",
-                  boxSizing: "border-box",
-                }}
-              >
-                <Typography id="learn">
-                  What would you like to learn or get out of the Ideathon? *
-                </Typography>
+
                 <TextField
+                  {...fieldProps("password")}
+                  label="Password"
+                  type="password"
+                  // "new-password" is what tells a password manager to offer a
+                  // generated one and to save what you type. The old form said
+                  // "current-password", so managers filled an existing password
+                  // from another site instead.
+                  autoComplete="new-password"
                   required
-                  id="learn"
-                  name="learn"
-                  variant="outlined"
-                  size="large"
-                  label="I would like to learn..."
-                  multiline
-                  maxRows={Infinity}
-                  value={learn}
-                  autoComplete="learn"
-                  onChange={(e) => {
-                    setLearn(e.target.value);
-                    setLearnCheck(e.target.value !== "");
-                  }}
-                  helperText={
-                    learn === "" && (
-                      <Typography sx={{ color: "#f82249", fontSize: "11px" }}>
-                        Enter something you would like to learn or N/A
-                      </Typography>
-                    )
-                  }
+                  fullWidth
+                  helperText={errorFor("password") ?? `At least ${MIN_PASSWORD} characters.`}
                 />
-              </Box>
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "flex",
-                  flexFlow: "column nowrap",
-                  gap: "8px",
-                }}
-              >
-                <FormControl size="large">
-                  <InputLabel>Dietary Restrictions</InputLabel>
+              </Section>
+
+              <Section id="studies" label="Studies">
+                <FormControl fullWidth>
+                  <InputLabel id="uvaSchool-label">School</InputLabel>
                   <Select
-                    labelId="dietary-restriction-select"
-                    label="Dietary Restrictions"
-                    value={dietaryRestriction}
-                    size="large"
-                    onChange={(e) => {
-                      setDietaryRestriction(e.target.value);
-                    }}
+                    labelId="uvaSchool-label"
+                    id="uvaSchool"
+                    name="uvaSchool"
+                    label="School"
+                    value={values.uvaSchool}
+                    onChange={handleChange}
                   >
-                    <MenuItem value="vegetarian">Vegetarian</MenuItem>
-                    <MenuItem value="gluten-free">Gluten Free</MenuItem>
-                    <MenuItem value="vegan">Vegan</MenuItem>
-                    <MenuItem value="none">None</MenuItem>
+                    {SCHOOLS.map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
-              </Box>
 
-              <Box
-                sx={{
-                  display: "flex",
-                  flexFlow: "row nowrap",
-                  gap: "16px",
-                }}
-              >
-                <Button
-                  sx={{
-                    backgroundColor: "#f82249",
-                    color: "#fff",
-                    boxShadow: 2,
-                    "&:hover": {
-                      transform: "scale3d(1.05, 1.05, 1)",
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                    },
-                  }}
-                  type="submit"
-                  onClick={() => handleSubmit()}
-                >
-                  Submit Registration
-                </Button>
-
-                <Link href="https://ideathon.hoohacks.io">
-                  <Button
-                    sx={{
-                      backgroundColor: "#fff",
-                      color: "#f82249",
-                      border: "1px solid",
-                      borderColor: "#f82249",
-                      boxShadow: 2,
-                      "&:hover": {
-                        transform: "scale3d(1.05, 1.05, 1)",
-                        backgroundColor: "#f82249",
-                        color: "#fff",
-                      },
-                    }}
-                    type="button"
+                <FormControl fullWidth>
+                  <InputLabel id="schoolYear-label">Expected graduation year</InputLabel>
+                  <Select
+                    labelId="schoolYear-label"
+                    id="schoolYear"
+                    name="schoolYear"
+                    label="Expected graduation year"
+                    value={values.schoolYear}
+                    onChange={handleChange}
                   >
-                    Cancel
-                  </Button>
-                </Link>
-              </Box>
-              {/* <Box
-                                sx={{
-                                    width: "100%",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    marginLeft: "auto",
-                                    marginRight: "auto",
-                                    textAlign: "center",
-                                    display: "flex",
-                                }}
-                            >
-                                <Typography >
-                                    Registration for Ideathon has ended!!!! Please reach out to <Link href="mailto:hackathon.virginia@gmail.com">hackathon.virginia@gmail.com</Link> for additional questions.
-                                </Typography>
-                            </Box> */}
-            </Card>
-          </Box>
-          <Copyright />
+                    {GRADUATION_YEARS.map((year) => (
+                      <MenuItem key={year} value={String(year)}>
+                        {year}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  {...fieldProps("major")}
+                  label="Major or intended major"
+                  autoComplete="off"
+                  required
+                  fullWidth
+                />
+              </Section>
+
+              <Section id="bring" label="Skills and interests">
+                <Question
+                  htmlFor="skills"
+                  prompt="What skills would you bring to a team?"
+                  hint="Read during team building, so be concrete. Design, market research and pitching count as much as code."
+                >
+                  <TextField
+                    {...fieldProps("skills")}
+                    placeholder="Python, user interviews, financial modelling…"
+                    autoComplete="off"
+                    multiline
+                    minRows={3}
+                    required
+                    fullWidth
+                  />
+                </Question>
+
+                <Question
+                  htmlFor="learn"
+                  prompt="What do you want to get out of the day?"
+                  hint="It shapes which workshops and mentors we point you at."
+                >
+                  <TextField
+                    {...fieldProps("learn")}
+                    placeholder="How to size a market, how to pitch without slides…"
+                    autoComplete="off"
+                    multiline
+                    minRows={3}
+                    required
+                    fullWidth
+                  />
+                </Question>
+
+                <Box>
+                  <Typography variant="h5" sx={{ mb: 0.5 }}>
+                    Résumé
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1.25 }}>
+                    Optional. Sponsors ask for these when they are hiring. PDF or Word, up to
+                    5 MB.
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Button variant="outlined" component="label">
+                      {resumeName ? "Replace file" : "Choose a file"}
+                      <input
+                        type="file"
+                        hidden
+                        accept={RESUME_ACCEPT}
+                        onChange={chooseResume}
+                      />
+                    </Button>
+                    {resumeName && (
+                      <Typography variant="body2" sx={{ minWidth: 0, wordBreak: "break-all" }}>
+                        {resumeName}
+                      </Typography>
+                    )}
+                  </Stack>
+                  {progress !== null && progress < 100 && (
+                    <LinearProgress
+                      variant="determinate"
+                      value={progress}
+                      sx={{ mt: 1.5, height: 4, borderRadius: 2 }}
+                    />
+                  )}
+                  {resumeError && (
+                    <Alert severity="warning" sx={{ mt: 1.5 }}>
+                      {resumeError}
+                    </Alert>
+                  )}
+                </Box>
+              </Section>
+
+              <Section id="details" label="Additional details">
+                <FormControl fullWidth error={Boolean(errorFor("gender"))}>
+                  <InputLabel id="gender-label">Gender</InputLabel>
+                  <Select
+                    labelId="gender-label"
+                    id="gender"
+                    name="gender"
+                    label="Gender"
+                    value={values.gender}
+                    onChange={handleChange}
+                    onBlur={markTouched}
+                    displayEmpty
+                    renderValue={(value) =>
+                      value
+                        ? GENDERS.find(([key]) => key === value)?.[1]
+                        : <Box component="span" sx={{ color: "text.secondary" }}>Choose an option</Box>
+                    }
+                  >
+                    {GENDERS.map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    {errorFor("gender") ?? "Reported to sponsors only as a total."}
+                  </FormHelperText>
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel id="dietaryRestriction-label">Dietary restrictions</InputLabel>
+                  <Select
+                    labelId="dietaryRestriction-label"
+                    id="dietaryRestriction"
+                    name="dietaryRestriction"
+                    label="Dietary restrictions"
+                    value={values.dietaryRestriction}
+                    onChange={handleChange}
+                  >
+                    {DIETARY.map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>Lunch and dinner are provided.</FormHelperText>
+                </FormControl>
+              </Section>
+            </Stack>
+
+            <MobileSubmitBar {...rail} />
+          </Grid>
+
+          <Grid item xs={12} md={5} lg={4} sx={{ display: { xs: "none", md: "block" } }}>
+            <SubmitRail
+              {...rail}
+              footer={
+                <>
+                  Already registered? <Link href="#/login">Sign in</Link>
+                </>
+              }
+            />
+          </Grid>
         </Grid>
-      </ThemeProvider>
-    </>
+      </Box>
+    </RegistrationShell>
   );
 };
 

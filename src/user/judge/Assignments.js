@@ -1,31 +1,56 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  Divider,
+  Grid,
+  Snackbar,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { Link } from "react-router-dom";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
-import GenerateSchedule from "./GenerateSchedule";
-import { getJudgeSchedule } from "./getJudgeSchedule";
-import { getPersonalSchedule } from "./getPersonalSchedule";
+import { readScheduleMeta } from "./scheduleConfig";
+import { getPersonalSchedule, getFinalRoundSchedule } from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
-import "./Assigments.css";
+import { hasRole } from "../../roles";
+import { ConfirmDialog } from "../admin/adminUi";
 import {
   findTeamIdByName,
-  writeTeamScore,
-  writeFinalRoundScore,
-  getMyScoredTeamsByName,
-  getMyFinalRoundScoredTeamsByName,
+  submitScore,
+  getMyScoredTeamIds,
+  getMyFinalRoundScoredTeamIds,
+  FIRST_ROUND,
+  FINAL_ROUND,
 } from "./getTeamInfo";
-import {
-  activateFinalRound,
-  deactivateFinalRound,
-  subscribeToFinalRoundState,
-} from "./finalRoundService";
+import { deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
+import { useJudgingSync } from "./useJudgingSync";
+import { clearDraft } from "./scoreDraft";
+import { readDraft } from "./draftStore";
+
+function Section({ title, caption, children }) {
+  return (
+    <Box>
+      <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1.5 }}>
+        <Typography variant="h2">{title}</Typography>
+        {caption && <Typography variant="body2">{caption}</Typography>}
+      </Stack>
+      {children}
+    </Box>
+  );
+}
 
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState(null);
 
   function openFor(card) {
-    console.log("Assignments.openFor called with", card);
     setSelected(card);
     setModalOpen(true);
   }
@@ -35,52 +60,120 @@ function Assignments() {
     setSelected(null);
   }
 
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [scheduleMeta, setScheduleMeta] = useState(null);
+  const [draft, setDraft] = useState(null);
   const [personalAssignments, setPersonalAssignments] = useState([]);
-  const [scoredTeamNames, setScoredTeamNames] = useState(() => new Set());
-  const [finalRoundScoredTeamNames, setFinalRoundScoredTeamNames] = useState(
-    () => new Set()
-  );
-  const [finalRoundState, setFinalRoundState] = useState({ active: false });
+  const [finalAssignments, setFinalAssignments] = useState([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  // scored teams are tracked by database id, never by name -- team names are
+  // not unique and would collide
+  const [scoredTeamIds, setScoredTeamIds] = useState(() => new Set());
+  const [finalRoundScoredTeamIds, setFinalRoundScoredTeamIds] = useState(() => new Set());
+  const [finalRoundActive, setFinalRoundActive] = useState(false);
   const [finalRoundLoading, setFinalRoundLoading] = useState(true);
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
-  async function handleGenerateClick() {
-    if (generated) return; // already generated once
-    try {
-      setGenerating(true);
-      const assignments = await getJudgeSchedule();
-      console.log("Generated schedule:", assignments);
-      setGenerated(true);
-    } catch (err) {
-      console.error("Error generating schedule:", err);
-    } finally {
-      setGenerating(false);
-    }
-  }
+  const { userTypes, userCredential } = useAuth();
+  const currentUserId = userCredential?.user?.uid;
+  const canManageSchedule = hasRole(userTypes, "admin");
+  const canViewAssignments = hasRole(userTypes, "judge");
 
-  async function handleActivateFinalRound() {
-    setTogglingFinalRound(true);
-    setFinalRoundError(null);
-    try {
-      await activateFinalRound();
-    } catch (err) {
-      console.error("Failed to activate final round:", err);
-      setFinalRoundError(err.message || "Failed to activate final round.");
-      alert(`Failed to activate final round: ${err.message}`);
-    } finally {
-      setTogglingFinalRound(false);
+  const { online, pendingCount, pendingTeamIds, syncing, retry } = useJudgingSync(
+    canViewAssignments ? currentUserId : null
+  );
+
+  const loadPersonalSchedule = useCallback(async () => {
+    if (!canViewAssignments) {
+      setLoadingAssignments(false);
+      return;
     }
-  }
+    try {
+      setLoadingAssignments(true);
+      const teams = await getPersonalSchedule();
+      setPersonalAssignments(teams ?? []);
+      setScoredTeamIds(await getMyScoredTeamIds((teams ?? []).map((t) => t.id)));
+    } catch (err) {
+      console.error("Error fetching personal schedule:", err);
+      // silently showing "no assignments yet" for what is really a failed read
+      // sends a judge to find an organizer for a problem that is not theirs
+      setToast({
+        severity: "error",
+        message: "Could not load your assignments. Check your connection and reload.",
+      });
+    } finally {
+      setLoadingAssignments(false);
+    }
+  }, [canViewAssignments]);
+
+  useEffect(() => {
+    loadPersonalSchedule();
+  }, [loadPersonalSchedule]);
+
+  /**
+   * Pick up scores that synced in the background.
+   *
+   * `scoredTeamIds` is read once, when the assignments load. A card queued on
+   * the device and drained later therefore landed in the database without this
+   * component knowing: the card stopped being "Saved on device" and fell back
+   * to "Score team", inviting the judge to score the same team a second time
+   * and reading, to them, as though their work had been thrown away.
+   *
+   * The queue emptying is the signal, so that is what this watches.
+   */
+  const lastPending = useRef(0);
+  useEffect(() => {
+    const drained = lastPending.current > 0 && pendingCount === 0;
+    lastPending.current = pendingCount;
+    if (!drained || !canViewAssignments) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const firstRoundIds = personalAssignments.map((assignment) => assignment.id);
+        if (firstRoundIds.length) {
+          const scored = await getMyScoredTeamIds(firstRoundIds);
+          if (!cancelled) setScoredTeamIds(scored);
+        }
+
+        const finalIds = finalAssignments.map((team) => team.id);
+        if (finalIds.length) {
+          const scored = await getMyFinalRoundScoredTeamIds(finalIds);
+          if (!cancelled) setFinalRoundScoredTeamIds(scored);
+        }
+      } catch (error) {
+        // the card stays as it is; the next load will correct it
+        console.warn("Could not refresh scored teams after syncing:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingCount, canViewAssignments, personalAssignments, finalAssignments]);
+
+  useEffect(() => {
+    if (!canManageSchedule) return;
+    readScheduleMeta().then(setScheduleMeta).catch(() => setScheduleMeta(null));
+  }, [canManageSchedule]);
+
+  // A one-shot check, not a live subscription -- this button just needs to
+  // know whether a draft exists when the page loads, so a live draft is not
+  // invisible from the page an organizer starts on. readDraft() already
+  // returns null on any failure (including "no draft yet"), so no .catch is
+  // needed here.
+  useEffect(() => {
+    if (!canManageSchedule) return;
+    readDraft().then(setDraft);
+  }, [canManageSchedule]);
 
   async function handleDeactivateFinalRound() {
-    const confirmed = window.confirm(
-      "Deactivate final round judging? This will hide final-round assignments until reactivated."
-    );
-    if (!confirmed) return;
+    setDeactivateConfirmOpen(true);
+  }
 
+  async function confirmDeactivateFinalRound() {
+    setDeactivateConfirmOpen(false);
     setTogglingFinalRound(true);
     setFinalRoundError(null);
     try {
@@ -88,276 +181,312 @@ function Assignments() {
     } catch (err) {
       console.error("Failed to deactivate final round:", err);
       setFinalRoundError(err.message || "Failed to deactivate final round.");
-      alert(`Failed to deactivate final round: ${err.message}`);
     } finally {
       setTogglingFinalRound(false);
     }
   }
 
-  useEffect(() => {
-    async function fetchPersonal() {
-      try {
-        const teams = await getPersonalSchedule();
-        console.log("Personal assignments for judge", teams);
-        setPersonalAssignments(teams || []);
-        if (teams?.length) {
-          const scoredMap = await getMyScoredTeamsByName(teams);
-          setScoredTeamNames(new Set(Object.keys(scoredMap)));
-        } else {
-          setScoredTeamNames(new Set());
-        }
-      } catch (err) {
-        console.error("Error fetching personal schedule:", err);
-      }
-    }
-
-    fetchPersonal();
-  }, []);
-
   async function handleSubmit(scores) {
+    if (submitting) return;
     try {
-      // selected has teamName/room/time from ScheduleCard
+      setSubmitting(true);
+
       const teamName = selected?.teamName;
       if (!teamName) throw new Error("No team selected");
 
-      // if you already submitted a score, don't allow to resubmit
-      const isFinalRound = selected?.round === "final";
+      const round = selected?.round === FINAL_ROUND ? FINAL_ROUND : FIRST_ROUND;
+      const isFinalRound = round === FINAL_ROUND;
 
-      if (!isFinalRound && scoredTeamNames.has(teamName)) {
-        alert(`You already submitted a score for ${teamName}`);
-        return;
-      }
-      if (isFinalRound && finalRoundScoredTeamNames.has(teamName)) {
-        alert(`You already submitted a final round score for ${teamName}`);
-        return;
-      }
-
-      // find the teamId
-      const teamId =
-        selected?.teamId ?? (await findTeamIdByName(teamName));
+      // schedules written before assignments carried an id fall back to a name
+      // lookup, which is why duplicate team names are worth avoiding
+      const teamId = selected?.teamId ?? (await findTeamIdByName(teamName));
       if (!teamId) {
-        alert(`Could not find teamId for "${teamName}"`);
+        setToast({ severity: "error", message: `Could not find "${teamName}" in the database.` });
         return;
       }
 
-      // write the score
-      if (isFinalRound) {
-        await writeFinalRoundScore({ teamId, teamName, score: scores });
-      } else {
-        await writeTeamScore({ teamId, teamName, score: scores });
-      }
+      const result = await submitScore({ round, teamId, teamName, score: scores });
 
-      // update scored keys
-      if (isFinalRound) {
-        setFinalRoundScoredTeamNames((prev) => {
-          const copy = new Set(prev);
-          copy.add(teamName);
-          return copy;
-        });
+      // the outbox owns the card either way now, so the draft has done its job
+      if (currentUserId) clearDraft({ round, teamId, judgeUid: currentUserId });
+
+      const record = isFinalRound ? setFinalRoundScoredTeamIds : setScoredTeamIds;
+      if (result.status === "saved") {
+        record((prev) => new Set(prev).add(teamId));
+        setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
       } else {
-        setScoredTeamNames((prev) => {
-          const copy = new Set(prev);
-          copy.add(teamName);
-          return copy;
+        setToast({
+          severity: "warning",
+          message: `No connection. ${teamName}'s score is saved on this device and will send itself when you are back online.`,
         });
       }
-
-      alert(`Submitted scores for ${teamName}`);
+      closeModal();
     } catch (e) {
       console.error(e);
-      alert(`Failed to submit score: ${e.message}`);
+      setToast({ severity: "error", message: `Could not submit: ${e.message}` });
     } finally {
-      closeModal();
+      setSubmitting(false);
     }
   }
 
   useEffect(() => {
-    const unsubscribe = subscribeToFinalRoundState((state) => {
-      setFinalRoundState(state || { active: false });
+    const unsubscribe = subscribeToFinalRoundActive((state) => {
+      setFinalRoundActive(Boolean(state?.active));
       setFinalRoundLoading(false);
       setFinalRoundError(state?.error ?? null);
     });
     return () => unsubscribe();
   }, []);
 
-  const finalRoundTeams = useMemo(() => {
-    if (!finalRoundState?.active || !finalRoundState?.teams) return [];
-    return Object.entries(finalRoundState.teams).map(([teamId, details]) => ({
-      teamId,
-      name: details?.name ?? "Unnamed Team",
-      averageScore: details?.averageScore ?? null,
-      excludedJudges: details?.excludedJudges ?? {},
-      room: details?.room ?? "TBD",
-      timeslot: details?.timeslot ?? "TBD",
-    }));
-  }, [finalRoundState]);
-
-  const { userTypes, userCredential } = useAuth();
-  const currentUserId = userCredential?.user?.uid;
-  const userRoles = Array.isArray(userTypes) ? userTypes : [];
-  const canManageSchedule = userRoles.includes("admin");
-  const canViewAssignments = userRoles.includes("judge");
-
-  const finalAssignmentsForJudge = useMemo(() => {
-    if (!finalRoundTeams.length || !currentUserId) return [];
-    return finalRoundTeams.filter(
-      (team) => !team.excludedJudges?.[currentUserId]
-    );
-  }, [finalRoundTeams, currentUserId]);
-
-  const finalRoundTeamNamesForJudge = useMemo(() => {
-    return finalAssignmentsForJudge
-      .map((team) => team.name)
-      .filter((name) => Boolean(name));
-  }, [finalAssignmentsForJudge]);
-
+  // The judge's finalists come from their own record. Deriving them in the
+  // browser from /finalRound only worked because every judge could read the
+  // standings -- team names and average scores -- before they were announced.
   useEffect(() => {
-    async function fetchFinalRoundScores() {
-      try {
-        if (!finalRoundState?.active || finalRoundTeamNamesForJudge.length === 0) {
-          setFinalRoundScoredTeamNames(new Set());
-          return;
+    let cancelled = false;
+    async function load() {
+      if (!finalRoundActive || !canViewAssignments) {
+        if (!cancelled) {
+          setFinalAssignments([]);
+          setFinalRoundScoredTeamIds(new Set());
         }
-        const scoredMap = await getMyFinalRoundScoredTeamsByName(
-          finalRoundTeamNamesForJudge
-        );
-        const keys = scoredMap ? Object.keys(scoredMap) : [];
-        setFinalRoundScoredTeamNames(new Set(keys));
+        return;
+      }
+      try {
+        const teams = await getFinalRoundSchedule();
+        if (cancelled) return;
+        setFinalAssignments(teams);
+        const scored = await getMyFinalRoundScoredTeamIds(teams.map((t) => t.id));
+        if (!cancelled) setFinalRoundScoredTeamIds(scored);
       } catch (err) {
-        console.error("Error fetching final round scores:", err);
+        console.error("Error fetching final round assignments:", err);
       }
     }
-
-    fetchFinalRoundScores();
-  }, [finalRoundState?.active, finalRoundTeamNamesForJudge]);
-
-  const finalRoundAssignments = finalAssignmentsForJudge.map((team) => {
-    return {
-      teamId: team.teamId,
-      teamName: team.name,
-      room: team.room,
-      time: team.timeslot,
+    load();
+    return () => {
+      cancelled = true;
     };
-  });
+  }, [finalRoundActive, canViewAssignments]);
+
+  const remaining = useMemo(
+    () =>
+      personalAssignments.filter(
+        (a) => !scoredTeamIds.has(a.id) && !pendingTeamIds.has(a.id)
+      ).length,
+    [personalAssignments, scoredTeamIds, pendingTeamIds]
+  );
+
+  const draftTarget = useMemo(() => {
+    if (!selected?.teamId || !currentUserId) return null;
+    return {
+      round: selected.round === FINAL_ROUND ? FINAL_ROUND : FIRST_ROUND,
+      teamId: selected.teamId,
+      judgeUid: currentUserId,
+    };
+  }, [selected, currentUserId]);
+
+  // An unpublished draft takes priority over scheduleMeta -- otherwise a
+  // live draft is invisible from the page an organizer starts on, and
+  // "Plan a new schedule" reads as an invitation to lose it.
+  const scheduleButtonLabel = draft
+    ? `Resume draft (${draft.edits?.length ?? 0} edit${(draft.edits?.length ?? 0) === 1 ? "" : "s"})`
+    : scheduleMeta?.generatedAt
+      ? "Plan a new schedule"
+      : "Plan schedule";
 
   return (
-    <Layout>
-      <div className="judging-page">
-        <h1>Judge Assignments</h1>
+    <Layout maxWidth="lg">
+      <Stack spacing={3}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          spacing={1}
+        >
+          <Typography variant="h1">Judging</Typography>
+          {canViewAssignments && personalAssignments.length > 0 && (
+            <Typography variant="body2">
+              {remaining === 0
+                ? "All teams scored"
+                : `${remaining} of ${personalAssignments.length} left to score`}
+            </Typography>
+          )}
+        </Stack>
+
+        {canViewAssignments && (pendingCount > 0 || !online) && (
+          <Alert
+            severity={pendingCount > 0 ? "warning" : "info"}
+            action={
+              pendingCount > 0 ? (
+                <Button color="inherit" size="small" onClick={retry} disabled={syncing}>
+                  {syncing ? "Sending…" : "Retry now"}
+                </Button>
+              ) : undefined
+            }
+          >
+            {pendingCount > 0
+              ? `${pendingCount} score${pendingCount === 1 ? "" : "s"} saved on this device and waiting to send. Keep this page open.`
+              : "You are offline. Scores will be saved on this device until the connection is back."}
+          </Alert>
+        )}
+
         {canManageSchedule && (
-          <>
-            <div className="assignments__admin-controls">
-              <GenerateSchedule
-                onButtonClick={handleGenerateClick}
-                disabled={generating || generated}
-              />
-              {finalRoundState?.active ? (
-                <>
-                  <button
-                    type="button"
-                    className="assignments__toggle-button assignments__toggle-button--disabled"
-                    disabled
-                  >
-                    Final Round Active
-                  </button>
-                  <button
-                    type="button"
-                    className="assignments__toggle-button assignments__toggle-button--danger"
-                    onClick={handleDeactivateFinalRound}
-                    disabled={togglingFinalRound || finalRoundLoading}
-                  >
-                    Deactivate Final Round
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="assignments__toggle-button"
-                  onClick={handleActivateFinalRound}
+          <Card sx={{ p: 2 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "stretch", sm: "center" }}
+            >
+              <Typography variant="h5" sx={{ flex: 1 }}>
+                Run of show
+              </Typography>
+              <Button variant="contained" component={Link} to="/user/admin/schedule">
+                {scheduleButtonLabel}
+              </Button>
+              {finalRoundActive ? (
+                <Button
+                  variant="outlined"
+                  onClick={handleDeactivateFinalRound}
                   disabled={togglingFinalRound || finalRoundLoading}
                 >
-                  Activate Final Round
-                </button>
+                  Deactivate final round
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  component={Link}
+                  to="/user/admin/schedule?round=final"
+                  disabled={togglingFinalRound || finalRoundLoading}
+                >
+                  Plan final round
+                </Button>
               )}
-            </div>
-            {finalRoundError && (
-              <p className="assignments__error">{finalRoundError}</p>
+            </Stack>
+
+            {(finalRoundError || finalRoundActive || scheduleMeta) && (
+              <Stack spacing={1} sx={{ mt: 2 }}>
+                {finalRoundActive && <Alert severity="info">Final round is active.</Alert>}
+                {scheduleMeta?.generatedAt && (
+                  <Typography variant="body2">
+                    Schedule generated {new Date(scheduleMeta.generatedAt).toLocaleString()}.
+                    Use Judging progress to move a single judge instead of rebuilding the plan.
+                  </Typography>
+                )}
+                {finalRoundError && <Alert severity="error">{finalRoundError}</Alert>}
+              </Stack>
             )}
-          </>
+          </Card>
         )}
+
         {canViewAssignments && (
           <>
-            <div className="assignments__section">
-              <h2 className="assignments__subheader">First Round</h2>
-              <div className="assignments__row">
-                {personalAssignments.length === 0 ? (
-                  <div>No assignments yet</div>
-                ) : (
-                  personalAssignments.map((assignment, idx) => (
-                    <ScheduleCard
-                      key={`${assignment.teamName}-${idx}`}
-                      teamName={assignment.teamName}
-                      room={assignment.room}
-                      time={assignment.time}
-                      onButtonClick={(card) => openFor({ ...card, round: "first" })}
-                      disabled={scoredTeamNames.has(assignment.teamName)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-            {finalRoundState?.active && (
+            <Section title="First round">
+              {loadingAssignments ? (
+                <Typography variant="body2">Loading your assignments…</Typography>
+              ) : personalAssignments.length === 0 ? (
+                <Card sx={{ p: 3 }}>
+                  <Typography variant="body2" align="center">
+                    No assignments yet. They appear once an admin generates the schedule.
+                  </Typography>
+                </Card>
+              ) : (
+                <Grid container spacing={2}>
+                  {personalAssignments.map((assignment, idx) => (
+                    <Grid item xs={12} sm={6} md={4} key={assignment.id ?? `${assignment.teamName}-${idx}`}>
+                      <ScheduleCard
+                        teamId={assignment.id}
+                        teamName={assignment.teamName}
+                        room={assignment.room}
+                        time={assignment.time}
+                        onButtonClick={(card) => openFor({ ...card, round: FIRST_ROUND })}
+                        disabled={scoredTeamIds.has(assignment.id)}
+                        pending={pendingTeamIds.has(assignment.id)}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Section>
+
+            {finalRoundActive && (
               <>
-                <hr className="assignments__divider" />
-                <div className="assignments__section">
-                  <h2 className="assignments__subheader">Final Round</h2>
-                  <div className="assignments__row">
-                    {finalRoundAssignments.length === 0 ? (
-                      <div>No final round assignments for you.</div>
-                    ) : (
-                      finalRoundAssignments.map((assignment) => {
-                        const isFinalScored = finalRoundScoredTeamNames.has(
-                          assignment.teamName
-                        );
-                        return (
+                <Divider />
+                <Section title="Final round">
+                  {finalAssignments.length === 0 ? (
+                    <Card sx={{ p: 3 }}>
+                      <Typography variant="body2" align="center">
+                        No final round assignments for you.
+                      </Typography>
+                    </Card>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {finalAssignments.map((team) => (
+                        <Grid item xs={12} sm={6} md={4} key={`final-${team.id}`}>
                           <ScheduleCard
-                            key={`final-${assignment.teamName}`}
-                            teamName={assignment.teamName}
-                            room={assignment.room}
-                            time={assignment.time}
-                            disabled={isFinalScored}
-                            onButtonClick={(card) =>
-                              openFor({
-                                ...card,
-                                teamId: assignment.teamId,
-                                round: "final",
-                              })
-                            }
+                            teamId={team.id}
+                            teamName={team.teamName}
+                            room={team.room}
+                            time={team.timeslot ?? team.time}
+                            disabled={finalRoundScoredTeamIds.has(team.id)}
+                            pending={pendingTeamIds.has(team.id)}
+                            onButtonClick={(card) => openFor({ ...card, round: FINAL_ROUND })}
                           />
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  )}
+                </Section>
               </>
             )}
           </>
         )}
-        {!canViewAssignments && (
-          <p className="assignments__empty">
-            You do not have assigned judging duties.
-          </p>
+
+        {!canViewAssignments && !canManageSchedule && (
+          <Typography variant="body2">You do not have assigned judging duties.</Typography>
         )}
-        {modalOpen && selected && (
-          <ScoreSubmission
-            teamName={selected.teamName}
-            room={selected.room}
-            time={selected.time}
-            onClose={closeModal}
-            onSubmit={handleSubmit}
-          />
-        )}
-      </div>
+      </Stack>
+
+      {modalOpen && selected && (
+        <ScoreSubmission
+          teamName={selected.teamName}
+          room={selected.room}
+          time={selected.time}
+          submitting={submitting}
+          draftTarget={draftTarget}
+          isOverwrite={
+            selected.round === FINAL_ROUND
+              ? finalRoundScoredTeamIds.has(selected.teamId)
+              : scoredTeamIds.has(selected.teamId)
+          }
+          onClose={closeModal}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      <Snackbar
+        open={Boolean(toast)}
+        autoHideDuration={6000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        {toast ? (
+          <Alert severity={toast.severity} onClose={() => setToast(null)} variant="filled">
+            {toast.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
+
+      <ConfirmDialog
+        open={deactivateConfirmOpen}
+        title="Deactivate final round judging?"
+        consequences={[
+          "Assignments are withdrawn from every judge.",
+          "The standings are archived.",
+        ]}
+        confirmLabel="Deactivate"
+        onConfirm={confirmDeactivateFinalRound}
+        onCancel={() => setDeactivateConfirmOpen(false)}
+      />
+
     </Layout>
   );
 }

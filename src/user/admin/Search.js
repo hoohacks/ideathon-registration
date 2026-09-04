@@ -1,288 +1,221 @@
-import { onValue, ref, get, set } from "firebase/database";
+import { onValue, ref, update } from "firebase/database";
 import { database } from "../../firebase";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { styled } from "@mui/material/styles";
-
-import ProgressBar from "react-bootstrap/ProgressBar";
-import Button from "react-bootstrap/Button";
-import "bootstrap/dist/css/bootstrap.min.css";
-import Form from "react-bootstrap/Form";
+import {
+  Alert,
+  Button,
+  Chip,
+  Link,
+  MenuItem,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import Layout from "../Layout";
-
-function CheckedInProgressBar({ percent }) {
-  return (
-    <div style={{ marginBottom: "40px", marginInline: "10%" }}>
-      <ProgressBar
-        now={percent}
-        label={percent + "%"}
-        variant="danger"
-      ></ProgressBar>
-    </div>
-  );
-}
+import { PageHeader, FilterBar, SearchField, RowList, Row } from "./adminUi";
+import CompetitorEditDrawer from "./records/CompetitorEditDrawer";
 
 function Search() {
-  const [Query, setQuery] = useState("");
-  const [dietaryRestriction, setDietaryRestriction] = useState([]);
-  const [selectedDietaryRestriction, setSelectedDietaryRestriction] =
-    useState("");
-  // varun stuff
+  const [query, setQuery] = useState("");
+  const [checkedInFilter, setCheckedInFilter] = useState("");
+  const [dietaryFilter, setDietaryFilter] = useState("");
+  const [competitors, setCompetitors] = useState([]);
+  const [teams, setTeams] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const handleMetricsClick = () => {
-    window.location.href =
-      "https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay";
-  };
-
-  const [Data, setData] = useState({});
-  const [checkedInCount, setCheckedInCount] = useState(0);
-
-  //progress bar
-  const [showProgressBar, setShowProgressBar] = useState(false);
-  const percentCheckedIn = (
-    (checkedInCount / Object.keys(Data).length) *
-    100
-  ).toFixed(2);
-
-  // <button onclick="https://hoohacks.github.io/ideathon-registration/#/registeredAtDisplay">Metrics</button>
-
-  function toggleProgressBar(e) {
-    setShowProgressBar(e.target.checked);
-  }
+  const checkedInCount = competitors.filter((person) => person.checkedIn).length;
+  const percentCheckedIn = competitors.length
+    ? (checkedInCount / competitors.length) * 100
+    : 0;
 
   useEffect(() => {
-    onValue(ref(database, "/competitors/"), (snapshot) => {
+    const unsubscribe = onValue(ref(database, "/competitors/"), (snapshot) => {
       const data = snapshot.val();
-      if (data) {
-        const newData = {};
-        let newCheckedInCount = 0;
-
-        for (const key in data) {
-          if (data.hasOwnProperty(key)) {
-            const entry = data[key];
-
-            const {
-              firstName,
-              lastName,
-              email,
-              dietaryRestriction,
-              resume,
-              checkedIn,
-            } = entry;
-            const fullName = `${firstName} ${lastName}`;
-
-            if (key != null) {
-              if (!newData[key]) {
-                newData[key] = [];
-                newData[key].push({
-                  fullName,
-                  email,
-                  dietaryRestriction,
-                  resume,
-                  checkedIn,
-                });
-
-                if (checkedIn) {
-                  newCheckedInCount++;
-                }
-              }
-            }
-          }
-        }
-
-        // Set the newData object as the state
-        setData(newData);
-        setCheckedInCount(newCheckedInCount);
-      }
+      setCompetitors(
+        data ? Object.entries(data).map(([id, details]) => ({ id, ...details })) : []
+      );
     });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleCheckIn = (key) => {
-    // Get a reference to the participant's check-in status in Firebase
-    const participantRef = ref(database, "/competitors/" + key);
+  // the edit drawer offers a team move, which needs the list of teams to move to
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, "/teams/"), (snapshot) =>
+      setTeams(snapshot.val() ?? {})
+    );
+    return () => unsubscribe();
+  }, []);
 
-    // Use the set function to update the check-in status
-    get(participantRef).then((snapshot) => {
-      const personData = snapshot.val() || false;
-      if (personData == false) {
-        return;
-      }
-
-      personData.checkedIn = !personData.checkedIn;
-
-      set(participantRef, personData);
+  const handleCheckIn = (person) => {
+    // a targeted update rather than writing the whole record back, which would
+    // clobber anything the competitor changed since this page loaded
+    update(ref(database, `/competitors/${person.id}`), {
+      checkedIn: !person.checkedIn,
     });
   };
 
-  const filteredResults = Object.keys(Data).filter((key) => {
-    const personData = Data[key];
-    const fullName = personData[0].fullName.toString();
-    const email = personData[0].email; // Get email from the person's data
+  const dietaryOptions = useMemo(() => {
+    const values = new Set(
+      competitors.map((person) => person.dietaryRestriction).filter(Boolean)
+    );
+    return [...values].sort();
+  }, [competitors]);
 
-    const matchesQuery =
-      fullName.toLowerCase().includes(Query.toLowerCase()) ||
-      (email && email.toLowerCase().includes(Query.toLowerCase()));
+  const results = useMemo(() => {
+    const needle = query.toLowerCase();
+    return competitors
+      .filter((person) => {
+        const fullName = `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim();
+        const matchesQuery =
+          fullName.toLowerCase().includes(needle) ||
+          (person.email ?? "").toLowerCase().includes(needle);
 
-    return matchesQuery;
-  });
+        const matchesCheckedIn =
+          checkedInFilter === "" ||
+          String(Boolean(person.checkedIn)) === checkedInFilter;
+
+        const matchesDietary =
+          dietaryFilter === "" || person.dietaryRestriction === dietaryFilter;
+
+        return matchesQuery && matchesCheckedIn && matchesDietary;
+      })
+      .sort((a, b) =>
+        `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
+          `${b.firstName ?? ""} ${b.lastName ?? ""}`
+        )
+      );
+  }, [competitors, query, checkedInFilter, dietaryFilter]);
 
   return (
-    <Layout>
-      <button
-        onClick={handleMetricsClick}
-        style={{
-          position: "fixed",
-          border: "1px solid white",
-          top: "20px",
-          left: "20px",
-          borderRadius: "12px",
-          backgroundColor: "#34a0a4",
-          color: "white",
-          zIndex: 1000,
-        }}
-      >
-        Metrics
-      </button>
-      <h1 className="label" style={{ fontSize: "48px", textAlign: "center" }}>
-        Ideathon Admin Dashboard
-      </h1>
-      <p style={{ fontSize: "24px", textAlign: "center" }}>
-        Total Signed-Up: {Object.keys(Data).length} | Checked In:{" "}
-        {checkedInCount} | Percentage: {percentCheckedIn}%
-        <Form.Check // prettier-ignore
-          inline
-          style={{ fontSize: "15px", marginLeft: "30px" }}
-          type="switch"
-          id="custom-switch"
-          label="Show Progress Bar"
-          onChange={(e) => toggleProgressBar(e)}
-        />
-      </p>
-      {showProgressBar && (
-        <CheckedInProgressBar
-          percent={percentCheckedIn}
-        ></CheckedInProgressBar>
-      )}
-      <h2 style={{ fontSize: "24px", textAlign: "center" }}>Name and Emails</h2>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "20px",
-        }}
-      >
-        {/* Search input */}
-        <input
-          type="text"
-          placeholder="Search by name or email"
-          value={Query}
+    <Layout maxWidth="lg">
+      <PageHeader
+        title="Competitors"
+        progress={percentCheckedIn}
+        stats={[
+          { label: "registered", value: competitors.length },
+          { label: "checked in", value: checkedInCount },
+          { label: "of registrants", value: `${percentCheckedIn.toFixed(0)}%` },
+        ]}
+      />
+
+      <FilterBar>
+        <SearchField
+          placeholder="Search name or email"
+          value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
         />
-        <select
-          value={selectedDietaryRestriction}
-          onChange={(e) => setSelectedDietaryRestriction(e.target.value)}
-          style={{
-            width: "300px",
-            height: "40px",
-            fontSize: "16px",
-          }}
+        <TextField
+          select
+          label="Check-in"
+          value={checkedInFilter}
+          onChange={(e) => setCheckedInFilter(e.target.value)}
+          sx={{ minWidth: 160 }}
         >
-          <option value="true">Checked In</option>
-          <option value="false">Not Checked In</option>
-          <option value="">No Filter</option>
-          <option value="vegetarian">Vegetarian</option>
-          <option value="gluten-free">Gluten-free</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "20px",
-        }}
-      >
-        {filteredResults.map((key, index) => {
-          const personData = Data[key]; // Access the data associated with the key(hash)
+          <MenuItem value="">Everyone</MenuItem>
+          <MenuItem value="true">Checked in</MenuItem>
+          <MenuItem value="false">Not checked in</MenuItem>
+        </TextField>
+        <TextField
+          select
+          label="Dietary"
+          value={dietaryFilter}
+          onChange={(e) => setDietaryFilter(e.target.value)}
+          sx={{ minWidth: 170 }}
+        >
+          <MenuItem value="">Any</MenuItem>
+          {dietaryOptions.map((option) => (
+            <MenuItem key={option} value={option} sx={{ textTransform: "capitalize" }}>
+              {option}
+            </MenuItem>
+          ))}
+        </TextField>
+      </FilterBar>
 
-          const dietaryRestrictionValue = personData[0].dietaryRestriction; // Get dietaryRestriction from the person's data
-          const fullName = personData[0].fullName.toString();
+      <RowList empty="No competitors match those filters.">
+        {results.map((person) => {
+          const fullName =
+            `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() ||
+            "Unnamed competitor";
+          const isCheckedIn = Boolean(person.checkedIn);
 
-          const isCheckedIn = personData[0].checkedIn;
-          const checkedInString = String(personData[0].checkedIn);
-
-          if (
-            !selectedDietaryRestriction ||
-            (dietaryRestrictionValue &&
-              dietaryRestrictionValue.includes(selectedDietaryRestriction)) ||
-            (checkedInString &&
-              checkedInString.includes(selectedDietaryRestriction))
-          ) {
-            return (
-              <div>
-                <div
-                  key={index}
-                  style={{
-                    borderRadius: "15px",
-                    border: isCheckedIn ? "1px solid #34a0a4" : "1px solid #ccc",
-                    padding: "30px",
-                  }}
-
-                //onMouseEnter={(e) => { e.target.style.transform = "scale(1.05)"; }} // Enlarge on hover
-                //onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }} // Return to the original size
-                >
-                  <p
-                    className="label"
-                    style={{ fontSize: "24px", fontWeight: "bold" }}
-                  >
-                    {fullName}
-                  </p>
-
-                  <p>{dietaryRestrictionValue}</p>
-                  <p>{personData[0].email}</p>
-                  {personData.map((data, dataIndex) => (
-                    <div key={dataIndex}>
-                      {data.resume ? (
-                        <p>
-                          <a
-                            href={data.resume}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          // style={{ color: "#89c2d9" }}
-                          >
-                            {fullName} resume
-                          </a>
-                        </p>
-                      ) : null}
-                      <Button
-                        onClick={() => handleCheckIn(key)}
-                        style={{
-                          borderRadius: "12px",
-                          backgroundColor: isCheckedIn
-                            ? "#34a0a4"
-                            : "#2a6f97",
-                          color: "white",
-                        }}
+          return (
+            <Row key={person.id} accent={isCheckedIn}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                spacing={1}
+              >
+                <Stack sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                    {person.dietaryRestriction && person.dietaryRestriction !== "none" && (
+                      <Chip
+                        label={person.dietaryRestriction}
+                        size="small"
+                        variant="outlined"
+                        sx={{ textTransform: "capitalize" }}
+                      />
+                    )}
+                    {person.foodCheckIn && (
+                      <Chip label="got food" size="small" variant="outlined" />
+                    )}
+                  </Stack>
+                  <Stack direction="row" spacing={1.5} alignItems="baseline" flexWrap="wrap">
+                    <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
+                      {person.email}
+                    </Typography>
+                    {person.resume && person.resume !== "none" && (
+                      <Link
+                        href={person.resume}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="body2"
                       >
-                        {isCheckedIn ? "Checked In" : "Check In"}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          } else {
-            return null; // Do not render if the dietary restriction does not match
-          }
+                        Resume
+                      </Link>
+                    )}
+                  </Stack>
+                </Stack>
+
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" onClick={() => setEditing(person)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={isCheckedIn ? "contained" : "outlined"}
+                    onClick={() => handleCheckIn(person)}
+                    sx={{ minWidth: 116 }}
+                  >
+                    {isCheckedIn ? "Checked in" : "Check in"}
+                  </Button>
+                </Stack>
+              </Stack>
+            </Row>
+          );
         })}
-      </div>
+      </RowList>
+
+      {editing && (
+        <CompetitorEditDrawer
+          person={editing}
+          teams={teams}
+          onClose={() => setEditing(null)}
+          onResult={(result, message) =>
+            setToast(result?.ok
+              ? { severity: "success", message }
+              : { severity: "error", message: result?.error ?? "Something went wrong." })}
+        />
+      )}
+
+      <Snackbar open={Boolean(toast)} autoHideDuration={6000} onClose={() => setToast(null)}>
+        {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.message}</Alert> : undefined}
+      </Snackbar>
     </Layout>
   );
 }
