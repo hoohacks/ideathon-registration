@@ -16,6 +16,7 @@ import {
   EVENT,
   EVENT_START,
   EVENT_TIME_ZONE,
+  eventPhase,
   eventLocalToInstant,
   instantToEventLocal,
 } from "./eventInfo";
@@ -79,4 +80,39 @@ describe("instant to wall clock", () => {
 
 test("the zone is named once and used everywhere", () => {
   expect(EVENT_TIME_ZONE).toBe("America/New_York");
+});
+
+/**
+ * "In progress" is a claim about right now, and it was made by the countdown
+ * simply having run out -- which is true from 10am on the day until the heat
+ * death of the site. By November the home page was telling people the event was
+ * currently happening.
+ */
+describe("which part of the day it is", () => {
+  const start = new Date(EVENT_START);
+  const at = (offsetMs) => new Date(start.getTime() + offsetMs);
+  const HOUR = 60 * 60 * 1000;
+
+  test("before it starts", () => {
+    expect(eventPhase(start, at(-1))).toBe("before");
+    expect(eventPhase(start, at(-30 * 24 * HOUR))).toBe("before");
+  });
+
+  test("while it is running", () => {
+    expect(eventPhase(start, at(0))).toBe("during");
+    expect(eventPhase(start, at(5 * HOUR))).toBe("during");
+    // judging ends at 7pm, nine hours in
+    expect(eventPhase(start, at(9 * HOUR - 1))).toBe("during");
+  });
+
+  test("once it is over, and it stays over", () => {
+    expect(eventPhase(start, at(9 * HOUR))).toBe("after");
+    expect(eventPhase(start, at(24 * HOUR))).toBe("after");
+    expect(eventPhase(start, at(365 * 24 * HOUR))).toBe("after");
+  });
+
+  test("an unreadable start reads as before, not as happening now", () => {
+    expect(eventPhase("not a date", start)).toBe("before");
+    expect(eventPhase(null, start)).toBe("before");
+  });
 });

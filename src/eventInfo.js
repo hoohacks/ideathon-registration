@@ -29,6 +29,33 @@ export const EVENT_START = "2026-10-18T10:00:00-04:00";
 
 const start = new Date(EVENT_START);
 
+/**
+ * How long the day runs, so "in progress" can stop being true.
+ *
+ * The countdown showed a live "In progress" badge for any start time in the
+ * past -- which is every moment after 10am on the day, for ever. The site is up
+ * all year, so by November it was telling people the event was happening.
+ *
+ * A duration rather than an end instant, because config/eventStart can move the
+ * start without a deploy and an absolute end would be left behind.
+ */
+export const EVENT_DURATION_MS = 9 * 60 * 60 * 1000; // 10:00 to 19:00
+
+/**
+ * "before" | "during" | "after", for a given start and clock.
+ *
+ * Pure, and takes `now`, so the three states are testable without waiting for
+ * October.
+ */
+export function eventPhase(start, now = new Date()) {
+  const startedAt = start instanceof Date ? start : new Date(String(start ?? ""));
+  if (Number.isNaN(startedAt.getTime())) return "before";
+
+  const elapsed = now.getTime() - startedAt.getTime();
+  if (elapsed < 0) return "before";
+  return elapsed < EVENT_DURATION_MS ? "during" : "after";
+}
+
 /** The offset the event's zone is at around a given instant, as "-04:00". */
 function zoneOffsetAt(instant) {
   try {

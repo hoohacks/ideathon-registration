@@ -7,7 +7,7 @@ import AdminHome from "./admin/AdminHome";
 import { Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { ref, onValue } from "firebase/database";
 import { database } from "../firebase";
-import { EVENT, EVENT_START } from "../eventInfo";
+import { EVENT, EVENT_START, eventPhase } from "../eventInfo";
 import { tokens } from "../theme";
 
 function differenceToTime(target) {
@@ -96,9 +96,15 @@ function Home() {
         return () => unsubscribe();
     }, []);
 
+    const [phase, setPhase] = useState(() => eventPhase(eventStart));
+
     useEffect(() => {
-        setTime(differenceToTime(eventStart));
-        const interval = setInterval(() => setTime(differenceToTime(eventStart)), 1000);
+        const tick = () => {
+            setTime(differenceToTime(eventStart));
+            setPhase(eventPhase(eventStart));
+        };
+        tick();
+        const interval = setInterval(tick, 1000);
         return () => clearInterval(interval);
     }, [eventStart]);
 
@@ -220,24 +226,32 @@ function Home() {
                             </>
                         ) : (
                             <Stack spacing={0.75} alignItems="center">
-                                {/* the only place the brand colour appears in the
-                                    interface: something is genuinely happening */}
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <Box
-                                        sx={{
-                                            width: 7,
-                                            height: 7,
-                                            borderRadius: "50%",
-                                            bgcolor: "secondary.main",
-                                        }}
-                                    />
-                                    <Typography variant="overline" sx={{ color: "secondary.main" }}>
-                                        In progress
-                                    </Typography>
-                                </Stack>
+                                {/* The badge is a claim, so it is only made while it is
+                                    true. The countdown reaching zero used to be the only
+                                    condition, which meant the site said the event was
+                                    happening every day after it for the rest of the year. */}
+                                {phase === "during" && (
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        {/* the only place the brand colour appears in the
+                                            interface: something is genuinely happening */}
+                                        <Box
+                                            sx={{
+                                                width: 7,
+                                                height: 7,
+                                                borderRadius: "50%",
+                                                bgcolor: "secondary.main",
+                                            }}
+                                        />
+                                        <Typography variant="overline" sx={{ color: "secondary.main" }}>
+                                            In progress
+                                        </Typography>
+                                    </Stack>
+                                )}
                                 <Typography variant="h2">{EVENT.name} {EVENT.year}</Typography>
                                 <Typography variant="body2">
-                                    {EVENT.hours} · {EVENT.venue}
+                                    {phase === "during"
+                                        ? `${EVENT.hours} · ${EVENT.venue}`
+                                        : `${EVENT.dateLabel} · ${EVENT.venue}`}
                                 </Typography>
                             </Stack>
                         )}
