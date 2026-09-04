@@ -104,8 +104,8 @@ export const EVENT = {
     month: "long",
     day: "numeric",
   }),
-  hours: "10:00 AM â€“ 7:00 PM",
-  judgingHours: "5:00 PM â€“ 7:00 PM",
+  hours: "10:00 AM – 7:00 PM",
+  judgingHours: "5:00 PM – 7:00 PM",
   venue: "Rice Hall",
   siteUrl: "https://ideathon.hoohacks.io",
 };

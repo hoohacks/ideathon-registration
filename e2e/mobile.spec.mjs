@@ -145,6 +145,38 @@ test("the public forms fit a phone, since that is how most people register", asy
 });
 
 /**
+ * Focusing a field must not hide it under the submit bar.
+ *
+ * The bar is pinned to the bottom 86 pixels of the screen on a phone, and the
+ * browser scrolls a focused field only just far enough to be "in view" -- which
+ * put the password field squarely underneath it, at the moment the keyboard
+ * came up. The person was then typing into something they could not see, on the
+ * form the whole event depends on.
+ */
+test("a focused field is never hidden behind the pinned submit bar", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Student registration")).toBeVisible();
+
+  for (const label of [/Password/, /Email address/, /Major or intended major/]) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByLabel(label).focus();
+
+    const covered = await page.evaluate(() => {
+      const bar = [...document.querySelectorAll("*")].find(
+        (el) =>
+          getComputedStyle(el).position === "sticky" && el.querySelector('button[type="submit"]')
+      );
+      if (!bar) return null;
+      const field = document.activeElement.getBoundingClientRect();
+      const pinned = bar.getBoundingClientRect();
+      return field.bottom > pinned.top && field.top < pinned.bottom;
+    });
+
+    expect(covered, `${label} sits under the submit bar once focused`).toBe(false);
+  }
+});
+
+/**
  * The room sheets are built for paper, but an organizer checking a room reads
  * them off a phone. Five columns cannot shrink below their content, so the
  * table used to carry the whole page sideways with it.
