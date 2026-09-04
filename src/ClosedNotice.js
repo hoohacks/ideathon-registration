@@ -34,8 +34,7 @@ export default function ClosedNotice({ what = "Registration" }) {
         </Stack>
 
         <Typography variant="body2" sx={{ mt: 3 }}>
-          Already registered, or here to help run it?{" "}
-          <Link href="#/login?staff">Sign in</Link>.
+          Organizers can <Link href="#/login?staff">sign in</Link>.
         </Typography>
       </Box>
     </PublicShell>
