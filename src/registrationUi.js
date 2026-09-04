@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import Nav from "./siteNav";
 import PageFooter from "./siteFooter";
+import { pageMinHeight } from "./theme";
 
 /**
  * The frame both public registration pages sit in.
@@ -301,7 +302,7 @@ export function PublicShell({ children, maxWidth = "lg", pad = false }) {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        ...pageMinHeight,
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
