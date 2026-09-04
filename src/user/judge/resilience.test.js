@@ -239,3 +239,76 @@ describe("localStore never throws", () => {
     setItem.mockRestore();
   });
 });
+
+/**
+ * Two things that only go wrong when the flush and the judge overlap.
+ *
+ * The judging screen drains the outbox on mount and again on the rising edge of
+ * `.info/connected`, which lands milliseconds later — so two flushes running at
+ * once is the ordinary case, not a rare one. Both bugs below were reachable
+ * with nothing more exotic than a judge correcting a card on a bad network.
+ */
+describe("a flush racing the judge", () => {
+  test("a card re-submitted mid-flush is not thrown away", async () => {
+    enqueue(entry({ score: { ...card, problem: 1 } }));
+
+    let land;
+    const write = jest.fn(() => new Promise((resolve) => { land = resolve; }));
+
+    const flush = flushPending(write, { judgeUid: "judge-1" });
+    await Promise.resolve();
+
+    // the judge notices a mistake and submits again while the first write hangs
+    enqueue(entry({ score: { ...card, problem: 10 } }));
+    expect(listPending("judge-1")[0].score.problem).toBe(10);
+
+    land();
+    await flush;
+
+    // the entry id is stable per judge/team/round, so a flush that removed "the
+    // entry with this id" on success deleted the correction and left the stale
+    // card as the one that landed
+    const left = listPending("judge-1");
+    expect(left).toHaveLength(1);
+    expect(left[0].score.problem).toBe(10);
+  });
+
+  test("overlapping flushes send each card once, not twice", async () => {
+    enqueue(entry());
+
+    const settle = [];
+    const write = jest.fn(() => new Promise((resolve) => { settle.push(resolve); }));
+
+    const first = flushPending(write, { judgeUid: "judge-1" });
+    const second = flushPending(write, { judgeUid: "judge-1" });
+    await Promise.resolve();
+
+    settle.forEach((resolve) => resolve());
+    await Promise.all([first, second]);
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(listPending("judge-1")).toHaveLength(0);
+  });
+
+  test("a card queued during a flush is still sent by the run behind it", async () => {
+    enqueue(entry());
+
+    const settle = [];
+    const write = jest.fn(() => new Promise((resolve) => { settle.push(resolve); }));
+
+    const first = flushPending(write, { judgeUid: "judge-1" });
+    await Promise.resolve();
+
+    // arrives too late for the running flush, which already took its snapshot
+    enqueue(entry({ teamId: "team-2" }));
+    const second = flushPending(write, { judgeUid: "judge-1" });
+
+    for (let tick = 0; tick < 6; tick += 1) {
+      settle.forEach((resolve) => resolve());
+      await Promise.resolve();
+    }
+    await Promise.all([first, second]);
+
+    expect(listPending("judge-1")).toHaveLength(0);
+  });
+});

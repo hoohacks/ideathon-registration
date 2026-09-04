@@ -28,6 +28,8 @@ export const SUBMIT_TIMEOUT_MS = 8000;
 
 const listeners = new Set();
 
+let revisionCounter = 0;
+
 function notify() {
   for (const listener of listeners) {
     try {
@@ -86,6 +88,18 @@ export function enqueue({ round, teamId, teamName, judgeUid, score }) {
 
   rest.push({
     id: `${round}:${teamId}:${judgeUid}`,
+    // Which version of this card it is.
+    //
+    // The id is stable per judge/team/round, on purpose -- re-submitting
+    // replaces rather than stacks. That is also how a card gets thrown away: a
+    // flush that is still waiting on the network for version one would remove
+    // "the entry with this id" on success, and by then the entry with that id
+    // is version two. The judge's correction disappeared and the stale card
+    // landed, which is the exact failure this whole module exists to prevent.
+    //
+    // The counter is here because two submissions inside one millisecond are
+    // entirely possible on a double tap.
+    revision: `${Date.now()}-${(revisionCounter += 1)}`,
     round,
     teamId,
     teamName,
@@ -104,6 +118,20 @@ export function removeEntry(id) {
 }
 
 /**
+ * Drop a card only if it is still the one that was sent.
+ *
+ * If the judge re-submitted while the write was in the air, the queued entry is
+ * a newer card wearing the same id, and it has to stay -- the write that just
+ * landed was the old one.
+ */
+function removeIfCurrent(sent) {
+  const all = readAll();
+  const stored = all.find((entry) => entry.id === sent.id);
+  if (stored && stored.revision !== sent.revision) return;
+  writeAll(all.filter((entry) => entry.id !== sent.id));
+}
+
+/**
  * Try to send everything queued.
  *
  * `write` is called as write({ round, teamId, teamName, judgeUid, score }) and
@@ -114,7 +142,24 @@ export function removeEntry(id) {
  * Re-sending a card that actually did land is harmless: the write is keyed by
  * judge and team, so it overwrites itself with identical values.
  */
-export async function flushPending(write, { judgeUid } = {}) {
+export function flushPending(write, options = {}) {
+  // Overlapping flushes are the normal case, not a rare one: the judging screen
+  // drains once on mount and again on the rising edge of `.info/connected`,
+  // which arrives milliseconds later. Both would walk the same queue and send
+  // every card twice, on the network that was already failing.
+  //
+  // Chained rather than dropped, so a card queued while a flush is running is
+  // still sent by the run behind it instead of waiting for a trigger that may
+  // never come.
+  const run = () => flushQueue(write, options);
+  const next = chain ? chain.then(run, run) : run();
+  chain = next.catch(() => {});
+  return next;
+}
+
+let chain = null;
+
+async function flushQueue(write, { judgeUid } = {}) {
   const queue = listPending(judgeUid);
   if (!queue.length) return { synced: 0, failed: 0 };
 
@@ -124,7 +169,7 @@ export async function flushPending(write, { judgeUid } = {}) {
   for (const entry of queue) {
     try {
       await write(entry);
-      removeEntry(entry.id);
+      removeIfCurrent(entry);
       synced += 1;
     } catch (error) {
       failed += 1;
