@@ -44,7 +44,6 @@ export default function PrintableSchedule() {
       <Stack
         className="no-print"
         direction="row"
-        spacing={1}
         alignItems="center"
         sx={{ mb: 3, flexWrap: "wrap", gap: 1 }}
       >

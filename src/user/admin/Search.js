@@ -151,7 +151,7 @@ function Search() {
                 spacing={1}
               >
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Stack sx={{ gap: 1 }} direction="row" alignItems="center" flexWrap="wrap">
                     <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
                     {person.dietaryRestriction && person.dietaryRestriction !== "none" && (
                       <Chip
@@ -165,7 +165,7 @@ function Search() {
                       <Chip label="got food" size="small" variant="outlined" />
                     )}
                   </Stack>
-                  <Stack direction="row" spacing={1.5} alignItems="baseline" flexWrap="wrap">
+                  <Stack sx={{ gap: 1.5 }} direction="row" alignItems="baseline" flexWrap="wrap">
                     <Typography variant="body2" sx={{ wordBreak: "break-all" }}>
                       {person.email}
                     </Typography>

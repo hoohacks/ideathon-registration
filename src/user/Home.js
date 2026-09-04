@@ -74,7 +74,7 @@ function NextStep({ label, title, body, actions }) {
                 <Typography variant="body2" sx={{ mb: 2 }}>
                     {body}
                 </Typography>
-                <Stack direction="row" spacing={1} sx={{ mt: "auto", flexWrap: "wrap", gap: 1 }}>
+                <Stack direction="row" sx={{ mt: "auto", flexWrap: "wrap", gap: 1 }}>
                     {actions}
                 </Stack>
             </CardContent>
@@ -188,7 +188,7 @@ function Home() {
                         {EVENT.dateLabel} · {EVENT.hours} · {EVENT.venue}
                     </Typography>
                     {roles.length > 0 && (
-                        <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, flexWrap: "wrap", gap: 0.75 }}>
+                        <Stack direction="row" sx={{ mt: 1.5, flexWrap: "wrap", gap: 0.75 }}>
                             {roles.map((role) => (
                                 <Chip
                                     key={role}

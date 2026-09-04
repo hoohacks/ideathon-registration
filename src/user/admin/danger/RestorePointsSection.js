@@ -245,7 +245,7 @@ export default function RestorePointsSection({ onResult }) {
                     <Typography variant="caption" color="text.secondary" component="div">
                       {when(point.at)} · {point.byName ?? point.by} · {bytes(point.bytes)}
                     </Typography>
-                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
+                    <Stack direction="row" sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
                       {(point.paths ?? []).map((path) => (
                         <Chip key={path} label={path} size="small" variant="outlined" />
                       ))}

@@ -25,18 +25,33 @@ import { pageMinHeight } from "./theme";
  * readable column beside a rail that answers exactly that question.
  */
 
-/** Date, hours and venue, separated by hairlines rather than middots. */
+/**
+ * Date, hours and venue, separated by hairlines rather than middots.
+ *
+ * The hairline is a left border on every fact but the first, which is correct
+ * only while they are all on one line. On a phone they are not: the strip wraps,
+ * and whichever fact starts the second line carried its border with it -- a
+ * divider hanging at the start of a line with nothing before it, on the first
+ * page every attendee sees.
+ *
+ * A border cannot know it is at the start of a line, so below `sm` the facts
+ * stack instead and the hairlines go away entirely. From `sm` up there is room
+ * for one line and the strip reads as designed.
+ */
 export function FactStrip({ facts }) {
   return (
-    <Stack direction="row" sx={{ flexWrap: "wrap", rowGap: 1, mt: 2.5 }}>
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      sx={{ flexWrap: "wrap", rowGap: { xs: 0.75, sm: 1 }, mt: 2.5 }}
+    >
       {facts.map((fact, index) => (
         <Typography
           key={fact}
           variant="body2"
           sx={{
-            pl: index === 0 ? 0 : 1.75,
-            pr: 1.75,
-            borderLeft: index === 0 ? 0 : 1,
+            pl: { xs: 0, sm: index === 0 ? 0 : 1.75 },
+            pr: { xs: 0, sm: 1.75 },
+            borderLeft: { xs: 0, sm: index === 0 ? 0 : 1 },
             borderColor: "divider",
             fontVariantNumeric: "tabular-nums",
             color: "text.primary",
