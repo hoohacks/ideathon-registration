@@ -5,7 +5,7 @@ Everything lives in one Firebase Realtime Database tree.
 ```
 /admins/{uid}              true
 /config                    judgingRooms[] batchCount batchTimes eventStart eventName
-                           finalRoundRoom finalRoundSize targetJudgesPerTeam
+                           finalRoundRoom finalRoundSize minJudgesPerTeam maxJudgesPerTeam
                            submissionsOpen submissionsCloseAt rulesVersion scheduleMeta
 /competitors/{uid}         name, email, major, school, dietary, resume,
                            checkedIn, foodCheckIn, teamId
@@ -41,7 +41,8 @@ admin-only root grant, and `src/schema.test.js` asserts they stay that way.
 | `submissionsCloseAt` | Optional deadline, as epoch milliseconds, compared with the server's clock by the rules |
 | `eventStart` | Overrides the start date compiled into `src/eventInfo.js`, so the date can move without a deploy |
 | `eventName` | The phrase typed to confirm publishing over an existing schedule |
-| `targetJudgesPerTeam`, `finalRoundSize` | Panel size (default 3) and finalists (default 4) |
+| `minJudgesPerTeam`, `maxJudgesPerTeam` | First-round panel size: min (default 3) is warned about, not enforced; max absent means no cap, so every judge is seated |
+| `finalRoundSize` | Finalists (default 4) |
 | `rulesVersion` | The rules version an organizer says is published; see [security rules](security-rules.md#versioning) |
 
 Keys without a screen of their own are set from Control panel, Event setup,

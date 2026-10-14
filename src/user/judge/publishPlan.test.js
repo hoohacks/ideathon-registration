@@ -87,6 +87,7 @@ function world({
       judges: judgesData,
       "config/judgingRooms": Array.from({ length: rooms }, (_, i) => `Room ${i}`),
       "config/batchCount": batchCount,
+      "config/maxJudgesPerTeam": 3,
       "config/batchTimes": { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" },
       "scores/first": scoresData,
       scheduleDraft: undefined,

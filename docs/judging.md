@@ -5,7 +5,7 @@
 A judge visits at most one team per batch, so the largest batch,
 `ceil(teams / batches)`, sets both limits.
 
-| Rooms | Max teams (3 batches) | Min judges | Judges for a panel of 3 |
+| Rooms | Max teams (3 batches) | Min judges | Judges for a min of 3 |
 | --- | --- | --- | --- |
 | 8 | 24 | 8 | 24 |
 | 12 | 36 | 12 | 36 |
@@ -13,10 +13,15 @@ A judge visits at most one team per batch, so the largest batch,
 
 **Max teams = rooms × batches.** Nothing else caps you.
 
-- **Too few judges:** building refuses and names both fixes: mark more judges, or
-  raise the batch count so fewer teams present at once.
-- **Too many judges:** panels cap at 3 (`config/targetJudgesPerTeam`), and the
-  rest become spares, rotated so a different group sits out each batch.
+- **Too few judges:** with fewer judges than teams presenting at once, building
+  refuses and names both fixes: mark more judges, or raise the batch count so
+  fewer teams present at once. With enough for one each but fewer than the min
+  (`config/minJudgesPerTeam`, default 3), it builds anyway and warns, saying how
+  many more judges would reach the min.
+- **More judges than the min:** with no max (the default), every judge is seated
+  and spread evenly across the rooms. With a max (`config/maxJudgesPerTeam`), the
+  rest become spares, rotated so a different group sits out each batch. Both are
+  set in Control panel, Event setup, Judging schedule.
 - **Batches that do not divide evenly** are the thing to avoid. With 20 teams over
   3 batches (7/7/6), the smaller batch draws from a better ratio. Building says so
   and names a batch count that divides evenly.
@@ -27,7 +32,8 @@ can be scheduled at all:
 - no judge in two rooms at once
 - no team without a judge
 - panels within a batch differing by at most one
-- nobody idle while a team is below target
+- every judge seated when there is no max, and nobody idle while a team is below
+  the max when there is one
 - judges reshuffled between batches
 
 These are asserted across 1 to 60 teams, 1 to 40 judges, and 2 to 5 batches.
@@ -56,7 +62,7 @@ a rebuild:
 | A team withdrew | **Drop** it from the plan |
 | A judge on a panel lost their round-one mark | **Remove** them |
 | A room the plan uses was removed | **Place** that team into a free room in the same batch |
-| The batch count or panel target changed | **Rebuild**: the shape of the day changed |
+| The batch count or judges per team changed | **Rebuild**: the shape of the day changed |
 
 **A hand-edited plan no longer carries the allocator's guarantees.** Panel balance
 and rotation are properties of a generated plan. Read the stats bar for what the

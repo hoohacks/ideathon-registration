@@ -18,7 +18,8 @@ const basis = {
   rooms: ["R1", "R2"],
   batchCount: 2,
   batchTimes: { 1: "5:00 PM", 2: "5:15 PM" },
-  target: 2,
+  minPerTeam: 2,
+  maxPerTeam: null,
 };
 const plan = {
   assignments: {
@@ -34,7 +35,8 @@ const unchanged = {
   rooms: ["R1", "R2"],
   batchCount: 2,
   batchTimes: { 1: "5:00 PM", 2: "5:15 PM" },
-  target: 2,
+  minPerTeam: 2,
+  maxPerTeam: null,
   teamNames: { a: "A", b: "B" },
   judgeNames: { j1: "J1", j2: "J2", j3: "J3" },
 };
@@ -50,7 +52,8 @@ test("everything moved at once: each change is named, with a repair that does no
     rooms: ["R2", "R3"],
     batchCount: 3,
     batchTimes: { 1: "5:00 PM" },
-    target: 3,
+    minPerTeam: 3,
+    maxPerTeam: 4,
     teamNames: { b: "B2", c: "C" },
     judgeNames: { j2: "J2 new", j3: "J3" },
   };
@@ -87,8 +90,8 @@ test("everything moved at once: each change is named, with a repair that does no
         repair: { type: "rebuild" },
       },
       {
-        kind: "targetChanged",
-        message: "Judges per team changed from 2 to 3 since this plan was built.",
+        kind: "panelChanged",
+        message: "Judges per team changed from at least 2 to between 3 and 4 since this plan was built.",
         repair: { type: "rebuild" },
       },
     ],
@@ -248,7 +251,7 @@ describe("reading the live basis", () => {
         jf: { firstName: "Final", isFinalRoundJudge: true },
       },
       teams: { tb: { name: "B", submitted: true }, ta: { submitted: true }, tx: { name: "Draft" }, tn: null },
-      config: { judgingRooms: ["R1"], batchCount: 2, batchTimes: { 1: "x", 2: "y" }, targetJudgesPerTeam: 2 },
+      config: { judgingRooms: ["R1"], batchCount: 2, batchTimes: { 1: "x", 2: "y" }, minJudgesPerTeam: 2, maxJudgesPerTeam: 4 },
     });
     await expect(readLiveBasis(false)).resolves.toEqual({
       teamIds: ["ta", "tb"],
@@ -258,7 +261,8 @@ describe("reading the live basis", () => {
       rooms: ["R1"],
       batchCount: 2,
       batchTimes: { 1: "x", 2: "y" },
-      target: 2,
+      minPerTeam: 2,
+      maxPerTeam: 4,
       judgeNames: { jb: "Bea Lee", ja: "Unnamed Judge" },
       teamNames: { tb: "B", ta: "Unnamed Team" },
     });

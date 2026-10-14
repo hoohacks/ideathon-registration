@@ -1,14 +1,21 @@
 import { ref, get } from "firebase/database";
 import { database } from "../../../firebase.js";
 import { applyAdminAction } from "../adminAction.js";
-import { BATCH_COUNT, BATCH_TIMES } from "../../judge/schedulePlan.js";
+import {
+  BATCH_COUNT,
+  BATCH_TIMES,
+  MIN_JUDGES_PER_TEAM,
+  MAX_JUDGES_PER_TEAM,
+  panelLabel,
+} from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService.js";
 import { EVENT_START } from "../../../eventInfo.js";
 
 /**
- * Batch count, batch times, event start and the final round room.
+ * Batch count, batch times, judges per team, event start and the final round
+ * room.
  *
- * All four were module constants and remain so as fallbacks. Unlike the room
+ * All of these were module constants and remain so as fallbacks. Unlike the room
  * list, these are structural rather than venue facts: an event always has some
  * number of batches, so an absent node should behave as it did before rather
  * than refusing to generate. Rooms are the opposite -- there is no sensible
@@ -29,13 +36,16 @@ async function readOne(path, fallback) {
 }
 
 export async function readEventConfig() {
-  const [batchCount, batchTimes, eventStart, finalRoundRoom] = await Promise.all([
-    readOne("config/batchCount", BATCH_COUNT),
-    readOne("config/batchTimes", BATCH_TIMES),
-    readOne("config/eventStart", EVENT_START),
-    readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
-  ]);
-  return { batchCount, batchTimes, eventStart, finalRoundRoom };
+  const [batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom] =
+    await Promise.all([
+      readOne("config/batchCount", BATCH_COUNT),
+      readOne("config/batchTimes", BATCH_TIMES),
+      readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
+      readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
+      readOne("config/eventStart", EVENT_START),
+      readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
+    ]);
+  return { batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom };
 }
 
 export async function setBatchCount(count) {
@@ -66,6 +76,36 @@ export async function setBatchTimes(times) {
     action: "config.batchTimes",
     summary: `Batch times set for ${count} batch(es)`,
     changes: [{ path: "config/batchTimes", before, after: times }],
+  });
+}
+
+/**
+ * The smallest and largest first-round panel. `max` is null for no cap, which
+ * seats every judge. The min is a floor the plan warns about rather than one it
+ * refuses to build under: on the day, a thin panel beats no judging.
+ */
+export async function setJudgesPerTeam({ min, max }) {
+  if (!Number.isInteger(min) || min < 1) {
+    return { ok: false, error: "The minimum judges per team must be a whole number of at least 1." };
+  }
+  if (max !== null && (!Number.isInteger(max) || max < min)) {
+    return {
+      ok: false,
+      error: `The maximum judges per team must be a whole number no smaller than the minimum (${min}), or blank for no cap.`,
+    };
+  }
+
+  const [beforeMin, beforeMax] = await Promise.all([
+    readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
+    readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
+  ]);
+  return applyAdminAction({
+    action: "config.judgesPerTeam",
+    summary: `Judges per team ${panelLabel(beforeMin, beforeMax)} to ${panelLabel(min, max)}`,
+    changes: [
+      { path: "config/minJudgesPerTeam", before: beforeMin, after: min },
+      { path: "config/maxJudgesPerTeam", before: beforeMax, after: max },
+    ],
   });
 }
 

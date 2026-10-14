@@ -2,7 +2,7 @@ import { ref, get } from "firebase/database";
 import { database } from "../../firebase.js";
 import { personName } from "../../roles.js";
 import { FIRST_ROUND } from "./getTeamInfo.js";
-import { BATCH_COUNT, BATCH_TIMES, TARGET_JUDGES_PER_TEAM } from "./schedulePlan.js";
+import { BATCH_COUNT, BATCH_TIMES, MIN_JUDGES_PER_TEAM, MAX_JUDGES_PER_TEAM } from "./schedulePlan.js";
 
 // The judging rooms live at config/judgingRooms and nowhere else. There is
 // deliberately no fallback list here: a hardcoded one silently papers over an
@@ -34,32 +34,52 @@ export async function fetchRooms() {
     }
 }
 
+const BUILT_IN = {
+    batchCount: BATCH_COUNT,
+    batchTimes: BATCH_TIMES,
+    minPerTeam: MIN_JUDGES_PER_TEAM,
+    maxPerTeam: MAX_JUDGES_PER_TEAM,
+};
+
+/** A whole number of at least one, or undefined. */
+function positiveInteger(snap) {
+    if (!snap.exists()) return undefined;
+    const value = Number(snap.val());
+    return Number.isInteger(value) && value >= 1 ? value : undefined;
+}
+
 /**
  * Batch count, times and panel size, overridable at config/* so the shape of
  * the day can change without a deploy. Same fallback contract as fetchRooms: an
  * absent or malformed node behaves exactly as the built-in constants did,
  * rather than producing an event with zero batches.
+ *
+ * `maxPerTeam` is null for no cap, which is also the built-in value. A max
+ * below the min is ignored rather than trusted, since the allocator would
+ * then never reach the min.
  */
 export async function fetchBatchConfig() {
     try {
-        const [countSnap, timesSnap, targetSnap] = await Promise.all([
+        const [countSnap, timesSnap, minSnap, maxSnap] = await Promise.all([
             get(ref(database, "config/batchCount")),
             get(ref(database, "config/batchTimes")),
-            get(ref(database, "config/targetJudgesPerTeam")),
+            get(ref(database, "config/minJudgesPerTeam")),
+            get(ref(database, "config/maxJudgesPerTeam")),
         ]);
 
-        const count = countSnap.exists() ? Number(countSnap.val()) : BATCH_COUNT;
         const times = timesSnap.exists() ? timesSnap.val() : BATCH_TIMES;
-        const target = targetSnap.exists() ? Number(targetSnap.val()) : TARGET_JUDGES_PER_TEAM;
+        const minPerTeam = positiveInteger(minSnap) ?? MIN_JUDGES_PER_TEAM;
+        const max = positiveInteger(maxSnap);
 
         return {
-            batchCount: Number.isInteger(count) && count >= 1 ? count : BATCH_COUNT,
+            batchCount: positiveInteger(countSnap) ?? BATCH_COUNT,
             batchTimes: times && typeof times === "object" ? times : BATCH_TIMES,
-            target: Number.isInteger(target) && target >= 1 ? target : TARGET_JUDGES_PER_TEAM,
+            minPerTeam,
+            maxPerTeam: max !== undefined && max >= minPerTeam ? max : MAX_JUDGES_PER_TEAM,
         };
     } catch (error) {
         console.warn("Could not read the batch config, using the built-in values:", error);
-        return { batchCount: BATCH_COUNT, batchTimes: BATCH_TIMES, target: TARGET_JUDGES_PER_TEAM };
+        return { ...BUILT_IN };
     }
 }
 

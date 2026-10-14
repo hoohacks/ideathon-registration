@@ -24,14 +24,15 @@ const TYPES = [
  * The type each known key must have.
  *
  * This exists because the type selector defaulted to Text, and saving
- * `targetJudgesPerTeam` as the string "2" is a mistake with no visible symptom:
+ * `minJudgesPerTeam` as the string "2" is a mistake with no visible symptom:
  * the reader coerces it, so it works, until a comparison somewhere does not.
  * A key the app actually reads should not depend on remembering to change a
  * dropdown.
  */
 export const KNOWN_KEYS = {
   batchCount: "number",
-  targetJudgesPerTeam: "number",
+  minJudgesPerTeam: "number",
+  maxJudgesPerTeam: "number",
   judgingRooms: "json",
   batchTimes: "json",
   finalRoundRoom: "string",
@@ -135,7 +136,7 @@ export default function AdvancedSection({ config = {}, onResult }) {
             <Stack spacing={1}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <TextField
-                  label="Key" placeholder="targetJudgesPerTeam" value={key}
+                  label="Key" placeholder="minJudgesPerTeam" value={key}
                   onChange={(event) => setKey(event.target.value)}
                   sx={{ width: { xs: "100%", sm: FIELD.key } }}
                   helperText="Written to config/<key>"

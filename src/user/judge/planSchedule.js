@@ -92,7 +92,8 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
             judgeCount: judgesList.length,
             roomCount: rooms.length,
             batchCount: batchConfig.batchCount,
-            target: batchConfig.target,
+            min: batchConfig.minPerTeam,
+            max: batchConfig.maxPerTeam,
         });
 
         if (!supply.ok) return fail(supply.error, supply.advice);
@@ -130,7 +131,7 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
                 judgeCount: judgesList.length,
                 batchSize: batch.length,
                 batchIndex,
-                target: batchConfig.target,
+                max: batchConfig.maxPerTeam,
             });
 
             panels.forEach((panel, seat) => {
@@ -188,7 +189,8 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
                     rooms,
                     batchCount: batchConfig.batchCount,
                     batchTimes: batchConfig.batchTimes,
-                    target: batchConfig.target,
+                    minPerTeam: batchConfig.minPerTeam,
+                    maxPerTeam: batchConfig.maxPerTeam,
                 },
                 onlyCheckedIn,
                 judgeNames: Object.fromEntries(

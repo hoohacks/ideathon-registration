@@ -27,7 +27,7 @@ const { requireAdmin } = await import("../../roles.js");
 
 const basis = {
   teamIds: ["t1", "t2"], judgeIds: ["j0", "j1"],
-  rooms: ["R1", "R2"], batchCount: 2, batchTimes: { 1: "5:00 PM", 2: "5:15 PM" }, target: 2,
+  rooms: ["R1", "R2"], batchCount: 2, batchTimes: { 1: "5:00 PM", 2: "5:15 PM" }, minPerTeam: 2, maxPerTeam: null,
 };
 const plan = {
   assignments: {
@@ -119,10 +119,27 @@ test("batch count changed, so the shape of the day changed", () => {
   expect(blocking[0].repair).toEqual({ type: "rebuild" });
 });
 
-test("target changed, so the shape of the day changed", () => {
-  // the basis was built when target was 3; config now says 2
-  const { blocking } = checkDrift({ ...basis, target: 3 }, live({ target: 2 }), plan);
+test("judges per team changed, so the shape of the day changed", () => {
+  // the basis was built with a min of 3; config now says 2
+  const { blocking } = checkDrift({ ...basis, minPerTeam: 3 }, live({ minPerTeam: 2 }), plan);
   expect(blocking.some((b) => b.repair.type === "rebuild")).toBe(true);
+  // and a cap appearing is a change too
+  expect(checkDrift(basis, live({ maxPerTeam: 3 }), plan).blocking.map((b) => b.kind)).toEqual(["panelChanged"]);
+});
+
+test("no cap stored reads back as an absent key, which is not a change", () => {
+  const { maxPerTeam: _dropped, ...readBack } = basis;
+  expect(checkDrift(readBack, live(), plan)).toEqual({ blocking: [], advisory: [] });
+});
+
+test("a draft from before min and max existed has to be rebuilt", () => {
+  const { minPerTeam: _min, maxPerTeam: _max, ...old } = basis;
+  const { blocking } = checkDrift({ ...old, target: 3 }, live(), plan);
+  expect(blocking).toEqual([{
+    kind: "panelChanged",
+    message: "Judges per team changed from an older setting to at least 2 since this plan was built.",
+    repair: { type: "rebuild" },
+  }]);
 });
 
 test("batch times changed, which is only a label", () => {
@@ -160,7 +177,7 @@ test("a room removed offers a free room in the same batch, keeping time and pane
 test("a room removed falls back to rebuild when its batch has no free room", () => {
   const twoRoomBasis = {
     teamIds: ["t1", "t2"], judgeIds: ["j0", "j1"],
-    rooms: ["R1", "R2"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, target: 1,
+    rooms: ["R1", "R2"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, minPerTeam: 1, maxPerTeam: null,
   };
   const bothInBatchOne = {
     assignments: {
@@ -193,7 +210,7 @@ test("a room removed falls back to rebuild when its batch has no free room", () 
 test("two teams in the same batch that both lose their room get different repair rooms", () => {
   const sameBatchBasis = {
     teamIds: ["t1", "t2", "t3"], judgeIds: ["j0"],
-    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, target: 1,
+    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, minPerTeam: 1, maxPerTeam: null,
   };
   const sameBatchPlan = {
     assignments: {
@@ -229,7 +246,7 @@ test("two teams in the same batch that both lose their room get different repair
 test("a same-batch room-removed case exhausts the free rooms, and the last one falls back to rebuild", () => {
   const sameBatchBasis = {
     teamIds: ["t1", "t2", "t3"], judgeIds: ["j0"],
-    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, target: 1,
+    rooms: ["R1", "R2", "R3", "R4", "R5"], batchCount: 1, batchTimes: { 1: "5:00 PM" }, minPerTeam: 1, maxPerTeam: null,
   };
   const sameBatchPlan = {
     assignments: {

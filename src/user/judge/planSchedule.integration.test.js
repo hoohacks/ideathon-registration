@@ -53,10 +53,10 @@ describe("a thin schedule", () => {
     expect(result.ok).toBe(true);
     expect(result.error).toBeNull();
     expect(result.warnings).toEqual([
-      "Some teams will be seen by only 1 judge. An average from one judge is that judge's opinion, and the final round is picked on averages.",
+      "Some teams will be seen by only 1 judge(s), below the minimum of 3. The final round is picked on averages, and a small panel makes those noisy.",
       "Seen by one judge only: Beacon. Add a judge to these from Judging progress.",
     ]);
-    expect(result.advice).toEqual(["Mark 1 more first-round judge(s) to give every team at least 2."]);
+    expect(result.advice).toEqual(["Mark 3 more first-round judge(s) to give every team at least 3."]);
   });
 
   test("assigns rooms in order, the batch time, and judges by full name", async () => {
@@ -92,7 +92,8 @@ describe("a thin schedule", () => {
       rooms: ["Rice 340", "Rice 342", "Olsson 005"],
       batchCount: 1,
       batchTimes: { 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" },
-      target: 3,
+      minPerTeam: 3,
+      maxPerTeam: null,
     });
     expect(plan.onlyCheckedIn).toBe(false);
     expect(plan.judgeNames).toEqual({ jc: "Cy", ja: "Ada Byron", jb: "Bo", jf: "Fay" });
@@ -116,10 +117,21 @@ describe("two thin teams, and a judge with no name", () => {
 });
 
 describe("a surplus of judges", () => {
-  test("names the spares and says how many are held back", async () => {
+  test("with no cap, every judge is seated and nobody is a spare", async () => {
+    event({
+      teams: { t1: { name: "Solo", submitted: true } },
+      judges: { j1: judge("A"), j2: judge("B"), j3: judge("C"), j4: judge("D"), j5: judge("E") },
+    });
+    const result = await planSchedule();
+    expect(result.warnings).toEqual([]);
+    expect(result.plan.assignments.t1.judges.map((j) => j.judgeId)).toEqual(["j1", "j2", "j3", "j4", "j5"]);
+  });
+
+  test("with a cap, names the spares and says how many are held back", async () => {
     event({
       teams: { t1: { name: "Solo", submitted: true } },
       judges: { j1: judge("A"), j2: judge("B"), j3: judge("C"), j4: judge("D"), j5: judge("", { lastName: "" }) },
+      config: { maxJudgesPerTeam: 3 },
     });
     const result = await planSchedule();
     expect(result.warnings).toEqual([

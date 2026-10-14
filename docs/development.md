@@ -46,9 +46,9 @@ Two things that will confuse you:
 
 - **Seeding recreates every account.** A tab that was signed in holds a
   credential for a uid that no longer exists. Sign in again.
-- **Seed at least 8 teams** to exercise the final round. Below about six, every
-  judge sees every team in round one, so all are excluded from the final and
-  activation produces no assignments. That is the data, not a bug.
+- **Seed at least 8 teams** to exercise the final round, so there is a real cut
+  between the top four and the rest. Every eligible judge is seated on every
+  finalist, including teams they scored in round one.
 
 ## Stack
 

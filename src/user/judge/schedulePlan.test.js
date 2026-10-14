@@ -8,16 +8,19 @@
  *
  *   - a judge in two rooms at once simply does not turn up to one of them
  *   - a team with no judges presents to an empty room
- *   - forty judges in one room is not better judging, it is a crowd
+ *   - with a cap set, forty judges in one room is not better judging, it is
+ *     a crowd; with none, every judge is seated and spread evenly
  */
 import {
   splitIntoBatches,
   allocateBatch,
   describeSupply,
   BATCH_COUNT,
-  TARGET_JUDGES_PER_TEAM,
   MIN_JUDGES_PER_TEAM,
 } from "./schedulePlan";
+
+/** A cap to test the capped paths with; the built-in has none. */
+const CAP = 3;
 
 /** Every (teams, judges, batches) the generator would accept. */
 function* schedulableEvents() {
@@ -104,12 +107,23 @@ describe("allocateBatch holds its invariants across every schedulable event", ()
     expect(broken).toEqual([]);
   });
 
-  test("no panel ever exceeds the target, however many judges turn up", () => {
+  test("with no cap, every judge is seated in every batch", () => {
     const broken = [];
     for (const { teams, judges, batchCount, sizes } of schedulableEvents()) {
       sizes.forEach((size, batchIndex) => {
-        for (const panel of allocateBatch({ judgeCount: judges, batchSize: size, batchIndex })) {
-          if (panel.length > TARGET_JUDGES_PER_TEAM) {
+        const used = new Set(allocateBatch({ judgeCount: judges, batchSize: size, batchIndex }).flat());
+        if (used.size !== judges) broken.push(`${teams}/${judges}/${batchCount}`);
+      });
+    }
+    expect(broken).toEqual([]);
+  });
+
+  test("with a cap, no panel ever exceeds it, however many judges turn up", () => {
+    const broken = [];
+    for (const { teams, judges, batchCount, sizes } of schedulableEvents()) {
+      sizes.forEach((size, batchIndex) => {
+        for (const panel of allocateBatch({ judgeCount: judges, batchSize: size, batchIndex, max: CAP })) {
+          if (panel.length > CAP) {
             broken.push(`${teams}/${judges}/${batchCount} -> panel of ${panel.length}`);
           }
         }
@@ -118,12 +132,12 @@ describe("allocateBatch holds its invariants across every schedulable event", ()
     expect(broken).toEqual([]);
   });
 
-  test("nobody is idle while a team is still below the target", () => {
+  test("with a cap, nobody is idle while a team is still below it", () => {
     const broken = [];
     for (const { teams, judges, batchCount, sizes } of schedulableEvents()) {
       sizes.forEach((size, batchIndex) => {
-        if (judges >= size * TARGET_JUDGES_PER_TEAM) return; // surplus is expected
-        const used = new Set(allocateBatch({ judgeCount: judges, batchSize: size, batchIndex }).flat());
+        if (judges >= size * CAP) return; // surplus is expected
+        const used = new Set(allocateBatch({ judgeCount: judges, batchSize: size, batchIndex, max: CAP }).flat());
         if (used.size !== judges) broken.push(`${teams}/${judges}/${batchCount}`);
       });
     }
@@ -131,17 +145,15 @@ describe("allocateBatch holds its invariants across every schedulable event", ()
   });
 });
 
-describe("a surplus of judges is capped, not crammed into the rooms", () => {
-  test("four teams and forty judges gives panels of three, not of forty", () => {
-    // the old allocator sent every judge to a team in every batch, which put
-    // 20 people in one room and 40 in another
-    const panels = allocateBatch({ judgeCount: 40, batchSize: 2, batchIndex: 0 });
+describe("with a cap, a surplus of judges is held back rather than crammed in", () => {
+  test("four teams and forty judges with a cap of three gives panels of three, not of twenty", () => {
+    const panels = allocateBatch({ judgeCount: 40, batchSize: 2, batchIndex: 0, max: CAP });
     expect(panels.map((p) => p.length)).toEqual([3, 3]);
   });
 
   test("the judges held back differ from batch to batch", () => {
     const spare = [0, 1, 2].map((batchIndex) => {
-      const used = new Set(allocateBatch({ judgeCount: 20, batchSize: 2, batchIndex }).flat());
+      const used = new Set(allocateBatch({ judgeCount: 20, batchSize: 2, batchIndex, max: CAP }).flat());
       return [...Array(20).keys()].filter((j) => !used.has(j)).join(",");
     });
     expect(new Set(spare).size).toBeGreaterThan(1);
@@ -216,10 +228,10 @@ describe("describeSupply warns about what the organizer can still fix", () => {
     expect(result.advice.join(" ")).not.toMatch(/divides/);
   });
 
-  test("a surplus of judges is reported as spares rather than silently seated", () => {
-    const result = describeSupply({ teamCount: 6, judgeCount: 30, roomCount: 10, batchCount: 3 });
+  test("with a cap, a surplus of judges is reported as spares rather than silently seated", () => {
+    const result = describeSupply({ teamCount: 6, judgeCount: 30, roomCount: 10, batchCount: 3, max: CAP });
     expect(result.ok).toBe(true);
-    expect(result.judgesPerTeam.max).toBeLessThanOrEqual(TARGET_JUDGES_PER_TEAM);
+    expect(result.judgesPerTeam.max).toBeLessThanOrEqual(CAP);
     expect(result.warnings.join(" ")).toMatch(/more than .* teams need/);
     expect(result.advice.join(" ")).toMatch(/spare|Spare/);
   });

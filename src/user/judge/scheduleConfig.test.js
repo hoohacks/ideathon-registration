@@ -10,9 +10,14 @@ vi.mock("firebase/database", async () => (await import("../../testing/fakeDataba
 
 const db = await import("../../testing/fakeDatabase");
 const { fetchRooms, fetchBatchConfig, displayName, readScheduleMeta } = await import("./scheduleConfig");
-const { BATCH_COUNT, BATCH_TIMES, TARGET_JUDGES_PER_TEAM } = await import("./schedulePlan");
+const { BATCH_COUNT, BATCH_TIMES, MIN_JUDGES_PER_TEAM, MAX_JUDGES_PER_TEAM } = await import("./schedulePlan");
 
-const builtIn = { batchCount: BATCH_COUNT, batchTimes: BATCH_TIMES, target: TARGET_JUDGES_PER_TEAM };
+const builtIn = {
+  batchCount: BATCH_COUNT,
+  batchTimes: BATCH_TIMES,
+  minPerTeam: MIN_JUDGES_PER_TEAM,
+  maxPerTeam: MAX_JUDGES_PER_TEAM,
+};
 
 beforeEach(() => {
   db.reset({});
@@ -47,24 +52,37 @@ describe("rooms", () => {
 });
 
 describe("batch config", () => {
-  test("nothing stored gives the built-in values", async () => {
+  test("nothing stored gives the built-in values: a min of 3 and no cap", async () => {
     await expect(fetchBatchConfig()).resolves.toEqual(builtIn);
+    expect(builtIn).toMatchObject({ minPerTeam: 3, maxPerTeam: null });
   });
 
   test("stored values win, each read from its own key", async () => {
     const times = { 1: "6:00 PM", 2: "6:20 PM" };
-    db.setData("config", { batchCount: 2, batchTimes: times, targetJudgesPerTeam: 4 });
-    await expect(fetchBatchConfig()).resolves.toEqual({ batchCount: 2, batchTimes: times, target: 4 });
+    db.setData("config", { batchCount: 2, batchTimes: times, minJudgesPerTeam: 2, maxJudgesPerTeam: 4 });
+    await expect(fetchBatchConfig()).resolves.toEqual({
+      batchCount: 2, batchTimes: times, minPerTeam: 2, maxPerTeam: 4,
+    });
   });
 
   test("numbers stored as strings are accepted", async () => {
-    db.setData("config", { batchCount: "5", targetJudgesPerTeam: "2" });
-    await expect(fetchBatchConfig()).resolves.toMatchObject({ batchCount: 5, target: 2 });
+    db.setData("config", { batchCount: "5", minJudgesPerTeam: "2", maxJudgesPerTeam: "3" });
+    await expect(fetchBatchConfig()).resolves.toMatchObject({ batchCount: 5, minPerTeam: 2, maxPerTeam: 3 });
   });
 
   test("one is the smallest usable count and panel", async () => {
-    db.setData("config", { batchCount: 1, targetJudgesPerTeam: 1 });
-    await expect(fetchBatchConfig()).resolves.toMatchObject({ batchCount: 1, target: 1 });
+    db.setData("config", { batchCount: 1, minJudgesPerTeam: 1, maxJudgesPerTeam: 1 });
+    await expect(fetchBatchConfig()).resolves.toMatchObject({ batchCount: 1, minPerTeam: 1, maxPerTeam: 1 });
+  });
+
+  test("a max below the min is ignored, so the min is still reachable", async () => {
+    db.setData("config", { minJudgesPerTeam: 4, maxJudgesPerTeam: 2 });
+    await expect(fetchBatchConfig()).resolves.toMatchObject({ minPerTeam: 4, maxPerTeam: null });
+  });
+
+  test("the old targetJudgesPerTeam key no longer caps anything", async () => {
+    db.setData("config", { targetJudgesPerTeam: 3 });
+    await expect(fetchBatchConfig()).resolves.toEqual(builtIn);
   });
 
   test.each([
@@ -73,7 +91,7 @@ describe("batch config", () => {
     ["fractional", 2.5],
     ["not a number", "many"],
   ])("a %s count or panel size falls back to the built-in one", async (_label, bad) => {
-    db.setData("config", { batchCount: bad, targetJudgesPerTeam: bad });
+    db.setData("config", { batchCount: bad, minJudgesPerTeam: bad, maxJudgesPerTeam: bad });
     await expect(fetchBatchConfig()).resolves.toEqual(builtIn);
   });
 

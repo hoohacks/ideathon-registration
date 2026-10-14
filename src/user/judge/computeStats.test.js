@@ -13,7 +13,7 @@ const plan = () => ({
   basis: {
     teamIds: ["t1", "t2", "t3", "t4"],
     judgeIds: ["j0", "j1", "j2", "j3"],
-    rooms: ["R1", "R2", "R3"], batchCount: 2, batchTimes: {}, target: 2,
+    rooms: ["R1", "R2", "R3"], batchCount: 2, batchTimes: {}, minPerTeam: 2, maxPerTeam: null,
   },
   judgeNames: {}, teamNames: {}, onlyCheckedIn: false,
 });
@@ -32,8 +32,8 @@ test("a submitted team with no slot is unscheduled", () => {
   expect(computeStats(plan()).unscheduledTeamIds).toEqual(["t4"]);
 });
 
-test("a team under target is named", () => {
-  expect(computeStats(plan()).belowTarget).toEqual(["t2"]);
+test("a team under the minimum is named", () => {
+  expect(computeStats(plan()).belowMin).toEqual(["t2"]);
 });
 
 test("batch sizes and rooms used", () => {
@@ -55,7 +55,7 @@ test("j0 and j1 sit together twice, so one repeat pairing", () => {
 test("an empty plan does not throw or return Infinity", () => {
   const stats = computeStats({
     assignments: {},
-    basis: { teamIds: [], judgeIds: [], rooms: [], batchCount: 3, batchTimes: {}, target: 3 },
+    basis: { teamIds: [], judgeIds: [], rooms: [], batchCount: 3, batchTimes: {}, minPerTeam: 3, maxPerTeam: null },
     judgeNames: {}, teamNames: {},
   });
   expect(stats.minJudgesPerTeam).toBe(0);

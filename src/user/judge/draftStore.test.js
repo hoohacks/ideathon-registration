@@ -29,7 +29,7 @@ const { applyEdit } = await import("./applyEdit");
 const { computeStats } = await import("./computeStats");
 
 const plan = (over = {}) => ({
-  assignments: {}, basis: { teamIds: [], judgeIds: [], rooms: [], batchCount: 3, batchTimes: {}, target: 3 },
+  assignments: {}, basis: { teamIds: [], judgeIds: [], rooms: [], batchCount: 3, batchTimes: {}, minPerTeam: 3, maxPerTeam: null },
   judgeNames: {}, teamNames: {}, onlyCheckedIn: false, edits: [], version: 0, ...over,
 });
 
@@ -176,7 +176,7 @@ test("a freshly-placed team's empty judges array, and an empty batchTimes map, s
       },
     },
     basis: {
-      teamIds: ["t4"], judgeIds: ["j9"], rooms: ["R2"], batchCount: 2, batchTimes: {}, target: 3,
+      teamIds: ["t4"], judgeIds: ["j9"], rooms: ["R2"], batchCount: 2, batchTimes: {}, minPerTeam: 3, maxPerTeam: null,
     },
     // A real plan always carries a name for every team in `basis.teamIds` --
     // planSchedule never builds one otherwise. Left at the `plan()` helper's

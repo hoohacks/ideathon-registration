@@ -40,7 +40,7 @@ test("ids that would read alike once joined are still different pairs", () => {
   expect(computeStats(plan).repeatPairings).toBe(0);
 });
 
-test("a plan with nothing in it is all zeros, with the default target", () => {
+test("a plan with nothing in it is all zeros, with the default minimum", () => {
   expect(computeStats({})).toEqual({
     teams: 0,
     judges: 0,
@@ -49,11 +49,11 @@ test("a plan with nothing in it is all zeros, with the default target", () => {
     minJudgesPerTeam: 0,
     maxJudgesPerTeam: 0,
     spareJudgeIds: [],
-    belowTarget: [],
+    belowMin: [],
     unscheduledTeamIds: [],
     repeatPairings: 0,
   });
   const twoJudges = { assignments: { a: { id: "a", batch: 1, judges: judges("x", "y") } } };
-  expect(computeStats(twoJudges).belowTarget).toEqual(["a"]);
+  expect(computeStats(twoJudges).belowMin).toEqual(["a"]);
   expect(computeStats({ basis: { teamIds: ["t1"] } }).unscheduledTeamIds).toEqual(["t1"]);
 });
