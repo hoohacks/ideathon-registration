@@ -156,18 +156,24 @@ describe("what a schedulable event will look like", () => {
   });
 
   test("eight batches is the most offered, and only the first three are named", () => {
-    const eight = describeSupply({ teamCount: 8, judgeCount: 3, roomCount: 8, batchCount: 3 }).advice;
+    const eight = describeSupply({ teamCount: 8, judgeCount: 8, roomCount: 8, batchCount: 3 }).advice;
     expect(eight).toContain(
       "Teams are split 3/3/2, so the smaller batches get more judges per team. A batch count of 2, 4 or 8 divides 8 teams evenly and removes that."
     );
-    const ten = describeSupply({ teamCount: 10, judgeCount: 4, roomCount: 10, batchCount: 3 }).advice;
+    const ten = describeSupply({ teamCount: 10, judgeCount: 10, roomCount: 10, batchCount: 3 }).advice;
     expect(ten).toContain(
       "Teams are split 4/3/3, so the smaller batches get more judges per team. A batch count of 2 or 5 divides 10 teams evenly and removes that."
     );
   });
 
+  test("a batch count the judges cannot cover is not offered", () => {
+    // 2 batches would put 10 teams in front of 7 judges at once, which building refuses
+    const { advice } = describeSupply({ teamCount: 20, judgeCount: 7, roomCount: 20, batchCount: 3 });
+    expect(advice.join(" ")).toContain("A batch count of 4 or 5 divides 20 teams evenly");
+  });
+
   test("at most three even batch counts are offered", () => {
-    const { advice } = describeSupply({ teamCount: 24, judgeCount: 5, roomCount: 24, batchCount: 5 });
+    const { advice } = describeSupply({ teamCount: 24, judgeCount: 12, roomCount: 24, batchCount: 5 });
     expect(advice).toContain(
       "Teams are split 5/5/5/5/4, so the smaller batches get more judges per team. A batch count of 2, 3 or 4 divides 24 teams evenly and removes that."
     );

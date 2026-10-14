@@ -62,28 +62,20 @@ test("everything moved at once: each change is named, with a repair that does no
       {
         kind: "teamAppeared",
         message: "C submitted after this plan was built and has no slot.",
-        repair: { type: "moveTeam", teamId: "c", batch: 1, room: "R3", teamName: "C" },
+        repair: { type: "moveTeam", teamId: "c", batch: 1, room: "R3", teamName: "C", rooms: ["R2", "R3"] },
       },
       {
         kind: "teamAppeared",
         message: "d submitted after this plan was built and has no slot.",
-        repair: { type: "moveTeam", teamId: "d", batch: 2, room: "R2", teamName: "d" },
+        repair: { type: "moveTeam", teamId: "d", batch: 2, room: "R2", teamName: "d", rooms: ["R2", "R3"] },
       },
       {
         kind: "teamWithdrew",
         message: "A withdrew its submission since this plan was built.",
         repair: { type: "dropTeam", teamId: "a" },
       },
-      {
-        kind: "judgeLost",
-        message: "J1 is no longer a first round judge, but is on the panel for A.",
-        repair: { type: "removeJudge", teamId: "a", judgeUid: "j1" },
-      },
-      {
-        kind: "roomRemoved",
-        message: "R1 is no longer a configured room, and batch 1 has no free room to move A into. Rebuild the plan.",
-        repair: { type: "rebuild" },
-      },
+      // A withdrew, so J1 leaving its panel and R1 vanishing under it need
+      // no repair of their own: dropping A answers both
       {
         kind: "batchCountChanged",
         message: "Batch count changed from 2 to 3 since this plan was built.",
@@ -96,6 +88,7 @@ test("everything moved at once: each change is named, with a repair that does no
       },
     ],
     advisory: [
+      { kind: "judgeLost", message: "J1 is no longer a first round judge, but was only judging A, which withdrew." },
       { kind: "batchTimesChanged", message: "Batch times changed since this plan was built. The new times will be applied to the draft." },
       { kind: "nameChanged", message: "J2 is now J2 new." },
       { kind: "nameChanged", message: "B is now B2." },
@@ -109,7 +102,7 @@ test("a removed room with a free one in its batch is moved there", () => {
     {
       kind: "roomRemoved",
       message: "R1 is no longer a configured room, but A is using it in batch 1.",
-      repair: { type: "moveTeam", teamId: "a", batch: 1, room: "R3" },
+      repair: { type: "moveTeam", teamId: "a", batch: 1, room: "R3", rooms: ["R2", "R3"] },
     },
   ]);
 });
@@ -125,8 +118,8 @@ test("rooms removed under several teams are handled in id order", () => {
   const live = { ...unchanged, teamIds: ["a", "z"], rooms: ["N1", "N2"] };
   const moves = checkDrift({ ...basis, teamIds: ["a", "z"] }, live, twoGone).blocking.map((issue) => issue.repair);
   expect(moves).toEqual([
-    { type: "moveTeam", teamId: "a", batch: 1, room: "N1" },
-    { type: "moveTeam", teamId: "z", batch: 1, room: "N2" },
+    { type: "moveTeam", teamId: "a", batch: 1, room: "N1", rooms: ["N1", "N2"] },
+    { type: "moveTeam", teamId: "z", batch: 1, room: "N2", rooms: ["N1", "N2"] },
   ]);
 });
 
@@ -169,7 +162,7 @@ test("a room taken only in another batch is free for a team that lost its room",
   };
   const live = { ...unchanged, rooms: ["N1", "N2"] };
   expect(checkDrift(basis, live, twoBatches).blocking.map((issue) => issue.repair)).toEqual([
-    { type: "moveTeam", teamId: "a", batch: 1, room: "N1" },
+    { type: "moveTeam", teamId: "a", batch: 1, room: "N1", rooms: ["N1", "N2"] },
   ]);
 });
 

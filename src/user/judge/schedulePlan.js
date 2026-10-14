@@ -210,7 +210,7 @@ export function describeSupply({
 
   // uneven batches are the only reason a team gets systematically less attention
   if (globalMax - globalMin >= 1 && new Set(sizes).size > 1) {
-    const even = evenBatchCountsFor(teamCount, roomCount, batchCount);
+    const even = evenBatchCountsFor(teamCount, roomCount, judgeCount, batchCount);
     if (even.length) {
       advice.push(
         `Teams are split ${sizes.join("/")}, so the smaller batches get more judges per team. ` +
@@ -259,13 +259,18 @@ function smallestBatchCountFor(teamCount, judgeCount, roomCount) {
   return null;
 }
 
-/** Batch counts that divide the teams evenly and still fit the rooms. */
-function evenBatchCountsFor(teamCount, roomCount, current) {
+/**
+ * Batch counts that divide the teams evenly and still fit the rooms and the
+ * judges. Offering one the judges cannot cover sends an organizer straight
+ * into the "too few judges" refusal.
+ */
+function evenBatchCountsFor(teamCount, roomCount, judgeCount, current) {
   const options = [];
   for (let batches = 2; batches <= Math.min(8, teamCount); batches++) {
     if (batches === current) continue;
     if (teamCount % batches !== 0) continue;
     if (teamCount / batches > roomCount) continue;
+    if (teamCount / batches > judgeCount) continue;
     options.push(batches);
   }
   return options.slice(0, 3);

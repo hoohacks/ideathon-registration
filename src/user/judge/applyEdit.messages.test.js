@@ -17,7 +17,7 @@ const plan = () => ({
   },
   teamNames: { t1: "Lantern", t2: "Circles", t3: "Tempo", t4: "Late" },
   judgeNames: { a: "Ada", b: "Bo", c: "Cy", d: "Dee", e: "Eve" },
-  basis: { rooms: ["R1", "R2", "R3"], batchTimes: { 1: "5:00 PM", 2: "5:15 PM" } },
+  basis: { teamIds: ["t1", "t2", "t3", "t4"], rooms: ["R1", "R2", "R3"], batchCount: 3, batchTimes: { 1: "5:00 PM", 2: "5:15 PM" } },
   edits: [],
 });
 
@@ -130,9 +130,18 @@ describe("moving a team", () => {
     expect(lastEdit(result)).toEqual({ op: { type: "moveTeam", teamId: "t4", batch: 1, room: "R3" }, summary: "Placed Late in R3, batch 1", before: null });
   });
 
-  test("a team known nowhere is called 'that team'", () => {
-    const result = applyEdit(plan(), { type: "moveTeam", teamId: "t9", batch: 1, room: "R3" });
-    expect(lastEdit(result).summary).toBe("Placed that team in R3, batch 1");
+  test("a team that never submitted cannot be placed", () => {
+    expect(applyEdit(plan(), { type: "moveTeam", teamId: "t9", batch: 1, room: "R3" })).toEqual({
+      ok: false,
+      error: "That team has not submitted a project, so it cannot be placed.",
+    });
+  });
+
+  test.each([0, 4, 1.5, undefined])("refuses batch %p, which the plan does not have", (batch) => {
+    expect(applyEdit(plan(), { type: "moveTeam", teamId: "t1", batch, room: "R3" })).toEqual({
+      ok: false,
+      error: `There is no batch ${batch}. This plan has 3.`,
+    });
   });
 
   test("a team's own recorded slot name is used when the name list lacks it", () => {

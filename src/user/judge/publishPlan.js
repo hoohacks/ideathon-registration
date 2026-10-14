@@ -65,6 +65,20 @@ export async function publishPlan(plan, { discardScores = false } = {}) {
             };
         }
 
+        // Undoing a placement, or a hand edit that never placed a team, leaves a
+        // submitted team in the plan's basis with no slot. Drift cannot see it
+        // (basis and the live roster agree), so without this the publish would
+        // clear that team's schedule and it would have nowhere to present.
+        const unplaced = (plan.basis?.teamIds ?? []).filter((id) => !plan.assignments?.[id]);
+        if (unplaced.length) {
+            return {
+                ok: false,
+                error: `${unplaced.length} team(s) have no slot (${unplaced
+                    .map((id) => plan.teamNames?.[id] ?? id)
+                    .join(", ")}). Place each one before publishing.`,
+            };
+        }
+
         // ---- refuse a plan whose inputs have moved underneath it ----
 
         const live = await readLiveBasis(plan.onlyCheckedIn);

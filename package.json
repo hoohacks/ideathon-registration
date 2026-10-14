@@ -39,6 +39,8 @@
     "seed": "node scripts/seed-event.mjs",
     "test:e2e": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=8 --judges=12 --rooms=8 --schedule && playwright test\"",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:tiny": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=1 --judges=1 --final-judges=1 --rooms=1 && cross-env E2E_EVENT_SIZE=tiny E2E_ROUND_ONE_JUDGES=1 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
+    "test:e2e:large": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=150 --judges=160 --final-judges=10 --rooms=50 && cross-env E2E_EVENT_SIZE=large E2E_ROUND_ONE_JUDGES=160 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
     "preview": "vite preview"
   },
   "devDependencies": {

@@ -22,6 +22,23 @@ Three bugs shipped because of the two "blind to" rows: joining a team failed on 
 read the rules always refuse; the planner stacked two full-height page frames so
 its content sat below the fold; and the room sheets had no link to them.
 
+## Sweeps and fuzzing
+
+The judging logic is tested over ranges as well as examples. Each of these
+collects every failure before asserting, so a broken run names every size, or
+seed, that broke rather than the first:
+
+- `src/user/judge/schedule.sweep.test.js`: the Build step, from nothing to 600
+  teams, every refusal, and whether the advice in each refusal works
+- `src/user/judge/planEdits.fuzz.test.js`: seeded random hand edits and undos,
+  then random changes to the event (late teams, withdrawals, lost judges,
+  removed and renamed rooms) repaired in a random order and published
+- `src/user/judge/finalRound.sweep.test.js`: the cut against a ranking worked
+  out independently, the publish, and random edits to the final round plan
+
+Their rules live in `src/testing/eventWorld.js`. To replay a fuzz failure, rerun
+the test: the seed in the message reproduces it exactly.
+
 ## Page tests
 
 Page tests render a real admin page with `renderPage` (`src/testing/renderPage.jsx`),
@@ -67,6 +84,20 @@ the right people live across several signed-in browsers.
 
 It runs as two projects: **desktop**, and **mobile** (Pixel 5), where a sweep of
 every page for every role asserts nothing scrolls sideways.
+
+Every spec above runs against one seeded event of eight teams. Two more scripts
+reseed the emulator at the edges and run `e2e/event-sizes.spec.mjs`, which builds,
+publishes, scores and runs the final round, then reads the database back and
+checks every slot and every judge's cards:
+
+- `npm run test:e2e:tiny`: one team, one judge, one room
+- `npm run test:e2e:large`: 150 teams, 160 judges, 50 rooms
+
+The spec skips itself under plain `test:e2e`. Run the two one after the other, not
+at once: they share the emulator ports.
+
+CI runs both in `.github/workflows/event-sizes.yml`, on pull requests that touch
+the judging code, the rules or the seed, alongside the main CI workflow.
 
 Two more specs check what assertions cannot:
 

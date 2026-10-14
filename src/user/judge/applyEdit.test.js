@@ -1,5 +1,6 @@
-const { applyEdit, undoEdit } = await import("./applyEdit");
+const { applyEdit, applyRepair, undoEdit } = await import("./applyEdit");
 const { computeStats } = await import("./computeStats");
+const { checkDrift } = await import("./checkDrift");
 
 const base = () => ({
   assignments: {
@@ -122,7 +123,7 @@ describe("moveTeam", () => {
   // that map was built at plan time. checkDrift's repair carries the name
   // instead, and moveTeam must prefer it over the (necessarily unaware) map.
   test("placing a team unknown to teamNames uses op.teamName, not \"that team\"", () => {
-    const { ok, plan } = applyEdit(base(), {
+    const { ok, plan } = applyRepair(base(), {
       type: "moveTeam", teamId: "t5", batch: 2, room: "R2", teamName: "Vireo",
     });
     expect(ok).toBe(true);
@@ -247,5 +248,33 @@ describe("undoEdit", () => {
 
     expect(edited.edits).toHaveLength(editsBefore);
     expect(edited.assignments.t2.judges).toHaveLength(judgesBefore);
+  });
+});
+
+describe("applyRepair brings the basis along, so the same drift is not reported again", () => {
+  const live = (over) => ({
+    ...base().basis, judgeNames: base().judgeNames, teamNames: base().teamNames, ...over,
+  });
+
+  test("a late team, once placed and judged, is no longer 'submitted after this plan was built'", () => {
+    const now = live({ teamIds: [...base().basis.teamIds, "t5"], teamNames: { ...base().teamNames, t5: "Late" } });
+    let plan = base();
+    const [late] = checkDrift(plan.basis, now, plan).blocking.filter((b) => b.kind === "teamAppeared");
+    plan = applyRepair(plan, late.repair).plan;
+    plan = applyEdit(plan, { type: "addJudge", teamId: "t5", judgeUid: "j3" }).plan;
+
+    expect(plan.basis.teamIds).toContain("t5");
+    expect(checkDrift(plan.basis, now, plan).blocking.filter((b) => b.teamId === "t5" || b.repair?.teamId === "t5")).toEqual([]);
+  });
+
+  test("a room renamed after the build can be moved into", () => {
+    const now = live({ rooms: ["R1 (Rice)", "R2", "R3"] });
+    let plan = base();
+    for (const item of checkDrift(plan.basis, now, plan).blocking) {
+      const result = applyRepair(plan, item.repair);
+      expect(result).toMatchObject({ ok: true });
+      plan = result.plan;
+    }
+    expect(checkDrift(plan.basis, now, plan).blocking).toEqual([]);
   });
 });

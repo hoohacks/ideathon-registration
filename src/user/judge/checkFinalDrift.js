@@ -46,6 +46,30 @@ export function checkFinalDrift(plan, live) {
     });
   }
 
+  // ---- a team nobody had scored when the ranking was computed ----
+  //
+  // The ranking only holds teams with a card, so `basis.cardCounts` has no
+  // entry for an unscored team, and the loop above cannot see its first card
+  // arrive -- a judge's queued score sending late, say. That card can put the
+  // team anywhere in the ranking, including inside the cut.
+  // A plan with no counts at all has nothing to compare against.
+  const counted = plan?.basis?.cardCounts;
+  for (const [teamId, now] of Object.entries(counted ? live?.cardCounts ?? {} : {})) {
+    if (!now || teamId in counted) continue;
+    if (!live?.submitted?.[teamId]) continue;
+
+    const name = live?.teamsData?.[teamId]?.name ?? teamId;
+    issues.push({
+      kind: "scores",
+      level: BLOCKING,
+      teamId,
+      message:
+        `${name} had no scores when this ranking was computed and has been scored since, so it ` +
+        `may now belong in the cut.`,
+      repair: "rerank",
+    });
+  }
+
   // ---- a finalist withdrew ----
   for (const slot of slotsOf(plan)) {
     if (live?.submitted?.[slot.teamId]) continue;

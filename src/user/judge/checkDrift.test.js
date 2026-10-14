@@ -168,10 +168,10 @@ test("a room removed offers a free room in the same batch, keeping time and pane
   const { blocking } = checkDrift(basis, live({ rooms: ["R2"] }), plan);
 
   const forT1 = blocking.find((b) => b.repair.teamId === "t1");
-  expect(forT1.repair).toEqual({ type: "moveTeam", teamId: "t1", batch: 1, room: "R2" });
+  expect(forT1.repair).toEqual({ type: "moveTeam", teamId: "t1", batch: 1, room: "R2", rooms: ["R2"] });
 
   const forT2 = blocking.find((b) => b.repair.teamId === "t2");
-  expect(forT2.repair).toEqual({ type: "moveTeam", teamId: "t2", batch: 2, room: "R2" });
+  expect(forT2.repair).toEqual({ type: "moveTeam", teamId: "t2", batch: 2, room: "R2", rooms: ["R2"] });
 });
 
 test("a room removed falls back to rebuild when its batch has no free room", () => {
@@ -272,7 +272,7 @@ test("a same-batch room-removed case exhausts the free rooms, and the last one f
   // which room it names rather than by repair.teamId
   const forT1 = blocking.find((b) => b.message.includes("R4"));
   const forT2 = blocking.find((b) => b.message.includes("R5"));
-  expect(forT1.repair).toEqual({ type: "moveTeam", teamId: "t1", batch: 1, room: "R2" });
+  expect(forT1.repair).toEqual({ type: "moveTeam", teamId: "t1", batch: 1, room: "R2", rooms: ["R1", "R2"] });
   // t2's only apparently-free room (R2) was already claimed by t1's repair
   expect(forT2.repair).toEqual({ type: "rebuild" });
 });
