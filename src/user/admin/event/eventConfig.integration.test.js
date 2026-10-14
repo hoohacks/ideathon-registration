@@ -24,7 +24,7 @@ describe("reading", () => {
   test("an empty database gives every built-in value", async () => {
     await expect(config.readEventConfig()).resolves.toEqual({
       batchCount: 3,
-      batchTimes: { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" },
+      batchTimes: { 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" },
       eventStart: "2026-10-25T10:00:00-04:00",
       finalRoundRoom: "Rice 011",
     });
@@ -79,7 +79,7 @@ describe("batch times", () => {
     expect(lastLog()).toMatchObject({
       action: "config.batchTimes",
       summary: "Batch times set for 3 batch(es)",
-      changes: [{ path: "config/batchTimes", before: { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" }, after: times }],
+      changes: [{ path: "config/batchTimes", before: { 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" }, after: times }],
     });
   });
 });

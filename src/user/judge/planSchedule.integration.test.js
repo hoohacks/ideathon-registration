@@ -66,7 +66,7 @@ describe("a thin schedule", () => {
         teamName: "Beacon",
         id: "tb",
         room: "Rice 340",
-        time: "5:00 PM",
+        time: "4:30 PM",
         batch: 1,
         judges: [{ judgeName: "Cy", judgeId: "jc" }],
       },
@@ -74,7 +74,7 @@ describe("a thin schedule", () => {
         teamName: "Anchor",
         id: "ta",
         room: "Rice 342",
-        time: "5:00 PM",
+        time: "4:30 PM",
         batch: 1,
         judges: [
           { judgeName: "Ada Byron", judgeId: "ja" },
@@ -91,7 +91,7 @@ describe("a thin schedule", () => {
       judgeIds: ["ja", "jb", "jc"],
       rooms: ["Rice 340", "Rice 342", "Olsson 005"],
       batchCount: 1,
-      batchTimes: { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" },
+      batchTimes: { 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" },
       target: 3,
     });
     expect(plan.onlyCheckedIn).toBe(false);

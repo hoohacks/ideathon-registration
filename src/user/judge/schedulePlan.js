@@ -27,9 +27,9 @@
 export const BATCH_COUNT = 3;
 
 export const BATCH_TIMES = {
-  1: "5:00 PM",
-  2: "5:15 PM",
-  3: "5:30 PM",
+  1: "4:30 PM",
+  2: "4:45 PM",
+  3: "5:00 PM",
 };
 
 /**
