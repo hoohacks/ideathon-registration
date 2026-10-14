@@ -36,7 +36,11 @@ can be scheduled at all:
   the max when there is one
 - judges reshuffled between batches
 
-These are asserted across 1 to 60 teams, 1 to 40 judges, and 2 to 5 batches.
+These are asserted across 1 to 60 teams, 1 to 40 judges, and 2 to 5 batches for the
+allocator alone, and for the whole Build step (rooms and times included) across
+every event up to 75 teams by 75 judges, events of up to 600 teams and 1000
+judges, and 1 to 8 batches (`schedule.sweep.test.js`). The same file checks that
+every number a refusal or a warning suggests actually works when applied.
 
 ## Planning a schedule
 
@@ -73,18 +77,20 @@ plan actually is.
 The Final round tab on the same page, or **Plan final round** on Judging progress.
 
 Building ranks every submitted team on its first-round average, cuts the top
-`config/finalRoundSize` (default 4), and fills each panel with every eligible
-judge who did **not** score that team in round one. Correct the running order and
-the panels, then publish.
+`config/finalRoundSize` (default 4), and seats every eligible judge on every
+panel: everyone marked for either round who has checked in, or everyone marked if
+nobody has. The finalists present in sequence to one room, so whoever is in it
+hears every pitch, and **scoring a team in round one does not bar a judge from
+it in the final**. Correct the running order and the panels, then publish.
 
-The draft lives at `/finalRoundDraft`. **A judge who scored a team in round one
-cannot judge it again**: the editor does not offer them, and the edit is refused.
+The draft lives at `/finalRoundDraft`. An organizer may seat any registered judge
+by hand, including one outside the pool.
 
 | What moved | What you get |
 | --- | --- |
-| Any ranked team was scored since the build | **Re-rank**: the averages the cut came from have moved |
+| Any team was scored since the build, including one that had no scores then | **Re-rank**: the averages the cut came from have moved |
 | A finalist withdrew | **Drop** it |
-| A judge is no longer a checked-in round-one judge | **Remove** them |
+| A judge on a panel no longer exists in the event | **Remove** them |
 | The final round room changed | **Apply** it (advisory) |
 
 ## Judges on bad wifi

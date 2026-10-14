@@ -113,6 +113,14 @@ export function applyEdit(plan, op) {
     }
 
     case "moveTeam": {
+      if (!Number.isInteger(op.batch) || op.batch < 1 || op.batch > next.basis.batchCount) {
+        return fail(`There is no batch ${op.batch}. This plan has ${next.basis.batchCount}.`);
+      }
+      // a team the plan was not built from has not submitted; a late one is
+      // placed through applyRepair, which adds it to the basis first
+      if (!current && !(next.basis.teamIds ?? []).includes(op.teamId)) {
+        return fail(`${teamName === "that team" ? "That team" : teamName} has not submitted a project, so it cannot be placed.`);
+      }
       if (!next.basis.rooms.includes(op.room)) {
         return fail(`${op.room} is not a configured room. Add it on the control panel first.`);
       }
@@ -147,6 +155,53 @@ export function applyEdit(plan, op) {
     default:
       return fail(`Unknown edit: ${op.type}`);
   }
+}
+
+/**
+ * Apply one of `checkDrift`'s repairs, and bring `basis` along with it.
+ *
+ * A repair is not an ordinary edit: it answers a difference between `basis`
+ * and the live world, so `basis` has to move too or the next drift check
+ * reports the same difference again. A placed team that stays out of
+ * `basis.teamIds` reads as "submitted after this plan was built" on every
+ * publish, forever; a move into a room added since the build is refused as
+ * "not a configured room". Both used to dead-end the publish.
+ *
+ * `dropTeam` is not recorded as an edit: undoing it would put back a team that
+ * has withdrawn.
+ */
+export function applyRepair(plan, repair) {
+  if (repair.type === "dropTeam") {
+    const assignments = { ...plan.assignments };
+    delete assignments[repair.teamId];
+    return {
+      ok: true,
+      plan: {
+        ...plan,
+        assignments,
+        basis: {
+          ...plan.basis,
+          teamIds: (plan.basis?.teamIds ?? []).filter((id) => id !== repair.teamId),
+        },
+      },
+    };
+  }
+
+  if (repair.type !== "moveTeam") return applyEdit(plan, repair);
+
+  const teamIds = plan.basis?.teamIds ?? [];
+  const base = {
+    ...plan,
+    basis: {
+      ...plan.basis,
+      rooms: repair.rooms ?? plan.basis?.rooms ?? [],
+      teamIds: teamIds.includes(repair.teamId) ? teamIds : [...teamIds, repair.teamId].sort(),
+    },
+    teamNames: repair.teamName
+      ? { ...plan.teamNames, [repair.teamId]: repair.teamName }
+      : plan.teamNames,
+  };
+  return applyEdit(base, repair);
 }
 
 /** Walk the newest edit back. Repeated, this reaches what the generator produced. */

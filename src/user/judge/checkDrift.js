@@ -61,10 +61,10 @@ function sameBatchTimes(a, b) {
  * repair they just applied. Checking `claimed` as well is what keeps every
  * repair generated in one pass free of the others.
  */
-function freeSlot(plan, live, claimed = new Set()) {
+function freeSlot(assignments, live, claimed = new Set()) {
   for (let batch = 1; batch <= live.batchCount; batch++) {
     const taken = new Set(
-      Object.values(plan.assignments).filter((a) => a.batch === batch).map((a) => a.room)
+      assignments.filter((a) => a.batch === batch).map((a) => a.room)
     );
     const room = live.rooms.find((r) => !taken.has(r) && !claimed.has(slotKey(batch, r)));
     if (room) return { batch, room };
@@ -92,11 +92,21 @@ export function checkDrift(basis, live, plan) {
   // same slot.
   const claimedSlots = new Set();
 
+  // The assignments that survive this drift. A team that withdrew is dropped,
+  // panel and all, so nothing else should be repaired on its account: a judge
+  // lost from its panel, or a room removed under it, would otherwise get a
+  // repair that is refused once the drop is done, or a rebuild that throws
+  // away every hand edit for a team that is leaving.
+  //
+  // Its room still counts as taken when a repair looks for a free one, so the
+  // repairs work in whatever order an organizer presses them.
+  const staying = Object.values(plan.assignments).filter((a) => liveTeamIds.has(a.id));
+
   // ---- teams that submitted since the plan was built ----
   const appeared = live.teamIds.filter((id) => !basisTeamIds.has(id)).sort();
   for (const teamId of appeared) {
     const teamName = live.teamNames?.[teamId] ?? teamId;
-    const slot = freeSlot(plan, live, claimedSlots);
+    const slot = freeSlot(Object.values(plan.assignments), live, claimedSlots);
     if (slot) {
       claimedSlots.add(slotKey(slot.batch, slot.room));
       blocking.push({
@@ -108,7 +118,9 @@ export function checkDrift(basis, live, plan) {
         // applyEdit's moveTeam has no source for this team's name and falls
         // back to "that team" -- which then gets published to the team's own
         // schedule and fanned out to the judge's card.
-        repair: { type: "moveTeam", teamId, batch: slot.batch, room: slot.room, teamName },
+        repair: {
+          type: "moveTeam", teamId, batch: slot.batch, room: slot.room, teamName, rooms: live.rooms,
+        },
       });
     } else {
       blocking.push({
@@ -138,9 +150,7 @@ export function checkDrift(basis, live, plan) {
   const lostJudges = basis.judgeIds.filter((id) => !liveJudgeIds.has(id));
   for (const judgeId of lostJudges) {
     const judgeName = plan.judgeNames?.[judgeId] ?? live.judgeNames?.[judgeId] ?? judgeId;
-    const onPanels = Object.values(plan.assignments).filter((a) =>
-      a.judges.some((j) => j.judgeId === judgeId)
-    );
+    const onPanels = staying.filter((a) => a.judges.some((j) => j.judgeId === judgeId));
 
     if (onPanels.length > 0) {
       for (const assignment of onPanels) {
@@ -152,10 +162,16 @@ export function checkDrift(basis, live, plan) {
         });
       }
     } else {
+      const leaving = Object.values(plan.assignments)
+        .filter((a) => !liveTeamIds.has(a.id) && a.judges.some((j) => j.judgeId === judgeId))
+        .map((a) => a.teamName);
       advisory.push({
         kind: "judgeLost",
-        message: `${judgeName} is no longer available, but was only a spare judge and is ` +
-          "not on any panel.",
+        message: leaving.length
+          ? `${judgeName} is no longer a first round judge, but was only judging ` +
+            `${leaving.join(", ")}, which withdrew.`
+          : `${judgeName} is no longer available, but was only a spare judge and is ` +
+            "not on any panel.",
       });
     }
   }
@@ -174,7 +190,7 @@ export function checkDrift(basis, live, plan) {
   // plan's stale rooms and can agree on the identical replacement, hence
   // `claimedSlots` (shared with the "teams appeared" section above).
   const liveRoomsSet = new Set(live.rooms);
-  const affectedByRoom = Object.values(plan.assignments)
+  const affectedByRoom = staying
     .filter((a) => !liveRoomsSet.has(a.room))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
@@ -196,6 +212,7 @@ export function checkDrift(basis, live, plan) {
           `${assignment.teamName} is using it in batch ${assignment.batch}.`,
         repair: {
           type: "moveTeam", teamId: assignment.id, batch: assignment.batch, room: freeRoom,
+          rooms: live.rooms,
         },
       });
     } else {

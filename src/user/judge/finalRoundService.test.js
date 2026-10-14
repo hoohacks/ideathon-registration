@@ -412,7 +412,6 @@ describe("publishing", () => {
   test("a finalist missing from the ranking is published with zeros", async () => {
     const { plan } = await planFinalRound();
     plan.ranked = undefined;
-    plan.basis.cardCounts = {};
     await publishFinalRound(plan);
     expect(db.getData("finalRound/teams/t1")).toEqual({
       name: "Lantern",

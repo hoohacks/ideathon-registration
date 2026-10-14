@@ -193,15 +193,6 @@ async function main() {
     `${ROOMS} rooms · ${BATCHES} batches\n`
   );
 
-  if (TEAMS < 8) {
-    console.warn(
-      `  ! ${TEAMS} teams is below 8. With very few teams every judge sees every\n` +
-        `    team in round one, so all of them are excluded from the final round\n` +
-        `    and activation produces no assignments. That is a property of the\n` +
-        `    data, not a bug. Seed at least 8 teams to exercise the final round.\n`
-    );
-  }
-
   await ensureEmulator();
   await resetEmulator();
 

@@ -13,7 +13,7 @@ import TeamSlotDrawer from "./TeamSlotDrawer.jsx";
 import DriftPanel from "./DriftPanel.jsx";
 import { planSchedule } from "../../judge/planSchedule.js";
 import { subscribeDraft, saveDraft, clearDraft } from "../../judge/draftStore.js";
-import { applyEdit, undoEdit } from "../../judge/applyEdit.js";
+import { applyEdit, applyRepair, undoEdit } from "../../judge/applyEdit.js";
 import { computeStats } from "../../judge/computeStats.js";
 import { publishPlan } from "../../judge/publishPlan.js";
 import { readScheduleMeta } from "../../judge/scheduleConfig.js";
@@ -158,33 +158,13 @@ export default function SchedulePreview({ header = null }) {
 
   async function handleRepair(repair) {
     const base = planRef.current ?? plan;
-    let nextPlan;
-
-    if (repair.type === "dropTeam") {
-      nextPlan = {
-        ...base,
-        assignments: { ...base.assignments },
-        // Also drop it from basis.teamIds, or computeStats.unscheduledTeamIds
-        // (which derives from that list) reports the just-withdrawn team as
-        // unscheduled the instant this saves -- putting a **Place** button in
-        // front of the organizer for a team that no longer exists.
-        basis: {
-          ...base.basis,
-          teamIds: (base.basis?.teamIds ?? []).filter((id) => id !== repair.teamId),
-        },
-      };
-      delete nextPlan.assignments[repair.teamId];
-      const saved = await saveDraft(nextPlan);
-      if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
-      planRef.current = { ...nextPlan, version: saved.version };
-    } else {
-      const result = applyEdit(base, repair);
-      if (!result.ok) { setToast({ severity: "error", message: result.error }); return; }
-      nextPlan = result.plan;
-      const saved = await saveDraft(nextPlan);
-      if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
-      planRef.current = { ...nextPlan, version: saved.version };
-    }
+    // applyRepair moves `basis` along with the plan, or the next publish
+    // reports the same drift again
+    const result = applyRepair(base, repair);
+    if (!result.ok) { setToast({ severity: "error", message: result.error }); return; }
+    const saved = await saveDraft(result.plan);
+    if (!saved.ok) { setToast({ severity: "error", message: saved.error }); return; }
+    planRef.current = { ...result.plan, version: saved.version };
 
     // The repaired item is stale now -- drop it from the panel rather than
     // waiting for a fresh Publish attempt to recompute the whole thing, so
