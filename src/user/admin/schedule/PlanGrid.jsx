@@ -7,7 +7,7 @@ import { StatStrip } from "../adminUi";
  * above and the two lists an organizer needs beside it.
  *
  * A card's border is the whole legend -- red at zero judges (this team
- * cannot be published as-is), amber below `basis.target` (publishable, but
+ * cannot be published as-is), amber below `basis.minPerTeam` (publishable, but
  * thin), and the default hairline otherwise. There is no fourth state and no
  * legend to read: an organizer scanning a wall of cards at 4:45 should not
  * need one.
@@ -17,10 +17,10 @@ function judgesLabel(min, max) {
   return min === max ? String(min) : `${min}-${max}`;
 }
 
-function TeamCard({ assignment, target, onOpenTeam }) {
+function TeamCard({ assignment, minPerTeam, onOpenTeam }) {
   const judgeCount = assignment.judges.length;
   const borderColor =
-    judgeCount === 0 ? "error.main" : judgeCount < target ? "warning.main" : "divider";
+    judgeCount === 0 ? "error.main" : judgeCount < minPerTeam ? "warning.main" : "divider";
 
   return (
     <Card
@@ -37,7 +37,7 @@ function TeamCard({ assignment, target, onOpenTeam }) {
         cursor: "pointer",
         borderWidth: 2,
         borderColor,
-        "&:hover": { borderColor: judgeCount === 0 ? "error.dark" : judgeCount < target ? "warning.dark" : "primary.main" },
+        "&:hover": { borderColor: judgeCount === 0 ? "error.dark" : judgeCount < minPerTeam ? "warning.dark" : "primary.main" },
       }}
     >
       <Typography variant="caption" color="text.secondary">{assignment.room}</Typography>
@@ -56,7 +56,7 @@ function TeamCard({ assignment, target, onOpenTeam }) {
 }
 
 export default function PlanGrid({ plan, stats, onOpenTeam }) {
-  const target = plan.basis?.target ?? 1;
+  const minPerTeam = plan.basis?.minPerTeam ?? 1;
   // memoised because `?? []` is a new array on every render, which would make
   // the useMemo below recompute every time and defeat the point of it
   const rooms = useMemo(() => plan.basis?.rooms ?? [], [plan.basis?.rooms]);
@@ -88,7 +88,7 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
     { label: "judges", singular: "judge", value: stats.judges },
     { label: "judges per team", value: judgesLabel(stats.minJudgesPerTeam, stats.maxJudgesPerTeam) },
     { label: "spares", singular: "spare", value: stats.spareJudgeIds?.length ?? 0 },
-    { label: "below target", value: stats.belowTarget?.length ?? 0 },
+    { label: "below minimum", value: stats.belowMin?.length ?? 0 },
     { label: "repeat pairings", singular: "repeat pairing", value: stats.repeatPairings },
   ];
 
@@ -113,7 +113,7 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
                       <TeamCard
                         key={assignment.id}
                         assignment={assignment}
-                        target={target}
+                        minPerTeam={minPerTeam}
                         onOpenTeam={onOpenTeam}
                       />
                     ))}

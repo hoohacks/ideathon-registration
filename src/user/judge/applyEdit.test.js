@@ -13,7 +13,7 @@ const base = () => ({
   basis: {
     teamIds: ["t1", "t2", "t3", "t4"], judgeIds: ["j0", "j1", "j2", "j3"],
     rooms: ["R1", "R2", "R3"], batchCount: 2,
-    batchTimes: { 1: "5:00 PM", 2: "5:15 PM" }, target: 2,
+    batchTimes: { 1: "5:00 PM", 2: "5:15 PM" }, minPerTeam: 2, maxPerTeam: null,
   },
   judgeNames: { j0: "Ada", j1: "Bo", j2: "Cy", j3: "Di" },
   teamNames: { t1: "A", t2: "B", t3: "C", t4: "D" },

@@ -27,16 +27,23 @@ describe("reading", () => {
       batchTimes: { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" },
       eventStart: "2026-10-25T10:00:00-04:00",
       finalRoundRoom: "Rice 011",
+      minJudgesPerTeam: 3,
+      maxJudgesPerTeam: null,
     });
   });
 
   test("each stored value is read from its own key", async () => {
-    db.setData("config", { batchCount: 2, batchTimes: { 1: "a", 2: "b" }, eventStart: "2026-11-01T09:00", finalRoundRoom: "Olsson 120" });
+    db.setData("config", {
+      batchCount: 2, batchTimes: { 1: "a", 2: "b" }, eventStart: "2026-11-01T09:00", finalRoundRoom: "Olsson 120",
+      minJudgesPerTeam: 2, maxJudgesPerTeam: 5,
+    });
     await expect(config.readEventConfig()).resolves.toEqual({
       batchCount: 2,
       batchTimes: { 1: "a", 2: "b" },
       eventStart: "2026-11-01T09:00",
       finalRoundRoom: "Olsson 120",
+      minJudgesPerTeam: 2,
+      maxJudgesPerTeam: 5,
     });
   });
 
@@ -81,6 +88,46 @@ describe("batch times", () => {
       summary: "Batch times set for 3 batch(es)",
       changes: [{ path: "config/batchTimes", before: { 1: "5:00 PM", 2: "5:15 PM", 3: "5:30 PM" }, after: times }],
     });
+  });
+});
+
+describe("judges per team", () => {
+  test("a min with no cap is saved, and the empty max is left absent", async () => {
+    await expect(config.setJudgesPerTeam({ min: 3, max: null })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("config/minJudgesPerTeam")).toBe(3);
+    expect(db.getData("config/maxJudgesPerTeam")).toBeNull();
+    expect(lastLog()).toMatchObject({
+      action: "config.judgesPerTeam",
+      summary: "Judges per team at least 3 to at least 3",
+    });
+  });
+
+  test("a min and max are saved together and logged against the old ones", async () => {
+    db.setData("config", { minJudgesPerTeam: 3, maxJudgesPerTeam: 4 });
+    await expect(config.setJudgesPerTeam({ min: 2, max: 2 })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("config")).toMatchObject({ minJudgesPerTeam: 2, maxJudgesPerTeam: 2 });
+    expect(lastLog()).toMatchObject({
+      summary: "Judges per team between 3 and 4 to exactly 2",
+      changes: [
+        { path: "config/minJudgesPerTeam", before: 3, after: 2 },
+        { path: "config/maxJudgesPerTeam", before: 4, after: 2 },
+      ],
+    });
+  });
+
+  test.each([0, -1, 2.5, NaN])("refuses a min of %p", async (min) => {
+    await expect(config.setJudgesPerTeam({ min, max: null })).resolves.toEqual({
+      ok: false,
+      error: "The minimum judges per team must be a whole number of at least 1.",
+    });
+  });
+
+  test.each([2, 3.5, NaN])("refuses a max of %p under a min of 3", async (max) => {
+    await expect(config.setJudgesPerTeam({ min: 3, max })).resolves.toEqual({
+      ok: false,
+      error: "The maximum judges per team must be a whole number no smaller than the minimum (3), or blank for no cap.",
+    });
+    expect(db.getData("config/minJudgesPerTeam")).toBeNull();
   });
 });
 

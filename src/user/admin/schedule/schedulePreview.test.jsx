@@ -125,7 +125,7 @@ function makePlan(overrides = {}) {
     basis: {
       teamIds: ["t1", "t2"], judgeIds: ["j0", "j1", "j2", "j3"],
       rooms: ["R1", "R2", "R3"], batchCount: 1,
-      batchTimes: { 1: "5:00 PM" }, target: 2,
+      batchTimes: { 1: "5:00 PM" }, minPerTeam: 2, maxPerTeam: null,
     },
     onlyCheckedIn: false,
     judgeNames: { j0: "Ada Lovelace", j1: "Bo Diaz", j2: "Cy Young", j3: "Di Prince" },
@@ -368,7 +368,7 @@ test("applying two repairs in a row builds the second on top of the first, not t
     // by accessible name below.
     teamIds: ["t1", "t2"], judgeIds: ["j0", "j1", "j2", "j3"],
     rooms: ["R1", "R2", "R3", "R4"], batchCount: 1,
-    batchTimes: { 1: "5:00 PM" }, target: 2,
+    batchTimes: { 1: "5:00 PM" }, minPerTeam: 2, maxPerTeam: null,
   };
   const initialPlan = makePlan({
     basis,

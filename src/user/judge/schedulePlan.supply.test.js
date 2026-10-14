@@ -8,8 +8,9 @@
  */
 import { allocateBatch, describeSupply } from "./schedulePlan";
 
-const ONE_JUDGE =
-  "Some teams will be seen by only 1 judge. An average from one judge is that judge's opinion, and the final round is picked on averages.";
+const thin = (seen, min = 3) =>
+  `Some teams will be seen by only ${seen} judge(s), below the minimum of ${min}. ` +
+  "The final round is picked on averages, and a small panel makes those noisy.";
 const SPARE_ADVICE =
   "Spare judges have no assignment card. Keep them on hand for a no-show, or add them to a team from Judging progress.";
 
@@ -21,14 +22,20 @@ describe("allocating one batch", () => {
 
   test("the second batch rotates which judges sit, and where", () => {
     // rotation (1 * 3) % 5 = 3, stride 2: positions seat 3, 4, then 0, 1
-    expect(allocateBatch({ judgeCount: 5, batchSize: 2, batchIndex: 1, target: 2 })).toEqual([
+    expect(allocateBatch({ judgeCount: 5, batchSize: 2, batchIndex: 1, max: 2 })).toEqual([
       [3, 0],
       [4, 1],
     ]);
   });
 
   test("the first batch seats judges in order", () => {
-    expect(allocateBatch({ judgeCount: 3, batchSize: 2, target: 3 })).toEqual([[0], [1, 2]]);
+    expect(allocateBatch({ judgeCount: 3, batchSize: 2, max: 3 })).toEqual([[0], [1, 2]]);
+  });
+
+  test("with no cap, every judge is seated once and panels differ by at most one", () => {
+    const panels = allocateBatch({ judgeCount: 7, batchSize: 3, batchIndex: 1 });
+    expect(panels.map((panel) => panel.length).sort()).toEqual([2, 2, 3]);
+    expect(panels.flat().sort()).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 });
 
@@ -80,15 +87,15 @@ describe("what a schedulable event will look like", () => {
     expect(describeSupply({ teamCount: 3, judgeCount: 3, roomCount: 3, batchCount: 1 })).toEqual({
       ok: true,
       error: null,
-      warnings: [ONE_JUDGE],
-      advice: ["Mark 3 more first-round judge(s) to give every team at least 2."],
+      warnings: [thin(1)],
+      advice: ["Mark 6 more first-round judge(s) to give every team at least 3."],
       batchSizes: [3],
       judgesPerTeam: { min: 1, max: 1 },
     });
   });
 
-  test("two judges per team is not called thin", () => {
-    expect(describeSupply({ teamCount: 2, judgeCount: 4, roomCount: 2, batchCount: 1 })).toEqual({
+  test("a panel at the configured min is not called thin", () => {
+    expect(describeSupply({ teamCount: 2, judgeCount: 4, roomCount: 2, batchCount: 1, min: 2 })).toEqual({
       ok: true,
       error: null,
       warnings: [],
@@ -98,17 +105,25 @@ describe("what a schedulable event will look like", () => {
     });
   });
 
-  test("a panel cap of one is thin even with judges to spare, but asks for nobody more", () => {
-    expect(describeSupply({ teamCount: 2, judgeCount: 4, roomCount: 2, batchCount: 1, target: 1 })).toEqual({
+  test("below the min still schedules, warns with the configured min, and says how many more", () => {
+    expect(describeSupply({ teamCount: 3, judgeCount: 6, roomCount: 3, batchCount: 1, min: 4 })).toEqual({
       ok: true,
       error: null,
-      warnings: [
-        ONE_JUDGE,
-        "4 judges is more than 2 teams need. Panels are capped at 1 and roughly 2 judge(s) are held back per batch as spares.",
-      ],
-      advice: [SPARE_ADVICE],
-      batchSizes: [2],
-      judgesPerTeam: { min: 1, max: 1 },
+      warnings: [thin(2, 4)],
+      advice: ["Mark 6 more first-round judge(s) to give every team at least 4."],
+      batchSizes: [3],
+      judgesPerTeam: { min: 2, max: 2 },
+    });
+  });
+
+  test("with no cap, every judge is seated and nobody is held back", () => {
+    expect(describeSupply({ teamCount: 3, judgeCount: 10, roomCount: 3, batchCount: 1 })).toEqual({
+      ok: true,
+      error: null,
+      warnings: [],
+      advice: [],
+      batchSizes: [3],
+      judgesPerTeam: { min: 3, max: 4 },
     });
   });
 
@@ -116,9 +131,9 @@ describe("what a schedulable event will look like", () => {
     expect(describeSupply({ teamCount: 6, judgeCount: 3, roomCount: 6, batchCount: 4 })).toEqual({
       ok: true,
       error: null,
-      warnings: [ONE_JUDGE],
+      warnings: [thin(1)],
       advice: [
-        "Mark 1 more first-round judge(s) to give every team at least 2.",
+        "Mark 3 more first-round judge(s) to give every team at least 3.",
         "Teams are split 2/2/1/1, so the smaller batches get more judges per team. A batch count of 2, 3 or 6 divides 6 teams evenly and removes that.",
       ],
       batchSizes: [2, 2, 1, 1],
@@ -159,7 +174,7 @@ describe("what a schedulable event will look like", () => {
   });
 
   test("uneven batch sizes that still give every team the same panel need no batch advice", () => {
-    const { advice, judgesPerTeam } = describeSupply({ teamCount: 6, judgeCount: 12, roomCount: 6, batchCount: 4 });
+    const { advice, judgesPerTeam } = describeSupply({ teamCount: 6, judgeCount: 12, roomCount: 6, batchCount: 4, max: 3 });
     expect(judgesPerTeam).toEqual({ min: 3, max: 3 });
     expect(advice).toEqual([SPARE_ADVICE]);
   });
@@ -168,14 +183,14 @@ describe("what a schedulable event will look like", () => {
     // eleven teams: nothing from 2 to 8 divides them
     const { advice, judgesPerTeam } = describeSupply({ teamCount: 11, judgeCount: 4, roomCount: 4, batchCount: 3 });
     expect(judgesPerTeam).toEqual({ min: 1, max: 2 });
-    expect(advice).toEqual(["Mark 4 more first-round judge(s) to give every team at least 2."]);
+    expect(advice).toEqual(["Mark 8 more first-round judge(s) to give every team at least 3."]);
   });
 
   test("spare judges are counted per batch", () => {
-    expect(describeSupply({ teamCount: 2, judgeCount: 10, roomCount: 2, batchCount: 1 }).warnings).toEqual([
+    expect(describeSupply({ teamCount: 2, judgeCount: 10, roomCount: 2, batchCount: 1, max: 3 }).warnings).toEqual([
       "10 judges is more than 2 teams need. Panels are capped at 3 and roughly 4 judge(s) are held back per batch as spares.",
     ]);
-    expect(describeSupply({ teamCount: 4, judgeCount: 10, roomCount: 2, batchCount: 2 }).warnings).toEqual([
+    expect(describeSupply({ teamCount: 4, judgeCount: 10, roomCount: 2, batchCount: 2, max: 3 }).warnings).toEqual([
       "10 judges is more than 4 teams need. Panels are capped at 3 and roughly 4 judge(s) are held back per batch as spares.",
     ]);
   });

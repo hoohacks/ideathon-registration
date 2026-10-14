@@ -16,12 +16,11 @@
  *    the allocator can undo it. The remedy is a batch count that divides the
  *    team count, which is what `describeSupply` recommends.
  *
- * 2. More judges is not automatically better. The old allocator sent every
- *    judge to a team in every batch, so 40 judges and 4 teams put 20 people in
- *    one room and 40 in another. Past a useful number, extra judges crowd the
- *    room and tell you nothing new. `TARGET_JUDGES_PER_TEAM` caps the panel and
- *    holds the rest back as spares, which is what you actually want on the day:
- *    someone to send when a judge does not turn up.
+ * 2. Panel size has a floor and an optional ceiling, both set on the control
+ *    panel. The floor is advisory: too few judges for it still builds, with a
+ *    warning, because a thin panel beats no judging. The ceiling, when there is
+ *    one, holds the extra judges back as spares; with none, every judge is
+ *    seated and spread evenly across the rooms.
  */
 
 export const BATCH_COUNT = 3;
@@ -33,15 +32,20 @@ export const BATCH_TIMES = {
 };
 
 /**
- * How many judges a team should ideally see.
+ * How many judges a team should see, when config/minJudgesPerTeam and
+ * config/maxJudgesPerTeam are not set.
  *
- * Two is the floor for an average to mean anything -- one judge is an opinion,
- * not a score. Three gives a median and absorbs one outlier. Above that the
- * marginal judge adds little and costs a seat in the room, so surplus judges
- * are held back as spares instead.
+ * Three gives a median and absorbs one outlier. No ceiling by default: the
+ * organizers would rather put every judge in a room than keep spares.
  */
-export const TARGET_JUDGES_PER_TEAM = 3;
-export const MIN_JUDGES_PER_TEAM = 2;
+export const MIN_JUDGES_PER_TEAM = 3;
+export const MAX_JUDGES_PER_TEAM = null;
+
+/** "at least 3", "between 2 and 4" or "exactly 3", for messages about the panel size setting. */
+export function panelLabel(min, max) {
+  if (max == null) return `at least ${min}`;
+  return min === max ? `exactly ${min}` : `between ${min} and ${max}`;
+}
 
 /**
  * Split teams into contiguous batches whose sizes differ by at most one.
@@ -67,8 +71,9 @@ export function splitIntoBatches(items, batchCount = BATCH_COUNT) {
  *
  *   - a judge appears at most once, so nobody is sent to two rooms at once
  *   - team panel sizes differ by at most one
- *   - no team exceeds `target` while any team is still below it
- *   - when there are more judges than the target needs, the surplus is left
+ *   - no team exceeds `max` while any team is still below it
+ *   - with no `max`, every judge is seated
+ *   - when there are more judges than `max` allows, the surplus is left
  *     out of this batch and a DIFFERENT surplus is left out of the next one
  *
  * The rotation is what stops the same people touring the building together.
@@ -76,12 +81,11 @@ export function splitIntoBatches(items, batchCount = BATCH_COUNT) {
  * index, so a judge who shared a room with someone in batch one is very
  * unlikely to share with them again in batch two.
  */
-export function allocateBatch({ judgeCount, batchSize, batchIndex = 0, target = TARGET_JUDGES_PER_TEAM }) {
+export function allocateBatch({ judgeCount, batchSize, batchIndex = 0, max = MAX_JUDGES_PER_TEAM }) {
   const seats = Array.from({ length: batchSize }, () => []);
   if (batchSize <= 0 || judgeCount <= 0) return seats;
 
-  // never seat more than the panel needs, and never more than we have
-  const seatsToFill = Math.min(judgeCount, batchSize * Math.max(1, target));
+  const seatsToFill = seatsFor(judgeCount, batchSize, max);
 
   // Two independent shifts, and both are needed.
   //
@@ -106,6 +110,11 @@ export function allocateBatch({ judgeCount, batchSize, batchIndex = 0, target = 
   return seats;
 }
 
+/** How many judges a batch of `size` teams seats: all of them, unless capped. */
+function seatsFor(judgeCount, size, max) {
+  return max == null ? judgeCount : Math.min(judgeCount, size * Math.max(1, max));
+}
+
 /**
  * Can this event be scheduled at all, and what should the organizer change?
  *
@@ -119,7 +128,8 @@ export function describeSupply({
   judgeCount,
   roomCount,
   batchCount = BATCH_COUNT,
-  target = TARGET_JUDGES_PER_TEAM,
+  min = MIN_JUDGES_PER_TEAM,
+  max = MAX_JUDGES_PER_TEAM,
 }) {
   const warnings = [];
   const advice = [];
@@ -180,23 +190,21 @@ export function describeSupply({
   const perTeam = sizes.map((size) => ({
     size,
     // what allocateBatch will actually produce for a batch of this size
-    min: Math.floor(Math.min(judgeCount, size * target) / size),
-    max: Math.ceil(Math.min(judgeCount, size * target) / size),
+    min: Math.floor(seatsFor(judgeCount, size, max) / size),
+    max: Math.ceil(seatsFor(judgeCount, size, max) / size),
   }));
 
   const globalMin = Math.min(...perTeam.map((p) => p.min));
   const globalMax = Math.max(...perTeam.map((p) => p.max));
 
-  if (globalMin < MIN_JUDGES_PER_TEAM) {
-    const needed = largest * MIN_JUDGES_PER_TEAM - judgeCount;
+  if (globalMin < min) {
+    const needed = largest * min - judgeCount;
     warnings.push(
-      `Some teams will be seen by only ${globalMin} judge. An average from one judge is that ` +
-        `judge's opinion, and the final round is picked on averages.`
+      `Some teams will be seen by only ${globalMin} judge(s), below the minimum of ${min}. ` +
+        "The final round is picked on averages, and a small panel makes those noisy."
     );
     if (needed > 0) {
-      advice.push(
-        `Mark ${needed} more first-round judge(s) to give every team at least ${MIN_JUDGES_PER_TEAM}.`
-      );
+      advice.push(`Mark ${needed} more first-round judge(s) to give every team at least ${min}.`);
     }
   }
 
@@ -212,13 +220,13 @@ export function describeSupply({
   }
 
   // the surplus case
-  const seatsWanted = sizes.reduce((sum, size) => sum + Math.min(judgeCount, size * target), 0);
+  const seatsWanted = sizes.reduce((sum, size) => sum + seatsFor(judgeCount, size, max), 0);
   const seatsAvailable = judgeCount * sizes.length;
   if (seatsAvailable > seatsWanted) {
     const spare = Math.floor((seatsAvailable - seatsWanted) / sizes.length);
     warnings.push(
       `${judgeCount} judges is more than ${teamCount} teams need. ` +
-        `Panels are capped at ${target} and roughly ${spare} judge(s) are held back per batch as spares.`
+        `Panels are capped at ${max} and roughly ${spare} judge(s) are held back per batch as spares.`
     );
     advice.push(
       "Spare judges have no assignment card. Keep them on hand for a no-show, or add them to a team " +

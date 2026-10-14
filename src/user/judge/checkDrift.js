@@ -2,6 +2,7 @@ import { ref, get } from "firebase/database";
 import { database } from "../../firebase.js";
 import { fetchRooms, fetchBatchConfig, displayName } from "./scheduleConfig.js";
 import { judgesRoundOne } from "./judgeRoles.js";
+import { panelLabel } from "./schedulePlan.js";
 
 /**
  * What moved since a plan was built.
@@ -217,10 +218,17 @@ export function checkDrift(basis, live, plan) {
       repair: { type: "rebuild" },
     });
   }
-  if (basis.target !== live.target) {
+  // A stored null is an absent key, so a draft read back has `undefined`
+  // where the live config has null. Both mean no cap. A draft built before
+  // min and max existed has neither, and has to be rebuilt.
+  const basisPanel = basis.minPerTeam === undefined
+    ? "an older setting"
+    : panelLabel(basis.minPerTeam, basis.maxPerTeam ?? null);
+  const livePanel = panelLabel(live.minPerTeam, live.maxPerTeam ?? null);
+  if (basisPanel !== livePanel) {
     blocking.push({
-      kind: "targetChanged",
-      message: `Judges per team changed from ${basis.target} to ${live.target} since this ` +
+      kind: "panelChanged",
+      message: `Judges per team changed from ${basisPanel} to ${livePanel} since this ` +
         "plan was built.",
       repair: { type: "rebuild" },
     });
@@ -312,7 +320,8 @@ export async function readLiveBasis(onlyCheckedIn) {
     rooms,
     batchCount: batchConfig.batchCount,
     batchTimes: batchConfig.batchTimes,
-    target: batchConfig.target,
+    minPerTeam: batchConfig.minPerTeam,
+    maxPerTeam: batchConfig.maxPerTeam,
     judgeNames: Object.fromEntries(
       judgesList.map((j) => [j.id, displayName(j, "Unnamed Judge")])
     ),

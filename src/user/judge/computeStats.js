@@ -1,3 +1,5 @@
+import { MIN_JUDGES_PER_TEAM } from "./schedulePlan.js";
+
 /**
  * The numbers describing a plan.
  *
@@ -8,7 +10,7 @@
  */
 export function computeStats(plan) {
   const assignments = Object.values(plan.assignments ?? {});
-  const { teamIds = [], judgeIds = [], target = 3 } = plan.basis ?? {};
+  const { teamIds = [], judgeIds = [], minPerTeam = MIN_JUDGES_PER_TEAM } = plan.basis ?? {};
 
   const byBatch = new Map();
   for (const a of assignments) {
@@ -43,7 +45,7 @@ export function computeStats(plan) {
     minJudgesPerTeam: panelSizes.length ? Math.min(...panelSizes) : 0,
     maxJudgesPerTeam: panelSizes.length ? Math.max(...panelSizes) : 0,
     spareJudgeIds: judgeIds.filter((uid) => !assigned.has(uid)),
-    belowTarget: assignments.filter((a) => a.judges.length < target).map((a) => a.id),
+    belowMin: assignments.filter((a) => a.judges.length < minPerTeam).map((a) => a.id),
     unscheduledTeamIds: teamIds.filter((id) => !plan.assignments?.[id]),
     repeatPairings,
   };

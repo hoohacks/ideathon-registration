@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, Card, TextField } from "@mui/material";
 import { FIELD, Section, SettingList, SettingRow } from "../adminUi";
-import { setBatchCount, setBatchTimes, setFinalRoundRoom } from "./eventConfig";
-import { BATCH_COUNT, BATCH_TIMES } from "../../judge/schedulePlan.js";
+import { setBatchCount, setBatchTimes, setFinalRoundRoom, setJudgesPerTeam } from "./eventConfig";
+import {
+  BATCH_COUNT,
+  BATCH_TIMES,
+  MIN_JUDGES_PER_TEAM,
+  MAX_JUDGES_PER_TEAM,
+  panelLabel,
+} from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService";
 
 /**
@@ -17,10 +23,15 @@ export default function ScheduleSection({ config, onResult }) {
   const storedCount = config.batchCount ?? BATCH_COUNT;
   const storedTimes = config.batchTimes ?? BATCH_TIMES;
   const storedRoom = config.finalRoundRoom ?? FINAL_ROUND_ROOM;
+  const storedMin = config.minJudgesPerTeam ?? MIN_JUDGES_PER_TEAM;
+  const storedMax = config.maxJudgesPerTeam ?? MAX_JUDGES_PER_TEAM;
 
   const [count, setCount] = useState(String(storedCount));
   const [times, setTimes] = useState(storedTimes);
   const [room, setRoom] = useState(storedRoom);
+  const [minJudges, setMinJudges] = useState(String(storedMin));
+  // blank is "no cap", which is how a null max reads back
+  const [maxJudges, setMaxJudges] = useState(storedMax == null ? "" : String(storedMax));
   const [busy, setBusy] = useState(false);
 
   // the database is the source of truth; re-sync when a write lands or another
@@ -28,6 +39,8 @@ export default function ScheduleSection({ config, onResult }) {
   useEffect(() => { setCount(String(storedCount)); }, [storedCount]);
   useEffect(() => { setTimes(storedTimes); }, [storedTimes]);
   useEffect(() => { setRoom(storedRoom); }, [storedRoom]);
+  useEffect(() => { setMinJudges(String(storedMin)); }, [storedMin]);
+  useEffect(() => { setMaxJudges(storedMax == null ? "" : String(storedMax)); }, [storedMax]);
 
   const run = async (work, message) => {
     setBusy(true);
@@ -39,6 +52,10 @@ export default function ScheduleSection({ config, onResult }) {
   };
 
   const batches = Array.from({ length: Number(count) || 0 }, (_, i) => i + 1);
+
+  const nextMin = Number(minJudges);
+  const nextMax = maxJudges.trim() === "" ? null : Number(maxJudges);
+  const panelUnchanged = nextMin === storedMin && nextMax === storedMax;
 
   return (
     <Section
@@ -103,6 +120,40 @@ export default function ScheduleSection({ config, onResult }) {
               }
             >
               Save times
+            </Button>
+          </SettingRow>
+
+          <SettingRow
+            label="Judges per team"
+            hint="First round only. Leave the max blank to seat every judge, spread evenly across the rooms. Too few judges for the min still builds, with a warning."
+          >
+            <TextField
+              type="number"
+              label="Min"
+              value={minJudges}
+              onChange={(event) => setMinJudges(event.target.value)}
+              inputProps={{ min: 1, "aria-label": "Min judges per team" }}
+              sx={{ width: FIELD.count }}
+            />
+            <TextField
+              type="number"
+              label="Max"
+              placeholder="No cap"
+              value={maxJudges}
+              onChange={(event) => setMaxJudges(event.target.value)}
+              inputProps={{ min: 1, "aria-label": "Max judges per team" }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: FIELD.count }}
+            />
+            <Button
+              variant="outlined"
+              disabled={busy || panelUnchanged}
+              onClick={() => run(
+                () => setJudgesPerTeam({ min: nextMin, max: nextMax }),
+                `Judges per team set to ${panelLabel(nextMin, nextMax)}`
+              )}
+            >
+              Save
             </Button>
           </SettingRow>
 
