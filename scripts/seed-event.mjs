@@ -239,8 +239,12 @@ async function main() {
 
   // ---- tree ----
   const now = Date.now();
+  // 15 minutes apart from 4:30 PM, matching BATCH_TIMES in schedulePlan.js
   const batchTimes = Object.fromEntries(
-    Array.from({ length: BATCHES }, (_, i) => [i + 1, `${5 + Math.floor(i / 4)}:${String((i * 15) % 60).padStart(2, "0")} PM`])
+    Array.from({ length: BATCHES }, (_, i) => {
+      const minutes = 4 * 60 + 30 + i * 15;
+      return [i + 1, `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")} PM`];
+    })
   );
 
   const teams = Array.from({ length: TEAMS }, (_, i) => ({
