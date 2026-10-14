@@ -96,6 +96,9 @@ checks every slot and every judge's cards:
 The spec skips itself under plain `test:e2e`. Run the two one after the other, not
 at once: they share the emulator ports.
 
+CI runs both in `.github/workflows/event-sizes.yml`, on pull requests that touch
+the judging code, the rules or the seed, alongside the main CI workflow.
+
 Two more specs check what assertions cannot:
 
 - **Accessibility** (`e2e/accessibility.spec.mjs`) runs axe against every page for

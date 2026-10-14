@@ -1,0 +1,84 @@
+name: Event sizes
+
+# The judging day in a real browser at the edges: one team in one room, and 150
+# teams across 50 rooms (e2e/event-sizes.spec.mjs). The scheduling arithmetic is
+# swept over thousands of sizes in the unit tests, against a fake database; only
+# this sees a page that slows down, or a publish the rules refuse, at scale.
+#
+# Its own workflow rather than a job in ci.yml, because `paths` filters a whole
+# workflow: this only runs when something judging depends on changes, and in
+# parallel with CI rather than after it.
+on:
+  pull_request:
+    paths:
+      - "src/user/judge/**"
+      - "src/user/admin/schedule/**"
+      - "src/user/admin/results/**"
+      - "src/user/admin/scores/**"
+      - "database.rules.json"
+      - "scripts/seed-event.mjs"
+      - "e2e/event-sizes.spec.mjs"
+      - "e2e/helpers.mjs"
+      - ".github/workflows/event-sizes.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: event-sizes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sizes:
+    name: Tiny and large events
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache the Firebase emulator
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: One team, one judge, one room
+        run: npm run test:e2e:tiny
+
+      # the two runs share the emulator ports; make sure the first let go
+      - name: Free the emulator ports
+        run: fuser -k 9000/tcp 9099/tcp 9199/tcp 4400/tcp 4500/tcp || true
+
+      - name: 150 teams, 160 judges, 50 rooms
+        run: npm run test:e2e:large
+
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-sizes-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
