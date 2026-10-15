@@ -30,7 +30,8 @@ import {
     Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import { PiArrowSquareOut, PiPresentationChart } from "react-icons/pi";
+import { PiArrowSquareOut } from "react-icons/pi";
+import PitchCard from "./PitchCard";
 
 // page title
 import usePageTitle from "../../usePageTitle";
@@ -372,26 +373,7 @@ function Team() {
 
                         <TeamIdCard teamId={teamId} />
 
-                        {/* When and where, as the sentence a team repeats to itself
-                            on the day, not two chips to decode. */}
-                        {(schedule || finalSlot) && (
-                            <Card sx={{ borderRadius: 4 }}>
-                                <CardContent sx={{ p: { xs: 2.5, sm: 3 }, "&:last-child": { pb: { xs: 2.5, sm: 3 } } }}>
-                                    <Stack spacing={1.25}>
-                                        {schedule && (
-                                            <PitchLine time={schedule.time} room={schedule.room} />
-                                        )}
-                                        {finalSlot && (
-                                            <PitchLine
-                                                label="Final round"
-                                                time={finalSlot.timeslot}
-                                                room={finalSlot.room}
-                                            />
-                                        )}
-                                    </Stack>
-                                </CardContent>
-                            </Card>
-                        )}
+                        <PitchCard schedule={schedule} finalSlot={finalSlot} />
 
                         {schedule || !accepting ? (
                             teamData.submission ? (
@@ -550,28 +532,6 @@ function Team() {
                 )}
             </Layout>
         </>
-    );
-}
-
-/** "You pitch at 5:00 PM in Rice 340." with the time and room in bold. */
-function PitchLine({ label, time, room }) {
-    return (
-        <Stack direction="row" alignItems="flex-start" sx={{ gap: 1.5 }}>
-            <Box aria-hidden sx={{ fontSize: 24, lineHeight: 0, mt: 0.25, color: "primary.main" }}>
-                <PiPresentationChart />
-            </Box>
-            <Box>
-                {label && (
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {label}
-                    </Typography>
-                )}
-                <Typography sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" }, fontWeight: 600, lineHeight: 1.3, color: "text.primary" }}>
-                    You pitch at <Box component="span" sx={{ fontWeight: 800 }}>{time}</Box> in{" "}
-                    <Box component="span" sx={{ fontWeight: 800 }}>{room}</Box>.
-                </Typography>
-            </Box>
-        </Stack>
     );
 }
 
