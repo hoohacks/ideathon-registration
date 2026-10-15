@@ -216,11 +216,11 @@ test("the final round is cut, published and handed to every judge in the room", 
   for (const [teamId, team] of Object.entries(after.teams)) {
     if (finalists.includes(teamId) !== Boolean(team.finalSlot)) broken.push(`${teamId}'s final slot is wrong`);
   }
-  // nobody checked out, so everyone marked for either round is in the room
+  // the final round is open to every checked-in judge, and the seed checks
+  // everyone in
   for (const [uid, j] of Object.entries(after.judges)) {
-    const marked = j.isRound1Judge || j.isFinalRoundJudge;
     const got = Object.keys(j.finalAssignments ?? {}).sort();
-    const want = marked ? finalists : [];
+    const want = j.checkedIn ? finalists : [];
     if (got.join() !== want.join()) broken.push(`${uid} has final cards for ${got}, expected ${want}`);
   }
   expect(broken).toEqual([]);

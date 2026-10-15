@@ -95,15 +95,14 @@ describe("the judge picker", () => {
     const options = judgePickerOptions({
       a: { firstName: "Zed", isRound1Judge: true, checkedIn: true },
       b: { firstName: "Abe", isRound1Judge: true, checkedIn: "yes" },
-      c: { firstName: "Cal", isFinalRoundJudge: true },
+      c: { firstName: "Cal" },
       d: { firstName: "Ann", isRound1Judge: true, checkedIn: true },
-      e: { firstName: "Out" },
     });
     expect(options).toEqual([
-      { uid: "d", name: "Ann", checkedIn: true, finalOnly: false },
-      { uid: "a", name: "Zed", checkedIn: true, finalOnly: false },
-      { uid: "b", name: "Abe", checkedIn: false, finalOnly: false },
-      { uid: "c", name: "Cal", checkedIn: false, finalOnly: true },
+      { uid: "d", name: "Ann", checkedIn: true, notRoundOne: false },
+      { uid: "a", name: "Zed", checkedIn: true, notRoundOne: false },
+      { uid: "b", name: "Abe", checkedIn: false, notRoundOne: false },
+      { uid: "c", name: "Cal", checkedIn: false, notRoundOne: true },
     ]);
   });
 });

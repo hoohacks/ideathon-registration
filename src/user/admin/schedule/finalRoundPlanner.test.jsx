@@ -62,8 +62,8 @@ beforeEach(() => {
   });
   db.reset({
     judges: {
-      j1: { firstName: "Priya", lastName: "Raman", isFinalRoundJudge: true },
-      j2: { firstName: "Sam", lastName: "Whitaker", isFinalRoundJudge: true },
+      j1: { firstName: "Priya", lastName: "Raman" },
+      j2: { firstName: "Sam", lastName: "Whitaker" },
       j3: { firstName: "Noor", lastName: "Haddad" },
     },
   });

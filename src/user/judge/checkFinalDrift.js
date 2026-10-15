@@ -85,7 +85,7 @@ export function checkFinalDrift(plan, live) {
   // ---- a judge on a panel has left the event ----
   //
   // Deliberately "is this still a judge at all", not "is this judge in the
-  // marked pool". The pool is who the build seats; an organizer may put any
+  // checked-in pool". The pool is who the build seats; an organizer may put any
   // registered judge on a panel by hand, so being outside it is a choice, not
   // drift. Checking the pool here would make every such hand edit
   // unpublishable -- the plan refusing to write the thing it was edited to

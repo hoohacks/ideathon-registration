@@ -57,7 +57,7 @@ beforeEach(() => {
   db.reset({
     judges: {
       j1: { firstName: "Priya", lastName: "Raman", isRound1Judge: true, checkedIn: true },
-      j2: { firstName: "Sam", lastName: "Whitaker", isFinalRoundJudge: true, checkedIn: false },
+      j2: { firstName: "Sam", lastName: "Whitaker", checkedIn: false },
     },
   });
   onClose = vi.fn();
@@ -218,13 +218,13 @@ describe("a team that submitted after the schedule was built", () => {
     );
   });
 
-  test("a final-round judge and one not yet checked in are labelled as such", async () => {
+  test("a judge not marked for the first round and not yet checked in is labelled as such", async () => {
     mock.findOpenSlots.mockResolvedValue([{ batch: 2, time: "5:15 PM", freeRooms: ["Rice 344"] }]);
     open(late);
     await screen.findByLabelText("Batch");
     await pick("Batch", /Batch 2/);
     fireEvent.mouseDown(screen.getByLabelText("Judges"));
     const listbox = await screen.findByRole("listbox");
-    expect(within(listbox).getByText(/Sam Whitaker \(final round judge\) \(not checked in\)/)).toBeInTheDocument();
+    expect(within(listbox).getByText(/Sam Whitaker \(not first round\) \(not checked in\)/)).toBeInTheDocument();
   });
 });

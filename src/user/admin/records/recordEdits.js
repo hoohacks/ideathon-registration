@@ -24,7 +24,7 @@ export const COMPETITOR_FIELDS = [
 
 export const JUDGE_FIELDS = [
   "firstName", "lastName", "email", "company", "withCompany", "wantsToMentor",
-  "checkedIn", "foodCheckIn", "isRound1Judge", "isFinalRoundJudge",
+  "checkedIn", "foodCheckIn", "isRound1Judge",
 ];
 
 /** Every path holding a copy of this team's name. Pure. */

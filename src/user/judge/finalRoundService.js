@@ -7,7 +7,7 @@ import { guardWith } from "../admin/snapshots.js";
 import { buildFinalPlan, slotsOf, slotLabel } from "./finalRoundPlan.js";
 import { checkFinalDrift, blockingOnly, BLOCKING } from "./checkFinalDrift.js";
 import { clearFinalDraft } from "./finalDraftStore.js";
-import { judgesEitherRound } from "./judgeRoles.js";
+import { judgesRoundOne } from "./judgeRoles.js";
 
 export const FINAL_ROUND_ROOM = "Rice 011";
 
@@ -60,14 +60,15 @@ export function rankTeams(teamsData, scoresByTeam) {
 }
 
 /**
- * Judges eligible to work the final round: everyone marked for either round who
- * has checked in, or -- if nobody has -- everyone marked, so a final round is
- * never silently assigned to nobody.
+ * Judges eligible to work the final round: every judge who has checked in, or
+ * -- if nobody has -- every first-round judge, so a final round is never
+ * silently assigned to nobody.
  *
- * Both marks count because both kinds of judge are in the room. The organizers
- * carry `isRound1Judge` and work both rounds; the professors and professionals
- * carry `isFinalRoundJudge` and are deliberately kept out of the first-round
- * schedule, which is `planSchedule`'s narrower filter, not this one.
+ * The final round is open to everyone, so there is no mark for it. Check-in is
+ * the gate instead: it is admin-set, so somebody who registered through the
+ * public form and never turned up is not handed a seat. The fallback stays on
+ * the first-round mark for the same reason -- it is the other thing only an
+ * admin can set.
  *
  * This used to iterate every registered judge, so somebody who signed up in
  * October and never turned up still received finalAssignments -- and that
@@ -76,9 +77,10 @@ export function rankTeams(teamsData, scoresByTeam) {
  * about who counts.
  */
 function eligibleJudgePool(judgesData) {
-  const marked = Object.entries(judgesData).filter(([, judge]) => judgesEitherRound(judge));
-  const workingJudges = marked.filter(([, judge]) => judge?.checkedIn === true);
-  return (workingJudges.length ? workingJudges : marked).map(([uid]) => uid);
+  const all = Object.entries(judgesData);
+  const checkedIn = all.filter(([, judge]) => judge?.checkedIn === true);
+  const pool = checkedIn.length ? checkedIn : all.filter(([, judge]) => judgesRoundOne(judge));
+  return pool.map(([uid]) => uid);
 }
 
 /**
@@ -132,24 +134,22 @@ function poolWithNames(judgesData) {
  *
  * Wider than the pool on purpose. The pool is who the build seats; this is
  * everyone an organizer may seat by hand, which has to include the judge who
- * registered five minutes ago and the one nobody has marked yet -- the two
+ * registered five minutes ago and the one nobody has checked in yet -- the two
  * cases that previously left an organizer clicking a picker that would never
  * contain the person standing in front of them.
  *
- * `marked` and `checkedIn` ride along so the picker can order and label them
- * rather than presenting a dormant October signup as an ordinary choice.
+ * `checkedIn` rides along so the picker can order and label them rather than
+ * presenting a dormant October signup as an ordinary choice.
  */
 export function allJudgesForPicker(judgesData) {
   return Object.entries(judgesData ?? {})
     .map(([uid, judge]) => ({
       judgeId: uid,
       judgeName: judgeNameOf(judge),
-      marked: judgesEitherRound(judge),
       checkedIn: judge?.checkedIn === true,
     }))
     .sort(
       (a, b) =>
-        Number(b.marked) - Number(a.marked) ||
         Number(b.checkedIn) - Number(a.checkedIn) ||
         a.judgeName.localeCompare(b.judgeName)
     );
@@ -192,7 +192,7 @@ export function warningsFor(plan) {
 
   if (!(plan?.pool ?? []).length) {
     warnings.push(
-      "No judges are marked for either round, so nobody can be given a final-round assignment."
+      "No judges have checked in or been marked for the first round, so nobody can be given a final-round assignment."
     );
   }
 

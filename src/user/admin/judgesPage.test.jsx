@@ -25,7 +25,7 @@ const judges = {
   },
   j2: {
     firstName: "Sam", lastName: "Whitaker", email: "sam@deloitte.com",
-    isFinalRoundJudge: true, checkedIn: false,
+    checkedIn: false,
   },
   j3: { firstName: "Noor", lastName: "Haddad", email: "noor@example.com", checkedIn: false },
 };
@@ -35,7 +35,7 @@ beforeEach(() => db.reset({ judges }));
 // a judge's row: the name's nearest ancestor that also holds the row's buttons
 const row = (name) => {
   let node = screen.getByText(name);
-  while (node && within(node).queryAllByRole("button").length < 4) node = node.parentElement;
+  while (node && within(node).queryAllByRole("button").length < 3) node = node.parentElement;
   return within(node);
 };
 // the filter pills share names with the row toggles, so they are reached
@@ -50,18 +50,17 @@ test("each judge shows their company and the teams they are seated on", () => {
   expect(screen.getByText("mentor")).toBeInTheDocument();
 });
 
-test("the header counts sign-ups, arrivals and both judging pools", () => {
+test("the header counts sign-ups, arrivals and the first-round pool", () => {
   renderPage(<JudgeSearch />);
   const count = (label) => screen.getByText(label).previousSibling.textContent;
   expect(count("signed up")).toBe("3");
   expect(count("checked in")).toBe("1");
   expect(count("first round")).toBe("1");
-  expect(count("final round")).toBe("1");
+  expect(screen.queryByText("final round")).not.toBeInTheDocument();
 });
 
 test.each([
   ["Mark first round", { isRound1Judge: true }],
-  ["Mark final round", { isFinalRoundJudge: true }],
   ["Check in", { checkedIn: true }],
 ])("%s writes only its own flag", async (label, expected) => {
   renderPage(<JudgeSearch />);
@@ -84,16 +83,22 @@ test("a flag that is on turns off, and says it is on while it is", async () => {
   );
 });
 
-test("the round filter separates the two pools and the unmarked", () => {
+test("the round filter separates the first-round pool from everyone else", () => {
   renderPage(<JudgeSearch />);
 
-  fireEvent.click(filter("Round", "Final round"));
+  fireEvent.click(filter("Round", "First round"));
+  expect(screen.getByText("Priya Raman")).toBeInTheDocument();
+  expect(screen.queryByText("Sam Whitaker")).not.toBeInTheDocument();
+
+  fireEvent.click(filter("Round", "Not first round"));
+  expect(screen.getByText("Noor Haddad")).toBeInTheDocument();
   expect(screen.getByText("Sam Whitaker")).toBeInTheDocument();
   expect(screen.queryByText("Priya Raman")).not.toBeInTheDocument();
+});
 
-  fireEvent.click(filter("Round", "Neither"));
-  expect(screen.getByText("Noor Haddad")).toBeInTheDocument();
-  expect(screen.queryByText("Sam Whitaker")).not.toBeInTheDocument();
+test("there is no final round mark to set", () => {
+  renderPage(<JudgeSearch />);
+  expect(row("Noor Haddad").queryByRole("button", { name: "Mark final round" })).not.toBeInTheDocument();
 });
 
 test("the check-in filter shows who has not arrived", () => {

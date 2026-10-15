@@ -107,7 +107,6 @@ describe("constants and blank records", () => {
       checkedIn: false,
       foodCheckIn: false,
       isRound1Judge: false,
-      isFinalRoundJudge: false,
       registeredAt: NOW,
     });
     expect(people.blankJudge()).toMatchObject({ firstName: "", lastName: "", email: "", company: "", withCompany: false });
@@ -193,13 +192,12 @@ describe("listing and searching", () => {
 });
 
 describe("describing a switch", () => {
-  test("a judge with assignments and both marks becoming a competitor", () => {
-    const person = { roles: ["admin", "judge"], judge: { ...grace, isFinalRoundJudge: true, teamAssignments: { a: {}, b: {} } } };
+  test("a marked judge with assignments becoming a competitor", () => {
+    const person = { roles: ["admin", "judge"], judge: { ...grace, isRound1Judge: true, teamAssignments: { a: {}, b: {} } } };
     expect(people.describeSwitch({ person, role: "competitor" })).toEqual([
       "Deletes their judge record.",
       "Removes 2 judging assignments, and their name from those teams' cards.",
       "Clears their first-round judge mark.",
-      "Clears their final-round judge mark.",
       "Scores they filed are kept, because they count toward averages.",
       "A copy of the record is archived, and can be put back.",
     ]);
@@ -549,7 +547,7 @@ describe("bulk edits", () => {
   });
 
   test("every judge field and both competitor fields are allowed", async () => {
-    for (const field of ["checkedIn", "foodCheckIn", "isRound1Judge", "isFinalRoundJudge"]) {
+    for (const field of ["checkedIn", "foodCheckIn", "isRound1Judge"]) {
       await expect(people.bulkSet({ uids: ["grace"], role: "judge", field, value: "x" })).resolves.toMatchObject({ ok: true });
     }
     for (const field of ["checkedIn", "foodCheckIn"]) {

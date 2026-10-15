@@ -42,8 +42,7 @@ describe("a thin schedule", () => {
         jc: judge("Cy"),
         ja: judge("Ada", { lastName: "Byron" }),
         jb: judge("Bo"),
-        jf: { firstName: "Fay", isFinalRoundJudge: true },
-        jz: { firstName: "Unmarked" },
+        jf: { firstName: "Fay" },
       },
     })
   );
@@ -97,7 +96,7 @@ describe("a thin schedule", () => {
     });
     expect(plan.onlyCheckedIn).toBe(false);
     expect(plan.judgeNames).toEqual({ jc: "Cy", ja: "Ada Byron", jb: "Bo", jf: "Fay" });
-    expect(plan.finalOnlyJudgeIds).toEqual(["jf"]);
+    expect(plan.notRoundOneJudgeIds).toEqual(["jf"]);
     expect(plan.teamNames).toEqual({ tb: "Beacon", ta: "Anchor" });
   });
 });

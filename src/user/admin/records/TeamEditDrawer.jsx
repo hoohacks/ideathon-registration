@@ -202,8 +202,9 @@ function ScheduleIntoBatch({ teamId, run, saving }) {
       .then(([openSlots, judgesData]) => {
         if (!live) return;
         setSlots(openSlots);
-        // both roles, because this places a team by hand: the generator would
-        // not seat a final-round judge, but an organizer filling a gap may
+        // every judge, because this places a team by hand: the generator only
+        // seats first-round judges, but an organizer filling a gap may reach
+        // past them
         setJudges(judgePickerOptions(judgesData));
       })
       .catch(() => { if (live) setSlots([]); })
@@ -274,7 +275,7 @@ function ScheduleIntoBatch({ teamId, run, saving }) {
         {judges.map((judge) => (
           <MenuItem key={judge.uid} value={judge.uid}>
             {judge.name}
-            {judge.finalOnly ? " (final round judge)" : ""}
+            {judge.notRoundOne ? " (not first round)" : ""}
             {judge.checkedIn ? "" : " (not checked in)"}
           </MenuItem>
         ))}

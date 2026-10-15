@@ -71,17 +71,18 @@
         ".read": "auth != null && $uid === auth.uid",
 
         // A judge writes their own record once, at registration. isRound1Judge,
-        // isFinalRoundJudge, checkedIn, teamAssignments and finalAssignments are
-        // set by admins through the root rule, so a judge cannot add themselves
-        // to either judging pool, check themselves in, or hand themselves extra
-        // teams.
+        // checkedIn, teamAssignments and finalAssignments are set by admins
+        // through the root rule, so a judge cannot add themselves to the first
+        // round, check themselves into the final round pool, or hand
+        // themselves extra teams.
         //
         // finalAssignments is the load-bearing one: the /scores write rule
         // treats an entry there as proof of assignment, so a judge who could
         // seed it at registration could file a final-round score for any team.
-        // isFinalRoundJudge is one step behind it -- it is what puts somebody in
-        // the pool the final round plan seats, and publishing that plan is what
-        // turns a seat into finalAssignments.
+        // checkedIn is one step behind it -- it is what puts somebody in the
+        // pool the final round plan seats, and publishing that plan is what
+        // turns a seat into finalAssignments. isFinalRoundJudge is a retired
+        // field, still refused so the deployed rules did not have to change.
         ".write": "auth != null && $uid === auth.uid && !data.exists() && !newData.hasChild('isRound1Judge') && !newData.hasChild('isFinalRoundJudge') && !newData.hasChild('teamAssignments') && !newData.hasChild('finalAssignments') && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false",
 
         // Final round assignments, denormalised the same way teamAssignments

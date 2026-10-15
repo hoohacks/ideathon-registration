@@ -58,7 +58,7 @@ describe("the allow-lists", () => {
     expect(COMPETITOR_FIELDS).toEqual(["firstName", "lastName", "email", "dietaryRestriction", "checkedIn", "foodCheckIn"]);
     expect(JUDGE_FIELDS).toEqual([
       "firstName", "lastName", "email", "company", "withCompany", "wantsToMentor",
-      "checkedIn", "foodCheckIn", "isRound1Judge", "isFinalRoundJudge",
+      "checkedIn", "foodCheckIn", "isRound1Judge",
     ]);
   });
 });
@@ -99,14 +99,15 @@ describe("editing a competitor", () => {
 
 describe("editing a judge", () => {
   test("uses the judge allow-list and logs as a judge edit", async () => {
-    await editJudge(JUDGE, { company: "Harvard", isFinalRoundJudge: true, teamAssignments: {} });
+    await editJudge(JUDGE, { company: "Harvard", isRound1Judge: true, isFinalRoundJudge: true, teamAssignments: {} });
     expect(db.getData(`judges/${JUDGE}/company`)).toBe("Harvard");
-    expect(db.getData(`judges/${JUDGE}/isFinalRoundJudge`)).toBe(true);
+    expect(db.getData(`judges/${JUDGE}/isRound1Judge`)).toBe(true);
+    expect(db.getData(`judges/${JUDGE}/isFinalRoundJudge`)).toBeNull();
     expect(db.getData(`judges/${JUDGE}/teamAssignments`)).toEqual({ t1: { id: "t1", teamName: "Lantern" } });
 
     const log = onlyLog();
     expect(log.action).toBe("judge.edit");
-    expect(log.summary).toBe("Edited judge judge-ui: company, isFinalRoundJudge");
+    expect(log.summary).toBe("Edited judge judge-ui: company, isRound1Judge");
   });
 
   test("a competitor-only field is not editable on a judge", async () => {

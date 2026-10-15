@@ -10,9 +10,9 @@
  * Nor does scoring a team in round one bar anybody from it -- the finalists
  * present in sequence to one room, so everyone there scores everyone.
  *
- * Nor is `pool` a gate. It is who the BUILD seated -- the marked, checked-in
- * judges -- and an organizer may put any registered judge on a panel by hand.
- * That is the only way to seat somebody who registered, or was marked, after
+ * Nor is `pool` a gate. It is who the BUILD seated -- the checked-in judges --
+ * and an organizer may put any registered judge on a panel by hand.
+ * That is the only way to seat somebody who registered, or checked in, after
  * the plan was built, and refusing it was a dead end with nothing on screen to
  * explain it. A caller adding somebody from outside the pool passes their
  * record as `op.judge`, and they join `pool` so the stats, the publish and the

@@ -241,7 +241,7 @@ describe("reading the live basis", () => {
       judges: {
         jb: { firstName: "Bea", lastName: "Lee", isRound1Judge: true, checkedIn: true },
         ja: { isRound1Judge: true },
-        jf: { firstName: "Final", isFinalRoundJudge: true },
+        jf: { firstName: "Final" },
       },
       teams: { tb: { name: "B", submitted: true }, ta: { submitted: true }, tx: { name: "Draft" }, tn: null },
       config: { judgingRooms: ["R1"], batchCount: 2, batchTimes: { 1: "x", 2: "y" }, minJudgesPerTeam: 2, maxJudgesPerTeam: 4 },

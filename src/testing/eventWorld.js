@@ -25,8 +25,8 @@ export const pick = (random, list) => list[Math.floor(random() * list.length)];
  * A database tree for an event.
  *
  * `teams` submitted teams (plus `unsubmitted` that are not), `judges` round-one
- * judges (the first `absent` of them not checked in), `finalOnly` judges marked
- * for the final round only, and `rooms` rooms. `min`, `max` and `batches` go to
+ * judges (the first `absent` of them not checked in), `finalOnly` judges not marked
+ * for round one, and `rooms` rooms. `min`, `max` and `batches` go to
  * config only when given, so the built-in defaults are what is tested otherwise.
  */
 export function eventTree({
@@ -62,7 +62,6 @@ export function eventTree({
     judgesData[`f${String(i).padStart(4, "0")}`] = {
       firstName: "Prof",
       lastName: String(i),
-      isFinalRoundJudge: true,
       checkedIn: true,
     };
   }

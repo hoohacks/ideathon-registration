@@ -78,8 +78,8 @@ The Final round tab on the same page, or **Plan final round** on Judging progres
 
 Building ranks every submitted team on its first-round average, cuts the top
 `config/finalRoundSize` (default 4), and seats every eligible judge on every
-panel: everyone marked for either round who has checked in, or everyone marked if
-nobody has. The finalists present in sequence to one room, so whoever is in it
+panel. The final round is open to every judge, so there is no mark for it: the
+pool is everyone who has checked in, or every first-round judge if nobody has. The finalists present in sequence to one room, so whoever is in it
 hears every pitch, and **scoring a team in round one does not bar a judge from
 it in the final**. Correct the running order and the panels, then publish.
 
