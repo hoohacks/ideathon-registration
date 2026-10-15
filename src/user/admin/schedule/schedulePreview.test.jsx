@@ -13,7 +13,7 @@
  * refusal from `applyEdit` is exactly what the "refused edit" case needs.
  */
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
@@ -34,8 +34,9 @@ vi.mock("firebase/database", () => ({
   set: vi.fn(async () => {}),
   update: vi.fn(async () => {}),
   push: vi.fn(() => ({ key: "new-id" })),
-  onValue: (_ref, cb) => {
-    cb({ exists: () => false, val: () => null });
+  onValue: (r, cb) => {
+    const value = globalThis.__onValueData?.[r?.path] ?? null;
+    cb({ exists: () => value !== null, val: () => value });
     return () => {};
   },
   query: (r) => r,
@@ -155,6 +156,27 @@ test("with no draft, the build control renders and the page does not crash", asy
   mockSubscribeDraft.mockImplementation((cb) => { cb(null); return () => {}; });
   renderPage(<SchedulePreview />);
   expect(await screen.findByRole("button", { name: "Build a plan" })).toBeInTheDocument();
+});
+
+test("the build control says who is scheduled, counted from the judges", async () => {
+  globalThis.__onValueData = {
+    judges: {
+      a: { isRound1Judge: true, checkedIn: true },
+      b: { isRound1Judge: true },
+      c: { isRound1Judge: true, checkedIn: true },
+      d: { checkedIn: true },
+    },
+  };
+  mockSubscribeDraft.mockImplementation((cb) => { cb(null); return () => {}; });
+  renderPage(<SchedulePreview />);
+
+  expect(await screen.findByText(/Only judges marked for the first round are scheduled: 3 right now/)).toBeInTheDocument();
+  const box = screen.getByRole("checkbox", { name: /not checked in \(2 of 3 checked in\)/ });
+  expect(screen.getByText("Every first-round judge gets teams, checked in or not.")).toBeInTheDocument();
+
+  fireEvent.click(box);
+  expect(screen.getByText("Only first-round judges who are checked in get teams.")).toBeInTheDocument();
+  delete globalThis.__onValueData;
 });
 
 // ---- 2. A draft's teams and judges render -----------------------------------
