@@ -140,16 +140,16 @@ test("every panel is prefilled with the whole pool", async () => {
   expect(plan.assignments.t1.judges.map((j) => j.judgeId)).toEqual(["j0", "j1", "j2", "j3", "j4"]);
 });
 
-test("a final-round judge is in the pool without judging round one", async () => {
-  judgesData.prof = { firstName: "Ada", lastName: "Prof", isFinalRoundJudge: true, checkedIn: true };
+test("a checked-in judge is in the pool without judging round one", async () => {
+  judgesData.prof = { firstName: "Ada", lastName: "Prof", checkedIn: true };
 
   const { plan } = await planFinalRound({});
   expect(plan.pool.map((judge) => judge.judgeId)).toContain("prof");
   expect(plan.assignments.t0.judges.map((j) => j.judgeId)).toContain("prof");
 });
 
-test("somebody marked for neither round is in no pool at all", async () => {
-  judgesData.nobody = { firstName: "Un", lastName: "Marked", checkedIn: true };
+test("somebody who has not checked in is not in the pool", async () => {
+  judgesData.nobody = { firstName: "Not", lastName: "Here", isRound1Judge: true };
 
   const { plan } = await planFinalRound({});
   expect(plan.pool.map((judge) => judge.judgeId)).not.toContain("nobody");
@@ -164,18 +164,18 @@ describe("the roster the per-team picker offers", () => {
     expect(roster.map((j) => j.judgeId)).toContain("newbie");
   });
 
-  test("it says who is unmarked, so the picker can label them", () => {
+  test("it says who has not checked in, so the picker can label them", () => {
     const roster = allJudgesForPicker({
-      marked: { firstName: "A", lastName: "B", isFinalRoundJudge: true },
-      unmarked: { firstName: "C", lastName: "D" },
+      here: { firstName: "A", lastName: "B", checkedIn: true },
+      away: { firstName: "C", lastName: "D" },
     });
-    expect(roster.find((j) => j.judgeId === "marked").marked).toBe(true);
-    expect(roster.find((j) => j.judgeId === "unmarked").marked).toBe(false);
+    expect(roster.find((j) => j.judgeId === "here").checkedIn).toBe(true);
+    expect(roster.find((j) => j.judgeId === "away").checkedIn).toBe(false);
   });
 
-  test("marked judges come first, so the usual choice is not buried", () => {
+  test("checked-in judges come first, so the usual choice is not buried", () => {
     const roster = allJudgesForPicker({
-      zed: { firstName: "Zed", isFinalRoundJudge: true },
+      zed: { firstName: "Zed", checkedIn: true },
       abe: { firstName: "Abe" },
     });
     expect(roster.map((j) => j.judgeId)).toEqual(["zed", "abe"]);

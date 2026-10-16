@@ -43,7 +43,7 @@ const seed = () => ({
   },
   judges: {
     j1: { firstName: "Ada", lastName: "Byron", isRound1Judge: true, checkedIn: true },
-    j2: { firstName: "Grace", isFinalRoundJudge: true },
+    j2: { firstName: "Grace" },
     j3: { firstName: "Unmarked", checkedIn: true },
     j4: { lastName: "Absent", isRound1Judge: true },
   },
@@ -103,22 +103,22 @@ describe("reading and ranking", () => {
 });
 
 describe("the judge picker", () => {
-  test("offers everyone: marked before unmarked, checked in before absent, then by name", () => {
+  test("offers everyone: checked in before absent, then by name", () => {
     const judges = {
       a: { firstName: "Zoe", isRound1Judge: true },
-      b: { firstName: "Yan", isFinalRoundJudge: true, checkedIn: true },
+      b: { firstName: "Yan", checkedIn: true },
       c: { firstName: "Xia", checkedIn: true },
       d: { firstName: "Abe" },
       e: { firstName: "Bea", isRound1Judge: true },
       f: { lastName: "  " },
     };
     expect(allJudgesForPicker(judges)).toEqual([
-      { judgeId: "b", judgeName: "Yan", marked: true, checkedIn: true },
-      { judgeId: "e", judgeName: "Bea", marked: true, checkedIn: false },
-      { judgeId: "a", judgeName: "Zoe", marked: true, checkedIn: false },
-      { judgeId: "c", judgeName: "Xia", marked: false, checkedIn: true },
-      { judgeId: "d", judgeName: "Abe", marked: false, checkedIn: false },
-      { judgeId: "f", judgeName: "Unnamed Judge", marked: false, checkedIn: false },
+      { judgeId: "c", judgeName: "Xia", checkedIn: true },
+      { judgeId: "b", judgeName: "Yan", checkedIn: true },
+      { judgeId: "d", judgeName: "Abe", checkedIn: false },
+      { judgeId: "e", judgeName: "Bea", checkedIn: false },
+      { judgeId: "f", judgeName: "Unnamed Judge", checkedIn: false },
+      { judgeId: "a", judgeName: "Zoe", checkedIn: false },
     ]);
   });
 
@@ -196,17 +196,17 @@ describe("warnings", () => {
       },
     });
     expect(warningsFor(empty)).toEqual([
-      "No judges are marked for either round, so nobody can be given a final-round assignment.",
+      "No judges have checked in or been marked for the first round, so nobody can be given a final-round assignment.",
       "A, B has nobody on its panel and will present to an empty room.",
     ]);
     expect(warningsFor(plan({ ranked: fine, pool: undefined }))).toEqual([
-      "No judges are marked for either round, so nobody can be given a final-round assignment.",
+      "No judges have checked in or been marked for the first round, so nobody can be given a final-round assignment.",
     ]);
   });
 });
 
 describe("planning", () => {
-  test("cuts the submitted teams to the configured size and seats the checked-in marked judges", async () => {
+  test("cuts the submitted teams to the configured size and seats every checked-in judge", async () => {
     const result = await planFinalRound();
     expect(result.ok).toBe(true);
     expect(result.error).toBeNull();
@@ -215,10 +215,11 @@ describe("planning", () => {
     expect(plan.ranked.map((t) => t.teamId)).toEqual(["t1", "t2", "t3"]);
     expect(plan.size).toBe(2);
     expect(plan.room).toBe("Rice 011");
-    expect(plan.pool).toEqual([{ judgeId: "j1", judgeName: "Ada Byron" }]);
+    const pool = [{ judgeId: "j1", judgeName: "Ada Byron" }, { judgeId: "j3", judgeName: "Unmarked" }];
+    expect(plan.pool).toEqual(pool);
     expect(Object.values(plan.assignments)).toEqual([
-      { teamId: "t1", teamName: "Lantern", order: 0, judges: [{ judgeId: "j1", judgeName: "Ada Byron" }] },
-      { teamId: "t2", teamName: "Circles", order: 1, judges: [{ judgeId: "j1", judgeName: "Ada Byron" }] },
+      { teamId: "t1", teamName: "Lantern", order: 0, judges: pool },
+      { teamId: "t2", teamName: "Circles", order: 1, judges: pool },
     ]);
     expect(result.warnings).toEqual([
       "Circles reached the final on fewer than 2 judges.",
@@ -231,19 +232,25 @@ describe("planning", () => {
     expect(plan.ranked.map((t) => t.teamId)).toEqual(["t4", "t1", "t2", "t3"]);
   });
 
-  test("uses the configured room, and seats every marked judge when nobody has checked in", async () => {
+  test("uses the configured room, and seats every first-round judge when nobody has checked in", async () => {
     db.setData("config/finalRoundRoom", "Olsson 120");
     db.setData("judges/j1/checkedIn", false);
     db.setData("judges/j3/checkedIn", false);
     const { plan } = await planFinalRound();
     expect(plan.room).toBe("Olsson 120");
-    expect(plan.pool.map((j) => j.judgeId)).toEqual(["j1", "j2", "j4"]);
-    expect(plan.pool.map((j) => j.judgeName)).toEqual(["Ada Byron", "Grace", "Absent"]);
+    expect(plan.pool.map((j) => j.judgeId)).toEqual(["j1", "j4"]);
+    expect(plan.pool.map((j) => j.judgeName)).toEqual(["Ada Byron", "Absent"]);
   });
 
-  test("an unmarked judge who checked in is not seated", async () => {
+  test("a judge not marked for the first round who checked in is seated", async () => {
     const { plan } = await planFinalRound();
-    expect(plan.pool.map((j) => j.judgeId)).not.toContain("j3");
+    expect(plan.pool.map((j) => j.judgeId)).toContain("j3");
+  });
+
+  test("a judge who has not checked in is not seated", async () => {
+    const { plan } = await planFinalRound();
+    expect(plan.pool.map((j) => j.judgeId)).not.toContain("j2");
+    expect(plan.pool.map((j) => j.judgeId)).not.toContain("j4");
   });
 
   test.each([
@@ -307,7 +314,7 @@ describe("the live basis", () => {
     const live = await readLiveFinalBasis();
     expect(live).toEqual({
       cardCounts: { t1: 2, t2: 1, t3: 1, t4: 1, t5: 0 },
-      eligibleJudges: { j1: true },
+      eligibleJudges: { j1: true, j3: true },
       registeredJudges: { j1: true, j2: true, j3: true, j4: true },
       submitted: { t1: true, t2: true, t3: true, t4: false, t5: true },
       room: "Rice 011",

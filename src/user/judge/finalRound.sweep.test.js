@@ -40,7 +40,7 @@ function card(random, flat) {
 /**
  * An event after round one: `teams` submitted teams, a few unsubmitted ones
  * that were scored anyway, `judges` round-one judges (some not checked in),
- * `finalOnly` final-round-only judges, and each team scored by up to
+ * `finalOnly` judges not marked for round one, and each team scored by up to
  * `cardsPerTeam` judges -- or by nobody, for a share of them.
  */
 function afterRoundOne({ teams, judges, finalOnly = 0, absent = 0, cardsPerTeam = 3, size, flat = false, seed = 1 }) {
@@ -52,9 +52,9 @@ function afterRoundOne({ teams, judges, finalOnly = 0, absent = 0, cardsPerTeam 
     tree.judges[id("j", i)] = { firstName: "Judge", lastName: String(i), isRound1Judge: true, checkedIn: i >= absent };
   }
   for (let i = 0; i < finalOnly; i++) {
-    tree.judges[id("f", i)] = { firstName: "Prof", lastName: String(i), isFinalRoundJudge: true, checkedIn: true };
+    tree.judges[id("f", i)] = { firstName: "Prof", lastName: String(i), checkedIn: true };
   }
-  tree.judges.unmarked = { firstName: "Never", lastName: "Marked", checkedIn: true };
+  tree.judges.away = { firstName: "Never", lastName: "Arrived", isRound1Judge: true, checkedIn: false };
 
   const judgeIds = Object.keys(tree.judges).filter((uid) => uid.startsWith("j"));
   const addCards = (teamId) => {
@@ -101,9 +101,9 @@ function expectedRanking(tree) {
 
 /** Who the build should seat on every panel. */
 function expectedPool(tree) {
-  const marked = Object.entries(tree.judges).filter(([, j]) => j.isRound1Judge || j.isFinalRoundJudge);
-  const here = marked.filter(([, j]) => j.checkedIn);
-  return (here.length ? here : marked).map(([uid]) => uid).sort();
+  const all = Object.entries(tree.judges);
+  const here = all.filter(([, j]) => j.checkedIn);
+  return (here.length ? here : all.filter(([, j]) => j.isRound1Judge)).map(([uid]) => uid).sort();
 }
 
 const SIZES = [];
@@ -182,7 +182,7 @@ describe("publishing the final round", () => {
       const tree = afterRoundOne({ ...event, seed: 5 });
       // a previous activation's leftovers, which publishing has to clear
       tree.teams.t0000.finalSlot = { room: "Old", timeslot: "Slot 9" };
-      tree.judges.unmarked.finalAssignments = { gone: { teamId: "gone" } };
+      tree.judges.away.finalAssignments = { gone: { teamId: "gone" } };
       db.reset(tree);
       const label = JSON.stringify(event);
 

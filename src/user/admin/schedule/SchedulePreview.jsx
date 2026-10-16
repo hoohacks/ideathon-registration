@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LinesSkeleton } from "../../../loadingUi";
 import { useNavigate } from "react-router-dom";
-import { ref, get } from "firebase/database";
+import { ref, get, onValue } from "firebase/database";
 import {
   Alert, Box, Button, Card, Checkbox, FormControlLabel, Snackbar, Stack, Typography,
 } from "@mui/material";
@@ -12,6 +12,7 @@ import PlanGrid from "./PlanGrid.jsx";
 import TeamSlotDrawer from "./TeamSlotDrawer.jsx";
 import DriftPanel from "./DriftPanel.jsx";
 import { planSchedule } from "../../judge/planSchedule.js";
+import { judgesRoundOne } from "../../judge/judgeRoles.js";
 import { subscribeDraft, saveDraft, clearDraft } from "../../judge/draftStore.js";
 import { applyEdit, applyRepair, undoEdit } from "../../judge/applyEdit.js";
 import { computeStats } from "../../judge/computeStats.js";
@@ -61,6 +62,24 @@ export default function SchedulePreview({ header = null }) {
   const [plan, setPlan] = useState(undefined);
 
   const [onlyCheckedIn, setOnlyCheckedIn] = useState(false);
+  // who the build would allocate from, so the check-in choice says what it
+  // actually leaves out rather than leaving the organizer to guess
+  const [pool, setPool] = useState(null);
+  useEffect(
+    () =>
+      onValue(
+        ref(database, "judges"),
+        (snapshot) => {
+          const roundOne = Object.values(snapshot.val() ?? {}).filter(judgesRoundOne);
+          setPool({
+            roundOne: roundOne.length,
+            checkedIn: roundOne.filter((judge) => judge?.checkedIn === true).length,
+          });
+        },
+        (error) => console.error("Could not read the judges for the schedule pool:", error)
+      ),
+    []
+  );
   const [building, setBuilding] = useState(false);
   const [buildResult, setBuildResult] = useState(null);
 
@@ -298,15 +317,31 @@ export default function SchedulePreview({ header = null }) {
               written until you publish it.
             </Typography>
 
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={onlyCheckedIn}
-                  onChange={(event) => setOnlyCheckedIn(event.target.checked)}
-                />
-              }
-              label="Only schedule judges who have checked in"
-            />
+            <Typography variant="body2">
+              Only judges marked for the first round are scheduled
+              {pool ? `: ${pool.roundOne} right now` : ""}. Mark them on the Judges page.
+              Everyone else judges the final round only.
+            </Typography>
+
+            <Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={onlyCheckedIn}
+                    onChange={(event) => setOnlyCheckedIn(event.target.checked)}
+                  />
+                }
+                label={
+                  "Leave out first-round judges who have not checked in" +
+                  (pool ? ` (${pool.checkedIn} of ${pool.roundOne} checked in)` : "")
+                }
+              />
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                {onlyCheckedIn
+                  ? "Only first-round judges who are checked in get teams."
+                  : "Every first-round judge gets teams, checked in or not."}
+              </Typography>
+            </Box>
 
             <Button
               variant="contained"

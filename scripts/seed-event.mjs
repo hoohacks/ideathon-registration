@@ -20,8 +20,8 @@
  *
  * Options:
  *   --teams=10 --judges=12 --rooms=10 --batches=3
- *   --final-judges=4  judges marked for the final round only -- the professors
- *                   and professionals, who are never given a first-round batch
+ *   --unmarked-judges=4  judges not marked for the first round, who only
+ *                   judge the final and are never given a first-round batch
  *   --scores        also file first-round score cards, so the final round and
  *                   the standings can be exercised straight away
  *   --schedule      also generate the first-round schedule
@@ -46,7 +46,7 @@ const args = Object.fromEntries(
 
 const TEAMS = Number(args.teams ?? 10);
 const JUDGES = Number(args.judges ?? 12);
-const FINAL_JUDGES = Number(args["final-judges"] ?? 4);
+const UNMARKED_JUDGES = Number(args["unmarked-judges"] ?? 4);
 const ROOMS = Number(args.rooms ?? 10);
 const BATCHES = Number(args.batches ?? 3);
 const PASSWORD = String(args.password ?? "testtest");
@@ -189,7 +189,7 @@ function buildSchedule(teams, judges, rooms, batchTimes) {
 async function main() {
   console.log(`\nSeeding ${PROJECT_ID} on the emulator`);
   console.log(
-    `  ${TEAMS} teams · ${JUDGES} judges (+${FINAL_JUDGES} final round) · ` +
+    `  ${TEAMS} teams · ${JUDGES} judges (+${UNMARKED_JUDGES} final round only) · ` +
     `${ROOMS} rooms · ${BATCHES} batches\n`
   );
 
@@ -200,11 +200,11 @@ async function main() {
   process.stdout.write("  creating accounts... ");
   const adminUid = await createAccount("admin@example.com");
 
-  // The first JUDGES are organizers (round one, and in the room for the final);
-  // the rest are marked for the final round only, so a seeded event exercises
-  // both roles -- including the generator's refusal to seat the second kind.
+  // The first JUDGES are marked for round one; the rest are left unmarked, so
+  // they only judge the final and a seeded event exercises the generator's
+  // refusal to seat them.
   const judges = [];
-  for (let i = 0; i < JUDGES + FINAL_JUDGES; i++) {
+  for (let i = 0; i < JUDGES + UNMARKED_JUDGES; i++) {
     const { firstName, lastName } = person(i);
     judges.push({
       uid: await createAccount(`judge${i + 1}@example.com`),
@@ -212,7 +212,7 @@ async function main() {
       lastName,
       name: `${firstName} ${lastName}`,
       index: i,
-      finalOnly: i >= JUDGES,
+      roundOne: i < JUDGES,
     });
   }
 
@@ -273,8 +273,7 @@ async function main() {
       timeslots: i % 3 === 0 ? [MENTOR_SHIFTS[(i / 3) % 4], MENTOR_SHIFTS[((i / 3) % 4) + 1]] : [],
       checkedIn: true,
       foodCheckIn: false,
-      isRound1Judge: !judge.finalOnly,
-      isFinalRoundJudge: judge.finalOnly,
+      isRound1Judge: judge.roundOne,
       registeredAt: now - (JUDGES - i) * 60000,
     };
   });
@@ -322,9 +321,8 @@ async function main() {
 
   // ---- optional schedule and scores ----
   if (WITH_SCHEDULE) {
-    // round-one judges only, the same filter planSchedule applies: a judge
-    // marked for the final round is not in the building for the first one
-    const roundOneJudges = judges.filter((judge) => !judge.finalOnly);
+    // round-one judges only, the same filter planSchedule applies
+    const roundOneJudges = judges.filter((judge) => judge.roundOne);
     const { byTeam, byJudge } = buildSchedule(
       teams,
       roundOneJudges,
@@ -386,16 +384,16 @@ async function main() {
   console.log("  Sign in with any of these (password: " + PASSWORD + ")");
   console.log("    admin@example.com          organizer, listed in /admins");
   console.log(`    judge1@example.com  …  judge${JUDGES}@example.com  round one`);
-  if (FINAL_JUDGES > 0) {
+  if (UNMARKED_JUDGES > 0) {
     console.log(
-      `    judge${JUDGES + 1}@example.com  …  judge${JUDGES + FINAL_JUDGES}@example.com  final round only`
+      `    judge${JUDGES + 1}@example.com  …  judge${JUDGES + UNMARKED_JUDGES}@example.com  final round only`
     );
   }
   console.log(`    competitor1@example.com  …  competitor${TEAMS * MEMBERS_PER_TEAM}@example.com`);
   console.log("\n  State:");
   console.log(
     `    ${TEAMS} teams, all submitted · ${JUDGES} round-one judges and ` +
-    `${FINAL_JUDGES} final-round judges, all checked in`
+    `${UNMARKED_JUDGES} final-round-only judges, all checked in`
   );
   console.log(`    schedule: ${WITH_SCHEDULE ? "generated" : "not generated — press Generate Schedule"}`);
   console.log(`    scores:   ${WITH_SCORES ? "filed for every assignment" : "none"}`);

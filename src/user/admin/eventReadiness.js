@@ -23,7 +23,7 @@ export const REQUIRED_RULES_VERSION = 10;
  * The app knew all of this and told nobody. Every constraint in it was enforced
  * at the moment it was violated -- building a plan refuses when no rooms are
  * configured, refuses again when there are too few first-round judges, and the
- * final round produces no assignments when nobody is marked. Each of those is a
+ * final round produces no assignments when nobody is checked in. Each of those is a
  * good refusal in the wrong place: you meet it while trying to do the thing,
  * not while there is still time to fix it.
  *
@@ -67,10 +67,6 @@ function countJudges(judges) {
   return {
     total: all.length,
     roundOne: all.filter((judge) => judge?.isRound1Judge === true).length,
-    // counted, but deliberately not fed to describeSupply below: the supply
-    // question is "can the first round run", and these judges are not in the
-    // building for it
-    finalRound: all.filter((judge) => judge?.isFinalRoundJudge === true).length,
     checkedIn: all.filter((judge) => judge?.checkedIn === true).length,
   };
 }

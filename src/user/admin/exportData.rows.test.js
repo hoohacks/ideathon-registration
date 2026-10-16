@@ -52,7 +52,7 @@ const world = {
       checkedIn: true,
       teamAssignments: { tA: { id: "tA", teamName: "Anchor", batch: 1 }, tB: { teamId: "tB", teamName: "Beacon", batch: 2 } },
     },
-    j2: { firstName: "Grace", isFinalRoundJudge: true, teamAssignments: { tC: { id: "tC", teamName: "Compass", batch: 1 } } },
+    j2: { firstName: "Grace", teamAssignments: { tC: { id: "tC", teamName: "Compass", batch: 1 } } },
     j3: {},
   },
   competitors: {
@@ -187,33 +187,33 @@ describe("standings", () => {
 describe("judges", () => {
   test("one row per judge with what they owe", () => {
     expect(judgeRows(world, "first")).toEqual([
-      ["Judge", "Judge UID", "Email", "Company", "Round 1", "Final round", "Checked in", "Assigned", "Submitted", "Outstanding"],
-      ["Ada Byron", "j1", "ada@x.io", "Engines", "yes", "no", "yes", 2, 1, "Beacon"],
-      ["Grace", "j2", "", "", "no", "yes", "no", 1, 0, "Compass"],
-      ["Unknown", "j3", "", "", "no", "no", "no", 0, 0, ""],
+      ["Judge", "Judge UID", "Email", "Company", "Round 1", "Checked in", "Assigned", "Submitted", "Outstanding"],
+      ["Ada Byron", "j1", "ada@x.io", "Engines", "yes", "yes", 2, 1, "Beacon"],
+      ["Grace", "j2", "", "", "no", "no", 1, 0, "Compass"],
+      ["Unknown", "j3", "", "", "no", "no", 0, 0, ""],
     ]);
   });
 
   test("defaults to the first round, and counts the final round when asked", () => {
     expect(judgeRows(world)).toEqual(judgeRows(world, "first"));
-    expect(judgeRows(world, "final")[2]).toEqual(["Grace", "j2", "", "", "no", "yes", "no", 1, 1, ""]);
+    expect(judgeRows(world, "final")[2]).toEqual(["Grace", "j2", "", "", "no", "no", 1, 1, ""]);
   });
 
   test("several outstanding teams are listed with semicolons", () => {
-    expect(judgeRows({ judges: { j1: world.judges.j1 }, scores: {} })[1][9]).toBe("Anchor; Beacon");
+    expect(judgeRows({ judges: { j1: world.judges.j1 }, scores: {} })[1][8]).toBe("Anchor; Beacon");
   });
 
   test("a round nobody has scored yet leaves everything outstanding", () => {
     const rows = judgeRows({ judges: { j1: world.judges.j1 }, scores: { first: {} } }, "final");
-    expect(rows[1].slice(7)).toEqual([2, 0, "Anchor; Beacon"]);
+    expect(rows[1].slice(6)).toEqual([2, 0, "Anchor; Beacon"]);
   });
 
   test("with no scores at all every assignment is outstanding", () => {
-    expect(judgeRows({ judges: { j1: world.judges.j1 }, scores: undefined })[1].slice(7)).toEqual([2, 0, "Anchor; Beacon"]);
+    expect(judgeRows({ judges: { j1: world.judges.j1 }, scores: undefined })[1].slice(6)).toEqual([2, 0, "Anchor; Beacon"]);
   });
 
   test("a null judge record or no scores at all still gives a row", () => {
-    expect(judgeRows({ judges: { jX: null }, scores: undefined })[1]).toEqual(["Unknown", "jX", "", "", "no", "no", "no", 0, 0, ""]);
+    expect(judgeRows({ judges: { jX: null }, scores: undefined })[1]).toEqual(["Unknown", "jX", "", "", "no", "no", 0, 0, ""]);
   });
 });
 

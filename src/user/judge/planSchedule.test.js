@@ -41,7 +41,7 @@ function world({
   }
   for (let i = 0; i < finalJudges; i++) {
     judgesData[`f${i}`] = {
-      firstName: "Prof", lastName: String(i), isFinalRoundJudge: true, checkedIn,
+      firstName: "Prof", lastName: String(i), checkedIn,
     };
   }
 

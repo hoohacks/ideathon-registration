@@ -60,7 +60,7 @@ describe("a brand new event", () => {
     expect(state.hasDraft).toBe(false);
     expect(state.counts).toEqual({
       teams: { total: 0, submitted: 0, scheduled: 0 },
-      judges: { total: 0, roundOne: 0, finalRound: 0, checkedIn: 0 },
+      judges: { total: 0, roundOne: 0, checkedIn: 0 },
       people: { competitors: 0, checkedIn: 0 },
       rooms: 0,
       batchCount: 3,
@@ -98,7 +98,7 @@ describe("an event ready to schedule", () => {
     teams: { ...submitted(3), draft: { name: "Draft" } },
     judges: {
       ...roundOne(3, { checkedIn: true }),
-      jf: { isFinalRoundJudge: true, checkedIn: "yes" },
+      jf: { checkedIn: "yes" },
     },
     competitors: { c1: { checkedIn: true }, c2: { checkedIn: "yes" }, c3: null },
   };
@@ -109,7 +109,7 @@ describe("an event ready to schedule", () => {
     expect(state.phaseLabel).toBe("Ready to schedule");
     expect(state.counts).toEqual({
       teams: { total: 4, submitted: 3, scheduled: 0 },
-      judges: { total: 4, roundOne: 3, finalRound: 1, checkedIn: 3 },
+      judges: { total: 4, roundOne: 3, checkedIn: 3 },
       people: { competitors: 3, checkedIn: 1 },
       rooms: 3,
       batchCount: 3,
@@ -197,7 +197,7 @@ describe("setup that cannot be scheduled yet", () => {
   test("a null team or judge record counts for nothing and breaks nothing", () => {
     const state = readEventState({ teams: { t1: null, ...submitted(1) }, judges: { j1: null, ...roundOne(1) } });
     expect(state.counts.teams).toEqual({ total: 2, submitted: 1, scheduled: 0 });
-    expect(state.counts.judges).toEqual({ total: 2, roundOne: 1, finalRound: 0, checkedIn: 0 });
+    expect(state.counts.judges).toEqual({ total: 2, roundOne: 1, checkedIn: 0 });
   });
 
   test("a batch count that is not a number falls back to three", () => {

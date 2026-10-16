@@ -230,15 +230,11 @@ describe("judges", () => {
     await assertSucceeds(set(ref(db("admin"), "judges/judge2/isRound1Judge"), true));
   });
 
-  test("a judge cannot promote themselves into the final round afterwards", async () => {
-    // the final-round mark is what puts somebody in the eligible pool, and the
+  test("a judge cannot check themselves into the final round pool afterwards", async () => {
+    // check-in is what puts somebody in the eligible final round pool, and the
     // publish turns that into finalAssignments -- which the /scores rule
     // treats as proof of assignment
-    await assertFails(set(ref(db("judge2"), "judges/judge2/isFinalRoundJudge"), true));
-  });
-
-  test("an admin can flag a final round judge", async () => {
-    await assertSucceeds(set(ref(db("admin"), "judges/judge2/isFinalRoundJudge"), true));
+    await assertFails(set(ref(db("judge2"), "judges/judge2/checkedIn"), true));
   });
 
   test("an admin can check a judge in", async () => {

@@ -35,7 +35,6 @@ function JudgeSearch() {
   // the scheduler only assigns judges carrying this flag, so the count belongs
   // where an admin will see it before building a plan
   const roundOneCount = judges.filter((judge) => judge.isRound1Judge === true).length;
-  const finalRoundCount = judges.filter((judge) => judge.isFinalRoundJudge === true).length;
   const percentCheckedIn = judges.length ? (checkedInCount / judges.length) * 100 : 0;
 
   const handleCheckIn = (judge) => {
@@ -47,15 +46,6 @@ function JudgeSearch() {
   const handleToggleRoundOne = (judge) => {
     update(ref(database, `/judges/${judge.id}`), {
       isRound1Judge: judge.isRound1Judge !== true,
-    });
-  };
-
-  // Deliberately independent of the round-one mark rather than exclusive with
-  // it. The two roles answer different questions -- who the generator may
-  // assign, and who is in the room for the final -- and somebody can be both.
-  const handleToggleFinalRound = (judge) => {
-    update(ref(database, `/judges/${judge.id}`), {
-      isFinalRoundJudge: judge.isFinalRoundJudge !== true,
     });
   };
 
@@ -73,12 +63,10 @@ function JudgeSearch() {
           String(Boolean(judge.checkedIn)) === checkedInFilter;
 
         const roundOne = judge.isRound1Judge === true;
-        const finalRound = judge.isFinalRoundJudge === true;
         const matchesRole =
           roundOneFilter === "" ||
           (roundOneFilter === "round1" && roundOne) ||
-          (roundOneFilter === "final" && finalRound) ||
-          (roundOneFilter === "none" && !roundOne && !finalRound);
+          (roundOneFilter === "none" && !roundOne);
 
         return matchesQuery && matchesCheckedIn && matchesRole;
       })
@@ -98,7 +86,6 @@ function JudgeSearch() {
           { label: "signed up", value: judges.length },
           { label: "checked in", value: checkedInCount },
           { label: "first round", value: roundOneCount },
-          { label: "final round", value: finalRoundCount },
         ]}
       />
 
@@ -133,8 +120,7 @@ function JudgeSearch() {
             options={[
               { value: "", label: "Any" },
               { value: "round1", label: "First round" },
-              { value: "final", label: "Final round" },
-              { value: "none", label: "Neither" },
+              { value: "none", label: "Not first round" },
             ]}
           />
         </FilterGroups>
@@ -146,7 +132,6 @@ function JudgeSearch() {
             `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim() || "Unnamed judge";
           const isCheckedIn = Boolean(judge.checkedIn);
           const isRoundOne = judge.isRound1Judge === true;
-          const isFinalRound = judge.isFinalRoundJudge === true;
           const assignments = assignmentList(judge.teamAssignments);
 
           return (
@@ -194,7 +179,7 @@ function JudgeSearch() {
                     display: "grid",
                     gap: 1,
                     width: { xs: "100%", md: "auto" },
-                    gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, auto)" },
+                    gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, auto)" },
                     "& > .MuiButton-root": { minWidth: 0 },
                   }}
                 >
@@ -208,13 +193,6 @@ function JudgeSearch() {
                     onLabel="First round"
                     offLabel="Mark first round"
                     onClick={() => handleToggleRoundOne(judge)}
-                    minWidth={140}
-                  />
-                  <StateToggle
-                    on={isFinalRound}
-                    onLabel="Final round"
-                    offLabel="Mark final round"
-                    onClick={() => handleToggleFinalRound(judge)}
                     minWidth={140}
                   />
                   <StateToggle

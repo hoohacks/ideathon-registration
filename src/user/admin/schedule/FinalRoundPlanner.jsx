@@ -51,10 +51,10 @@ export default function FinalRoundPlanner() {
   useEffect(() => subscribeFinalDraft((next) => setPlan(next)), []);
 
   // Live, not read once with the plan. The pool a plan carries is frozen at
-  // build time, so a judge who registered -- or was marked -- after that was
+  // build time, so a judge who registered -- or checked in -- after that was
   // absent from the picker with nothing on screen to say why, and the only way
   // to reach them was to rebuild and lose every hand edit. Subscribing means
-  // marking somebody on the Judges page puts them in this picker at once.
+  // checking somebody in on the Judges page puts them in this picker at once.
   useEffect(() => {
     const unsubscribe = onValue(
       ref(database, "judges"),
@@ -447,11 +447,11 @@ function PanelDrawer({ plan, slot, allJudges = [], onClose, onEdit }) {
   const inPool = new Set((plan.pool ?? []).map((judge) => judge.judgeId));
   const roster = allJudges.length
     ? allJudges
-    : (plan.pool ?? []).map((judge) => ({ ...judge, marked: true }));
+    : (plan.pool ?? []);
   const available = roster.filter((judge) => !seatedIds.has(judge.judgeId));
 
   const labelFor = (judge) => {
-    if (judge.marked === false) return `${judge.judgeName} (not marked for a round)`;
+    if (judge.checkedIn === false) return `${judge.judgeName} (not checked in)`;
     if (!inPool.has(judge.judgeId)) return `${judge.judgeName} (not in the built pool)`;
     return judge.judgeName;
   };

@@ -9,8 +9,7 @@ Everything lives in one Firebase Realtime Database tree.
                            submissionsOpen submissionsCloseAt rulesVersion scheduleMeta
 /competitors/{uid}         name, email, major, school, dietary, resume,
                            checkedIn, foodCheckIn, teamId
-/judges/{uid}              name, email, company, checkedIn, isRound1Judge,
-                           isFinalRoundJudge
+/judges/{uid}              name, email, company, checkedIn, isRound1Judge
                            wantsToMentor wantsToJudge timeslots[] skills[]
                            questionsAndConcerns registeredAt
                            teamAssignments/{teamId}   room time batch judges[]

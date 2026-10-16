@@ -76,7 +76,7 @@ function world({
   if (finalJudges) {
     for (let i = 0; i < finalJudges; i++) {
       judgesData[`f${i}`] = {
-        firstName: "Prof", lastName: String(i), isFinalRoundJudge: true, checkedIn,
+        firstName: "Prof", lastName: String(i), checkedIn,
       };
     }
   }
@@ -230,7 +230,7 @@ describe("what gets written", () => {
         exists: () => true,
         val: () => ({
           ...base.val(),
-          prof: { firstName: "Wei", lastName: "Chen", isFinalRoundJudge: true, checkedIn: true },
+          prof: { firstName: "Wei", lastName: "Chen", checkedIn: true },
         }),
       };
     });

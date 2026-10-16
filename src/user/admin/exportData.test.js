@@ -38,7 +38,7 @@ const world = {
   judges: {
     j1: { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", company: "Analytical", isRound1Judge: true, checkedIn: true, teamAssignments: { t1: { id: "t1", teamName: "Lumen", batch: 1 }, t2: { id: "t2", teamName: "Beta", batch: 2 } } },
     j2: { firstName: "Alan", lastName: "Turing", email: "alan@example.com", isRound1Judge: true, checkedIn: false, teamAssignments: { t1: { id: "t1", teamName: "Lumen", batch: 1 } } },
-    j3: { firstName: "Grace", lastName: "Hopper", email: "grace@example.com", isFinalRoundJudge: true, checkedIn: true },
+    j3: { firstName: "Grace", lastName: "Hopper", email: "grace@example.com", checkedIn: true },
   },
   competitors: {
     c1: {
@@ -236,14 +236,12 @@ describe("the judge export", () => {
     expect(judge("Alan Turing")[col("Checked in")]).toBe("no");
   });
 
-  test("says which rounds each judge is marked for", () => {
-    // the two marks are independent, and which one somebody carries decides
-    // whether the generator may seat them -- so both belong on the sheet an
-    // organizer prints
+  test("says who is marked for the first round", () => {
+    // the mark decides whether the generator may seat them, so it belongs on
+    // the sheet an organizer prints
     expect(judge("Ada Lovelace")[col("Round 1")]).toBe("yes");
-    expect(judge("Ada Lovelace")[col("Final round")]).toBe("no");
     expect(judge("Grace Hopper")[col("Round 1")]).toBe("no");
-    expect(judge("Grace Hopper")[col("Final round")]).toBe("yes");
+    expect(col("Final round")).toBe(-1);
   });
 });
 

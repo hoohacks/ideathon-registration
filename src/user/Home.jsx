@@ -10,6 +10,7 @@ import { ref, onValue } from "firebase/database";
 import { database } from "../firebase";
 import { EVENT, EVENT_START, eventPhase } from "../eventInfo";
 import { tokens } from "../theme";
+import PitchCard, { useTeamPitch } from "./team/PitchCard";
 
 // page title
 import usePageTitle from "../usePageTitle";
@@ -143,6 +144,7 @@ function Home() {
     const isCompetitor = hasRole(userTypes, "competitor");
     const isJudge = hasRole(userTypes, "judge");
     const onATeam = Boolean(userData?.teamId);
+    const pitch = useTeamPitch(isCompetitor ? userData?.teamId : null);
 
     const steps = [];
 
@@ -216,6 +218,11 @@ function Home() {
                     </Typography>
                     <EventFacts />
                 </Stack>
+
+                {/* the one thing a team needs on the day, above everything else
+                    -- it used to be on the team page only, a tap away from
+                    where everyone lands */}
+                <PitchCard schedule={pitch.schedule} finalSlot={pitch.finalSlot} />
 
                 {/* organizers first: this page used to build nothing for them */}
                 {isAdmin && <AdminHome />}

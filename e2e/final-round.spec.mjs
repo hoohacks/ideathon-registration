@@ -85,8 +85,8 @@ test("a judge is given final round cards, on their own record", async ({ page })
 });
 
 test("a final-round-only judge gets cards, despite judging no first round", async ({ page }) => {
-  // The professors and professionals carry isFinalRoundJudge and are never
-  // given a first-round batch, so this judge reaches the page with an empty
+  // A judge not marked for the first round is never given a first-round
+  // batch, so this judge reaches the page with an empty
   // first-round list. That must not stop the final round section rendering --
   // it is the only reason they are here.
   await signIn(page, judge(13));

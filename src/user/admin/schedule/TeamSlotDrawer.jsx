@@ -75,15 +75,16 @@ export default function TeamSlotDrawer({ open, plan, teamId, onEdit, onClose }) 
 
   const judges = current?.judges ?? [];
   const onTeamIds = new Set(judges.map((j) => j.judgeId));
-  // `judgeNames` covers everyone marked for either round, which is wider than
+  // `judgeNames` covers every registered judge, which is wider than
   // `basis.judgeIds` -- the pool the plan was allocated from. That gap is the
-  // point: a final-round judge is never auto-assigned, but an organizer filling
-  // a no-show should be able to reach one, so they are offered and labelled.
-  const finalOnly = new Set(plan.finalOnlyJudgeIds ?? []);
+  // point: a judge not marked for the first round is never auto-assigned, but
+  // an organizer filling a no-show should be able to reach one, so they are
+  // offered and labelled.
+  const notRoundOne = new Set(plan.notRoundOneJudgeIds ?? []);
   const addableJudges = Object.keys(plan.judgeNames ?? {})
     .filter((id) => !onTeamIds.has(id))
-    .map((id) => ({ id, name: plan.judgeNames?.[id] ?? id, finalOnly: finalOnly.has(id) }))
-    .sort((a, b) => Number(a.finalOnly) - Number(b.finalOnly) || a.name.localeCompare(b.name));
+    .map((id) => ({ id, name: plan.judgeNames?.[id] ?? id, notRoundOne: notRoundOne.has(id) }))
+    .sort((a, b) => Number(a.notRoundOne) - Number(b.notRoundOne) || a.name.localeCompare(b.name));
 
   const removeJudge = (judgeUid) => runEdit({ type: "removeJudge", teamId, judgeUid });
 
@@ -167,7 +168,7 @@ export default function TeamSlotDrawer({ open, plan, teamId, onEdit, onClose }) 
                 >
                   {addableJudges.map((option) => (
                     <MenuItem key={option.id} value={option.id}>
-                      {option.name}{option.finalOnly ? " (final round judge)" : ""}
+                      {option.name}{option.notRoundOne ? " (not first round)" : ""}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -192,13 +193,13 @@ export default function TeamSlotDrawer({ open, plan, teamId, onEdit, onClose }) 
             disabled={busy || !addableJudges.length}
             helperText={
               addableJudges.length
-                ? "Final round judges are offered but never assigned automatically."
+                ? "Judges not marked for the first round are offered but never assigned automatically."
                 : "Every eligible judge is already on this team"
             }
           >
             {addableJudges.map((option) => (
               <MenuItem key={option.id} value={option.id}>
-                {option.name}{option.finalOnly ? " (final round judge)" : ""}
+                {option.name}{option.notRoundOne ? " (not first round)" : ""}
               </MenuItem>
             ))}
           </TextField>
