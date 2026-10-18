@@ -269,8 +269,8 @@ function Home() {
                             What to do next
                         </Typography>
                         <Card>
-                            {steps.map((step, index) => (
-                                <Box key={step.key}>
+                            {steps.map(({ key, ...step }, index) => (
+                                <Box key={key}>
                                     {index > 0 && <Divider sx={{ mx: 2.5 }} />}
                                     <NextStep {...step} />
                                 </Box>
