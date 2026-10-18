@@ -103,8 +103,7 @@ test("judging progress shows the first round, and the final round separately", a
 
   // the final round is not a filtered view of the first: switching it used to
   // leave every submitted team on screen with its first-round room and panel
-  // MUI renders a Select as a button carrying its current value, not a combobox
-  await page.getByRole("button", { name: "First round" }).click();
+  await page.getByRole("combobox", { name: "Round" }).click();
   await page.getByRole("option", { name: "Final round" }).click();
 
   await expectPagePainted(page);

@@ -279,6 +279,9 @@ function JudgingProgress() {
             size="small"
             value={round}
             onChange={(e) => setRound(e.target.value)}
+            // no visible label, so it needs a name of its own; older MUI let the
+            // selected value stand in for one, and newer MUI does not
+            SelectProps={{ inputProps: { "aria-label": "Round" } }}
             sx={{ minWidth: 150 }}
           >
             <MenuItem value={FIRST_ROUND}>First round</MenuItem>
