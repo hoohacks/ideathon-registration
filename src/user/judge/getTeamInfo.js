@@ -78,7 +78,7 @@ export async function submitScore({ round, teamId, teamName, score }) {
     await withTimeout(writeScore(entry));
     return { status: "saved" };
   } catch (error) {
-    if (!enqueue(entry)) {
+    if (!(await enqueue(entry))) {
       throw new Error(
         "Could not reach the database, and this device will not let the score be " +
           "saved locally either. Write the scores down and give them to an organizer."
