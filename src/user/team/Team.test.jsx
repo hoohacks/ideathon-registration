@@ -299,7 +299,10 @@ describe("the submission deadline", () => {
   });
 
   test("the form closes by itself when the deadline passes, without a reload", async () => {
-    vi.useFakeTimers();
+    // only the clock and the countdown's interval: Testing Library's waitFor
+    // ends on a setTimeout(0) it only knows how to advance under Jest, so a
+    // faked setTimeout here hangs openTeam
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
     vi.setSystemTime(new Date("2026-10-25T14:59:50-04:00"));
     store["config/submissionsCloseAt"] = new Date("2026-10-25T15:00:00-04:00").getTime();
     await openTeam();

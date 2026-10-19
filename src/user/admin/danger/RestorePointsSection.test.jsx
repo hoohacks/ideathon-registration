@@ -98,6 +98,12 @@ function renderSection(onResult = vi.fn()) {
   );
 }
 
+let user;
+
+beforeEach(() => {
+  user = userEvent.setup();
+});
+
 describe("a restore point row", () => {
   test("shows when it was taken, who by, and how big", () => {
     renderSection();
@@ -127,7 +133,7 @@ describe("a restore point row", () => {
 describe("the preview dialog", () => {
   test("names the team and judge behind a lost score", async () => {
     renderSection();
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
 
     expect(previewSnapshot).toHaveBeenCalledWith("snap-1");
     expect(
@@ -161,7 +167,7 @@ describe("the preview dialog", () => {
       },
     });
     renderSection();
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
 
     expect(
       await screen.findByText(
@@ -173,7 +179,7 @@ describe("the preview dialog", () => {
   test("falls back to the judge's uid when the one-shot judges read fails", async () => {
     readJudgeNames.mockResolvedValue({ ok: false, error: "no permission", names: {} });
     renderSection();
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
 
     // the dialog still opens and still names the team -- only the judge falls back
     expect(
@@ -190,10 +196,10 @@ describe("the preview dialog", () => {
   test("with no event name configured, restoring requires typing a short count -- typing the label does not work", async () => {
     const onResult = vi.fn();
     renderSection(onResult);
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     await screen.findByText(/score card will be destroyed/);
 
-    userEvent.click(screen.getByRole("button", { name: "Restore…" }));
+    await user.click(screen.getByRole("button", { name: "Restore…" }));
 
     const confirmButton = await screen.findByRole("button", { name: "Restore" });
     // mockPreviewResult's `entries` cover two paths (teams, scores), and no
@@ -202,14 +208,14 @@ describe("the preview dialog", () => {
 
     // The restore point's own label -- what this used to require -- must no
     // longer work.
-    userEvent.type(typedField, "Before the schedule was generated");
+    await user.type(typedField, "Before the schedule was generated");
     expect(confirmButton).toBeDisabled();
 
-    userEvent.clear(typedField);
-    userEvent.type(typedField, "2");
+    await user.clear(typedField);
+    await user.type(typedField, "2");
     expect(confirmButton).toBeEnabled();
 
-    userEvent.click(confirmButton);
+    await user.click(confirmButton);
 
     await waitFor(() => expect(onResult).toHaveBeenCalled());
     expect(restoreSnapshot).toHaveBeenCalledWith("snap-1");
@@ -222,19 +228,19 @@ describe("the preview dialog", () => {
   test("with an event name configured, restoring requires typing it instead of the count", async () => {
     mockGet.mockResolvedValue({ exists: () => true, val: () => "HooHacks Ideathon" });
     renderSection();
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     await screen.findByText(/score card will be destroyed/);
 
-    userEvent.click(screen.getByRole("button", { name: "Restore…" }));
+    await user.click(screen.getByRole("button", { name: "Restore…" }));
 
     const confirmButton = await screen.findByRole("button", { name: "Restore" });
     const typedField = screen.getByLabelText('Type "HooHacks Ideathon" to confirm');
 
-    userEvent.type(typedField, "2");
+    await user.type(typedField, "2");
     expect(confirmButton).toBeDisabled();
 
-    userEvent.clear(typedField);
-    userEvent.type(typedField, "HooHacks Ideathon");
+    await user.clear(typedField);
+    await user.type(typedField, "HooHacks Ideathon");
     expect(confirmButton).toBeEnabled();
   });
 
@@ -257,14 +263,14 @@ describe("the preview dialog", () => {
       .mockResolvedValueOnce(mockPreviewResult({ extraJudgeScore: true }));
 
     renderSection(onResult);
-    userEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     await screen.findByText("teams", { selector: "strong" });
     expect(screen.queryByText(/score card will be destroyed/)).toBeNull();
 
-    userEvent.click(screen.getByRole("button", { name: "Restore…" }));
+    await user.click(screen.getByRole("button", { name: "Restore…" }));
     const confirmButton = await screen.findByRole("button", { name: "Restore" });
-    userEvent.type(screen.getByLabelText('Type "2" to confirm'), "2");
-    userEvent.click(confirmButton);
+    await user.type(screen.getByLabelText('Type "2" to confirm'), "2");
+    await user.click(confirmButton);
 
     // The restore must not go through on the stale, already-confirmed diff --
     // the organizer confirmed "0 score cards", not "1".
