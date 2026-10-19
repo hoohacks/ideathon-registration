@@ -1,34 +1,45 @@
 import { Navigate, Routes, Route } from "react-router-dom"
-import { createContext, useContext, useMemo, useState, useEffect, useCallback } from "react"
+import { createContext, lazy, Suspense, useContext, useMemo, useState, useEffect, useCallback } from "react"
 import Registration from "./Registration"
-import Search from "./user/admin/Search.jsx"
-import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
 import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/auth"
-import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
-import UserHome from "./user/Home"
-import NewJoinTeam from "./user/team/NewJoinTeam.jsx"
-import CreateTeam from "./user/team/CreateTeam.jsx"
-import Team from "./user/team/Team.jsx"
-import UserProfile from "./user/Profile"
-import CheckIn from "./user/CheckIn"
-import AdminScan from "./user/admin/Scan"
-import JudgeDashboard from "./user/admin/JudgeSearch.jsx"
-import Mentors from "./user/admin/Mentors.jsx"
-import ForgotPassword from "./ForgotPassword.jsx"
-import Assignments from "./user/judge/Assignments.jsx"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.jsx"
 import { PageSkeleton } from "./loadingUi";
-import TeamDashboard from "./user/admin/TeamSearch.jsx"
-import JudgingProgress from "./user/admin/JudgingProgress.jsx"
-import Control from "./user/admin/Control.jsx"
-import SchedulePlanner from "./user/admin/schedule/SchedulePlanner.jsx"
-import Results from "./user/admin/results/Results.jsx"
-import PrintableSchedule from "./user/admin/schedule/PrintableSchedule.jsx"
+
+/**
+ * Every page but the two front doors is its own chunk, fetched the first time
+ * someone opens it.
+ *
+ * Everything used to ship in one 1.7 MB bundle, so a student opening the
+ * registration form on their phone downloaded the schedule planner, the results
+ * charts and the QR scanner before seeing a single field. Registration and
+ * sign-in stay in the main bundle because they are where almost every visit
+ * starts; nothing else is needed until someone is signed in.
+ */
+const JudgeRegistration = lazy(() => import("./JudgeRegistration"))
+const ForgotPassword = lazy(() => import("./ForgotPassword.jsx"))
+const UserHome = lazy(() => import("./user/Home"))
+const UserProfile = lazy(() => import("./user/Profile"))
+const CheckIn = lazy(() => import("./user/CheckIn"))
+const Assignments = lazy(() => import("./user/judge/Assignments.jsx"))
+const Team = lazy(() => import("./user/team/Team.jsx"))
+const NewJoinTeam = lazy(() => import("./user/team/NewJoinTeam.jsx"))
+const CreateTeam = lazy(() => import("./user/team/CreateTeam.jsx"))
+const RegisteredAtDisplay = lazy(() => import("./RegisteredAtDisplay"))
+const AdminScan = lazy(() => import("./user/admin/Scan"))
+const Search = lazy(() => import("./user/admin/Search.jsx"))
+const JudgeDashboard = lazy(() => import("./user/admin/JudgeSearch.jsx"))
+const Mentors = lazy(() => import("./user/admin/Mentors.jsx"))
+const TeamDashboard = lazy(() => import("./user/admin/TeamSearch.jsx"))
+const JudgingProgress = lazy(() => import("./user/admin/JudgingProgress.jsx"))
+const SchedulePlanner = lazy(() => import("./user/admin/schedule/SchedulePlanner.jsx"))
+const PrintableSchedule = lazy(() => import("./user/admin/schedule/PrintableSchedule.jsx"))
+const Results = lazy(() => import("./user/admin/results/Results.jsx"))
+const Control = lazy(() => import("./user/admin/Control.jsx"))
 import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
 
 const AuthContext = createContext(null);
@@ -59,15 +70,20 @@ function useAuth() {
   return useContext(AuthContext);
 }
 
+/** The frame a signed-in page shows while it waits, for a role or for its code. */
+function LoadingFrame() {
+  return (
+    <Layout>
+      <PageSkeleton label="Loading" />
+    </Layout>
+  );
+}
+
 function ProtectedRoute({ children, requiredRoles }) {
   const { userCredential, userTypes, loadingAuth, loadingUserData } = useAuth();
 
   if (loadingAuth || loadingUserData) {
-    return (
-      <Layout>
-        <PageSkeleton label="Loading" />
-      </Layout>
-    );
+    return <LoadingFrame />;
   }
 
   if (!userCredential) {
@@ -78,7 +94,9 @@ function ProtectedRoute({ children, requiredRoles }) {
     return <Navigate to="/user/home" replace />;
   }
 
-  return children;
+  // the same frame as the role check above, so fetching the page's chunk
+  // reads as one continuous load rather than a second, different one
+  return <Suspense fallback={<LoadingFrame />}>{children}</Suspense>;
 }
 
 function AuthProvider({ children }) {
@@ -176,6 +194,10 @@ function App() {
   return (
     <AuthProvider>
       <NavDrawerProvider>
+      {/* only the public lazy pages reach this one; signed-in pages suspend
+          inside ProtectedRoute. Blank for the moment it takes, because a
+          skeleton outside the page's own shell would jump when it arrives. */}
+      <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
@@ -215,6 +237,7 @@ function App() {
             app being broken rather than the address being wrong */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       </NavDrawerProvider>
     </AuthProvider>
   )
