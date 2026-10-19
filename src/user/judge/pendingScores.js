@@ -58,28 +58,69 @@ export const LOCK_TIMEOUT_MS = 3000;
  * mutation directly, exactly as before, with the optimistic re-read in
  * `enqueue` as the only guard.
  *
- * In the fallback it returns `fn()`'s value synchronously, so callers that read
- * `enqueue`'s boolean return keep working unchanged. Under a lock it returns a
- * promise of that value; the one production caller that reads the result
- * (`submitScore`) awaits it, which behaves identically either way.
+ * It always returns a promise of `fn`'s value -- under a lock and in the
+ * fallback alike. The mutation itself still runs synchronously when there is
+ * no lock: `fn` is called straight away, so the queue is written before this
+ * returns, exactly as before; only the *return value* is wrapped. Keeping one
+ * return type matters because a promise is always truthy. If the fallback
+ * returned a bare boolean while the lock path returned a promise, a caller
+ * writing `if (!enqueue(card))` without `await` would correctly catch the
+ * storage-refused `false` in jsdom tests but silently miss it in a real
+ * browser -- a lost-score bug that no test could see. One type, awaited
+ * everywhere, fails the same way in both.
+ *
+ * `fn` is called with one argument: `true` when it runs holding the lock,
+ * `false` when it runs without one (no Web Locks, or a lock we failed to
+ * acquire). A caller can use it to skip work that only guards the lock-less
+ * race -- `enqueue`'s compare-and-swap retry, which can never trip while the
+ * lock is held.
  */
-function withQueueLock(fn) {
+async function withQueueLock(fn) {
   const locks = typeof navigator !== "undefined" && navigator.locks;
-  if (!locks || typeof locks.request !== "function") return fn();
+  if (!locks || typeof locks.request !== "function") return fn(false);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOCK_TIMEOUT_MS);
-  return locks
-    .request(LOCK_NAME, { mode: "exclusive", signal: controller.signal }, fn)
-    .catch((error) => {
-      // An aborted acquisition is the timeout above firing: some tab is holding
-      // the lock longer than any real mutation should, so proceed without it
-      // rather than leave this card un-queued. A rejection thrown by `fn`
-      // itself is a genuine error and must propagate.
-      if (controller.signal.aborted) return fn();
-      throw error;
-    })
-    .finally(() => clearTimeout(timer));
+
+  // `locks.request` rejects for two very different reasons, and only one of
+  // them is a real failure. It rejects when the lock cannot be ACQUIRED --
+  // the timeout abort above, but also InvalidStateError when the document is
+  // not fully active (bfcache, prerender) or SecurityError -- and it rejects
+  // when `fn` itself throws once it holds the lock. Losing the lock must never
+  // cost us the mutation: enqueue could not fail this way before the lock
+  // existed, and a judge seeing a raw DOMException instead of "saved" is the
+  // regression. So we record whether `fn` actually ran, and in the catch run
+  // it (un-locked, back to the narrow pre-lock race) whenever it did not --
+  // rethrowing only errors `fn` raised itself.
+  let fnRan = false;
+  const runFn = () => {
+    fnRan = true;
+    return fn(true);
+  };
+
+  try {
+    return await locks.request(
+      LOCK_NAME,
+      { mode: "exclusive", signal: controller.signal },
+      runFn
+    );
+  } catch (error) {
+    if (fnRan) throw error;
+    // The lock could not be acquired: the timeout above fired (a frozen
+    // holder), or the document is not lockable (InvalidStateError from
+    // bfcache/prerender, SecurityError). We run the mutation anyway rather
+    // than drop the card -- but this is the one path that reopens the HOO-66
+    // race: another tab that also timed out can be mid read-modify-write this
+    // same moment, so a write can still clobber. Warn so this last-resort path
+    // is visible in logs instead of silently losing a score.
+    console.warn(
+      "[pendingScores] proceeding without the cross-tab lock; queue writes may race",
+      controller.signal.aborted ? "(lock acquisition timed out)" : error
+    );
+    return fn(false);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const listeners = new Set();
@@ -203,16 +244,23 @@ export function enqueue({ round, teamId, teamName, judgeUid, score }) {
     lastError: null,
   };
 
-  return withQueueLock(() => {
+  return withQueueLock((locked) => {
+    // Under the lock no other tab can touch the queue between this read and
+    // this write, so a plain read-modify-write is already safe and the
+    // compare-and-swap loop below would only ever run a single pass -- two
+    // wasted reads and a pair of JSON.stringify calls on every submit. Skip it.
+    if (locked) return writeAll(nextQueue(readAll(), cardEntry));
+
+    // No lock held (older browser, jsdom, or a lock we failed to acquire).
+    // `localStorage` has no compare-and-swap, so another tab's write can land
+    // in the gap between our read and our `writeAll`. Re-read right up against
+    // the write and, if the queue changed since the read this edit was based
+    // on, re-base the same edit onto the fresh read and try again rather than
+    // overwriting it. This only NARROWS the race; it cannot close it.
     let before = readAll();
     for (let attempt = 0; attempt < MAX_ENQUEUE_ATTEMPTS; attempt += 1) {
       const rest = nextQueue(before, cardEntry);
 
-      // Re-read right up against the write. If another tab's enqueue (or a
-      // flush's remove) landed since `before` was read, `rest` was built on a
-      // queue that no longer exists -- re-base on what is actually there now
-      // and try again, instead of overwriting it. Under the lock this never
-      // trips; without it, it is the narrowing guard described above.
       const justBefore = readAll();
       if (JSON.stringify(justBefore) !== JSON.stringify(before)) {
         before = justBefore;
@@ -287,18 +335,13 @@ async function flushQueue(write, { judgeUid } = {}) {
   for (const entry of queue) {
     try {
       await write(entry);
-      // The network send above is deliberately outside the lock -- it can hang
-      // for up to SUBMIT_TIMEOUT_MS, and holding a cross-tab lock across it
-      // would make every other tab's enqueue time out. Only the storage edits
-      // take the lock. `removeIfCurrent` returns a promise under a lock and
-      // `undefined` in the fallback, so the guard keeps the fallback path free
-      // of an extra microtask and leaves the existing flush timing untouched.
-      const removed = removeIfCurrent(entry);
-      if (removed) await removed;
-      synced += 1;
     } catch (error) {
+      // The SEND failed. This is the only thing the try guards, and the only
+      // path that treats the card as failed: bump its attempt count, leave it
+      // queued for the next flush, and move on. Nothing that can abort the loop
+      // and strand the cards behind it belongs here.
       failed += 1;
-      const bumped = withQueueLock(() => {
+      await withQueueLock(() => {
         const all = readAll();
         const target = all.find((candidate) => candidate.id === entry.id);
         if (target) {
@@ -307,8 +350,20 @@ async function flushQueue(write, { judgeUid } = {}) {
           writeAll(all);
         }
       });
-      if (bumped) await bumped;
+      continue;
     }
+
+    // The send landed. Dropping the card from the queue is cleanup, kept OUT of
+    // the try above on purpose: a storage or lock hiccup while removing a card
+    // that already synced must never reclassify it as failed or bump its
+    // attempts. Worst case the entry lingers and the next flush re-sends it,
+    // which is harmless -- the write is idempotent at its path.
+    //
+    // The send itself is kept outside the lock too: it can hang for up to
+    // SUBMIT_TIMEOUT_MS, and holding a cross-tab lock across it would time out
+    // every other tab's enqueue. Only the storage edit below takes the lock.
+    await removeIfCurrent(entry);
+    synced += 1;
   }
 
   return { synced, failed };
