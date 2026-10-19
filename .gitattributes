@@ -1,0 +1,2 @@
+# a CRLF checkout breaks bash, including the script visual-linux.sh hands to docker
+*.sh text eol=lf

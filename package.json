@@ -24,7 +24,7 @@
     "build": "vite build",
     "test": "vitest",
     "test:ci": "vitest run",
-    "test:rules": "firebase emulators:exec --only database --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
+    "test:rules": "firebase emulators:exec --only database,storage --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
     "test:rules:watch": "vitest --config vitest.rules.config.mjs",
     "emulators": "firebase emulators:start --only database,auth,storage --project demo-ideathon",
     "rules:cutover": "node scripts/make-cutover-rules.mjs",
@@ -38,12 +38,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:tiny": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=1 --judges=1 --unmarked-judges=1 --rooms=1 && cross-env E2E_EVENT_SIZE=tiny E2E_ROUND_ONE_JUDGES=1 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
     "test:e2e:large": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=150 --judges=160 --unmarked-judges=10 --rooms=50 && cross-env E2E_EVENT_SIZE=large E2E_ROUND_ONE_JUDGES=160 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:visual:linux": "bash scripts/visual-linux.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@firebase/rules-unit-testing": "^6.0.0",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "1.62.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
