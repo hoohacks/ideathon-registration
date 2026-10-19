@@ -11,8 +11,9 @@ Actions tab.
 
 1. Open a PR, let CI go green, merge.
 2. If `database.rules.json` changed, publish it (below).
-3. If `storage.rules` changed, publish it. Nothing checks this one, and forgetting
-   it silently breaks uploads.
+3. If `storage.rules` changed, publish it. `npm run test:rules` checks the file,
+   but nothing checks that the console has it, and forgetting it silently breaks
+   uploads.
 4. Publish a release.
 
 The deploy job runs the unit and rules tests again before building, so a red
