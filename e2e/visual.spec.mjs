@@ -17,9 +17,11 @@ import { goto, signIn } from "./helpers.mjs";
  *
  * The baselines live next to this file, one set per platform, because fonts
  * rasterize differently on Windows and Linux. A platform with no baseline yet
- * skips these with a note rather than failing, so CI stays green until someone
- * records Linux's; `npx playwright test e2e/visual.spec.mjs --update-snapshots`
- * writes them, and the same command accepts an intended change.
+ * (a Mac, say) skips these with a note rather than failing;
+ * `npx playwright test e2e/visual.spec.mjs --update-snapshots` writes them, and
+ * the same command accepts an intended change. The Linux set is what CI checks,
+ * and it is recorded with `npm run test:visual:linux -- --update-snapshots` in
+ * the same container CI runs in (docs/testing.md).
  */
 
 /** Compare against the baseline, or skip if this platform has none yet. */
@@ -27,12 +29,23 @@ async function matchesBaseline(page, name, options) {
   const info = test.info();
   const recording = ["all", "changed"].includes(info.config.updateSnapshots);
   if (!recording && !fs.existsSync(info.snapshotPath(name))) {
+    // in CI a missing baseline is a failure: skipping there is how these went
+    // unchecked for as long as only Windows baselines existed
+    if (process.env.CI) {
+      throw new Error(`No ${process.platform} baseline for ${name}. Record it with npm run test:visual:linux -- --update-snapshots.`);
+    }
     test.skip(true, `No ${process.platform} baseline for ${name} yet. Record one with --update-snapshots.`);
   }
   await expect(page).toHaveScreenshot(name, options);
 }
 
 const countdown = (page) => page.getByText(/starts in/).locator("..");
+
+// Whether a competitor's home shows a pitch card, and what it says, depends on
+// which schedule and final round the specs before this one published. Masking
+// is not enough, since a second line changes the height of everything below,
+// so it is taken out of the picture. PitchCard.test.jsx covers what it says.
+const HIDE_PITCH_CARD = 'section[aria-label="When you pitch"] { display: none !important; }';
 
 // the device profile minus its browser type, which a describe block cannot
 // switch -- every project here is Chromium already
@@ -57,6 +70,8 @@ test.describe("desktop", () => {
     await signIn(page, "competitor");
     await goto(page, "/user/home");
     await expect(page.getByText("What to do next")).toBeVisible();
+    await page.addStyleTag({ content: HIDE_PITCH_CARD });
+    await expect(page.getByRole("region", { name: "When you pitch" })).toBeHidden();
     await matchesBaseline(page, "competitor-home-desktop.png", { mask: [countdown(page)] });
   });
 });

@@ -69,6 +69,14 @@ jobs:
     name: Browser journeys
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The screenshot baselines (e2e/visual.spec.mjs) are recorded in this exact
+    # image by `npm run test:visual:linux`, because fonts render differently from
+    # one Linux install to the next. Running here rather than on the bare runner
+    # is what makes them comparable. Keep the tag in step with that script and
+    # with the installed @playwright/test; the image already has the browser.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --ipc=host
 
     steps:
       - uses: actions/checkout@v4
@@ -93,18 +101,6 @@ jobs:
 
       - name: Install
         run: npm ci
-
-      # Pinned to the installed @playwright/test so the cache is not reused
-      # across a version bump, which is how a browser and its driver drift apart.
-      - name: Cache the browser
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install the browser
-        run: npx playwright install --with-deps chromium
 
       # Starts the emulators, seeds an event, starts the app on port 3010 and
       # drives it. Nothing here can reach the real project.
