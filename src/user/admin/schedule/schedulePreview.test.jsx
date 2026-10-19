@@ -139,7 +139,10 @@ function makePlan(overrides = {}) {
   };
 }
 
+let user;
+
 beforeEach(() => {
+  user = userEvent.setup();
   mockSaveDraft.mockResolvedValue({ ok: true, version: 2 });
   mockClearDraft.mockResolvedValue({ ok: true });
   mockReadDraft.mockResolvedValue(null);
@@ -177,12 +180,6 @@ test("the build control says who is scheduled, counted from the judges", async (
   fireEvent.click(box);
   expect(screen.getByText("Only first-round judges who are checked in get teams.")).toBeInTheDocument();
   delete globalThis.__onValueData;
-});
-
-let user;
-
-beforeEach(() => {
-  user = userEvent.setup();
 });
 
 // ---- 2. A draft's teams and judges render -----------------------------------

@@ -67,6 +67,9 @@ function announceAutofill(name) {
   document.querySelector(`[name="${name}"]`).dispatchEvent(event);
 }
 
+// set up fresh for each test in the beforeEach below
+let user;
+
 // MUI 5.10 gives a Select role="button", and names it from its label plus
 // whatever it is currently showing -- hence the loose match.
 async function pickOption(selectName, optionName) {
@@ -103,8 +106,6 @@ const JUDGE = {
   email: "dana@acme.com",
   password: "correcthorse",
 };
-
-let user;
 
 // `mockReset: true` (vite.config.mjs) wipes what a test set on a mock, not
 // just its call log, so the implementations are put back before each test.
