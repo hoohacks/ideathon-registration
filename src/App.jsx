@@ -9,38 +9,94 @@ import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.jsx"
 import { PageSkeleton } from "./loadingUi";
+import JudgeRegistration from "./JudgeRegistration"
+import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
 
 /**
- * Every page but the two front doors is its own chunk, fetched the first time
- * someone opens it.
+ * Every page but the three front doors is its own chunk.
  *
  * Everything used to ship in one 1.7 MB bundle, so a student opening the
  * registration form on their phone downloaded the schedule planner, the results
- * charts and the QR scanner before seeing a single field. Registration and
- * sign-in stay in the main bundle because they are where almost every visit
- * starts; nothing else is needed until someone is signed in.
+ * charts and the QR scanner before seeing a single field. The two registration
+ * forms and sign-in stay in the main bundle because they are where visits
+ * start, judges' from a link in an email.
+ *
+ * Once someone is signed in, every other page is fetched in the background
+ * (see prefetchPages). A page that waited to be opened would fail to open on
+ * venue wifi that has just dropped, where a judge with one bundle could still
+ * move around the app, and the scoring page already copes with being offline.
  */
-const JudgeRegistration = lazy(() => import("./JudgeRegistration"))
-const ForgotPassword = lazy(() => import("./ForgotPassword.jsx"))
-const UserHome = lazy(() => import("./user/Home"))
-const UserProfile = lazy(() => import("./user/Profile"))
-const CheckIn = lazy(() => import("./user/CheckIn"))
-const Assignments = lazy(() => import("./user/judge/Assignments.jsx"))
-const Team = lazy(() => import("./user/team/Team.jsx"))
-const NewJoinTeam = lazy(() => import("./user/team/NewJoinTeam.jsx"))
-const CreateTeam = lazy(() => import("./user/team/CreateTeam.jsx"))
-const RegisteredAtDisplay = lazy(() => import("./RegisteredAtDisplay"))
-const AdminScan = lazy(() => import("./user/admin/Scan"))
-const Search = lazy(() => import("./user/admin/Search.jsx"))
-const JudgeDashboard = lazy(() => import("./user/admin/JudgeSearch.jsx"))
-const Mentors = lazy(() => import("./user/admin/Mentors.jsx"))
-const TeamDashboard = lazy(() => import("./user/admin/TeamSearch.jsx"))
-const JudgingProgress = lazy(() => import("./user/admin/JudgingProgress.jsx"))
-const SchedulePlanner = lazy(() => import("./user/admin/schedule/SchedulePlanner.jsx"))
-const PrintableSchedule = lazy(() => import("./user/admin/schedule/PrintableSchedule.jsx"))
-const Results = lazy(() => import("./user/admin/results/Results.jsx"))
-const Control = lazy(() => import("./user/admin/Control.jsx"))
-import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
+const pageLoaders = [];
+
+function page(load) {
+  pageLoaders.push(load);
+  return lazy(load);
+}
+
+const ForgotPassword = page(() => import("./ForgotPassword.jsx"))
+const UserHome = page(() => import("./user/Home"))
+const UserProfile = page(() => import("./user/Profile"))
+const CheckIn = page(() => import("./user/CheckIn"))
+const Assignments = page(() => import("./user/judge/Assignments.jsx"))
+const Team = page(() => import("./user/team/Team.jsx"))
+const NewJoinTeam = page(() => import("./user/team/NewJoinTeam.jsx"))
+const CreateTeam = page(() => import("./user/team/CreateTeam.jsx"))
+const RegisteredAtDisplay = page(() => import("./RegisteredAtDisplay"))
+const AdminScan = page(() => import("./user/admin/Scan"))
+const Search = page(() => import("./user/admin/Search.jsx"))
+const JudgeDashboard = page(() => import("./user/admin/JudgeSearch.jsx"))
+const Mentors = page(() => import("./user/admin/Mentors.jsx"))
+const TeamDashboard = page(() => import("./user/admin/TeamSearch.jsx"))
+const JudgingProgress = page(() => import("./user/admin/JudgingProgress.jsx"))
+const SchedulePlanner = page(() => import("./user/admin/schedule/SchedulePlanner.jsx"))
+const PrintableSchedule = page(() => import("./user/admin/schedule/PrintableSchedule.jsx"))
+const Results = page(() => import("./user/admin/results/Results.jsx"))
+const Control = page(() => import("./user/admin/Control.jsx"))
+
+/**
+ * Fetch every page's chunk once the browser is idle. A module that has loaded
+ * once resolves from memory afterwards, so opening any page later needs no
+ * network. A failure here is ignored: the page fetches again when opened.
+ *
+ * Returns a cancel, for the effect that schedules it.
+ */
+function prefetchPages() {
+  const run = () => pageLoaders.forEach((load) => load().catch(() => {}));
+  // Safari has no requestIdleCallback
+  if (window.requestIdleCallback) {
+    const id = window.requestIdleCallback(run, { timeout: 5000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = setTimeout(run, 2000);
+  return () => clearTimeout(id);
+}
+
+/**
+ * A deploy replaces every chunk's hashed file name, so a tab opened before it
+ * asks for files that are gone and the page fails to load. Reloading picks up
+ * the new build. Once per minute at most, so a chunk that is genuinely
+ * unreachable ends at the error screen instead of reloading forever.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    const KEY = "ideax:reloadedForChunk";
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem(KEY)) || 0;
+    } catch {
+      // storage blocked: reload anyway, the once-a-minute guard is a nicety
+    }
+    // offline, a reload would swap the app for the browser's own error page
+    if (!navigator.onLine || Date.now() - last < 60_000) return;
+    try {
+      sessionStorage.setItem(KEY, String(Date.now()));
+    } catch {
+      // as above
+    }
+    event.preventDefault();
+    window.location.reload();
+  });
+}
 
 const AuthContext = createContext(null);
 
@@ -161,6 +217,12 @@ function AuthProvider({ children }) {
     } finally {
       setLoadingUserData(false);
     }
+  }, [userCredential]);
+
+  // signed in, so the rest of the app is about to be needed
+  useEffect(() => {
+    if (!userCredential) return undefined;
+    return prefetchPages();
   }, [userCredential]);
 
   useEffect(() => {
