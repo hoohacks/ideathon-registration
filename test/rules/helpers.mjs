@@ -39,6 +39,25 @@ export async function makeTestEnv() {
   });
 }
 
+/**
+ * The same harness for storage.rules, against the Storage emulator.
+ *
+ * A separate environment rather than one with both, because every database
+ * file calls clearDatabase between tests and has no use for a bucket.
+ */
+export async function makeStorageTestEnv() {
+  const [host, port] = (process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? "127.0.0.1:9199").split(":");
+
+  return initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    storage: {
+      rules: readFileSync(new URL("../../storage.rules", import.meta.url), "utf8"),
+      host,
+      port: Number(port),
+    },
+  });
+}
+
 /** Write a fixture straight past the rules. */
 export async function seed(testEnv, data) {
   const { ref, set } = await import("firebase/database");
