@@ -336,7 +336,7 @@ export default function SchedulePreview({ header = null }) {
                   (pool ? ` (${pool.checkedIn} of ${pool.roundOne} checked in)` : "")
                 }
               />
-              <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", ml: 4 }}>
                 {onlyCheckedIn
                   ? "Only first-round judges who are checked in get teams."
                   : "Every first-round judge gets teams, checked in or not."}
@@ -375,11 +375,12 @@ export default function SchedulePreview({ header = null }) {
       <Stack spacing={2} sx={{ pb: 10 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
           spacing={1}
-        >
-          <Typography variant="body2" color="text.secondary">
+          sx={{
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" }
+          }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {formatAge(plan.createdAt) ? `Started ${formatAge(plan.createdAt)}` : "Draft"}
             {plan.createdByName ? ` by ${plan.createdByName}` : ""}
           </Typography>
@@ -430,10 +431,11 @@ export default function SchedulePreview({ header = null }) {
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          justifyContent="space-between"
-        >
-          <Stack sx={{ gap: 2 }} direction="row" alignItems="baseline" flexWrap="wrap">
+          sx={{
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between"
+          }}>
+          <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 2 }}>
             <Typography variant="body2">
               {stats.teams} teams · {stats.judges} judges
             </Typography>

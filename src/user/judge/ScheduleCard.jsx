@@ -87,7 +87,7 @@ function ScheduleCard({
           <Typography variant="h5" sx={{ lineHeight: 1.3 }}>
             {teamName}
           </Typography>
-          <Stack sx={{ gap: 0.75 }} direction="row" flexWrap="wrap">
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
             {/* where and when: the two things a judge reads off this card while
                 walking, so they are set as data rather than as labels */}
             <Chip
@@ -147,12 +147,7 @@ function ScheduleCard({
                       <Typography variant="body2">{submission.problemStatement}</Typography>
                     )}
                     {submission.pitchDeckURL && (
-                      <Link
-                        href={submission.pitchDeckURL}
-                        target="_blank"
-                        rel="noreferrer"
-                        variant="body2"
-                      >
+                      <Link href={submission.pitchDeckURL} target="_blank" rel="noreferrer" variant="body2">
                         {submission.pitchDeckName || "Pitch deck"}
                       </Link>
                     )}

@@ -1,41 +1,108 @@
 import { Navigate, Routes, Route } from "react-router-dom"
-import { createContext, useContext, useMemo, useState, useEffect, useCallback } from "react"
+import { createContext, lazy, Suspense, useContext, useMemo, useState, useEffect, useCallback } from "react"
 import Registration from "./Registration"
-import Search from "./user/admin/Search.jsx"
-import RegisteredAtDisplay from "./RegisteredAtDisplay"
 import { auth } from "./firebase";
 import { browserLocalPersistence, signInWithEmailAndPassword } from "firebase/auth"
-import JudgeRegistration from "./JudgeRegistration"
 import Login from "./Login"
-import UserHome from "./user/Home"
-import NewJoinTeam from "./user/team/NewJoinTeam.jsx"
-import CreateTeam from "./user/team/CreateTeam.jsx"
-import Team from "./user/team/Team.jsx"
-import UserProfile from "./user/Profile"
-import CheckIn from "./user/CheckIn"
-import AdminScan from "./user/admin/Scan"
-import JudgeDashboard from "./user/admin/JudgeSearch.jsx"
-import Mentors from "./user/admin/Mentors.jsx"
-import ForgotPassword from "./ForgotPassword.jsx"
-import Assignments from "./user/judge/Assignments.jsx"
 import { ref, get } from "firebase/database"
 import { database } from "./firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import Layout from "./user/Layout.jsx"
 import { PageSkeleton } from "./loadingUi";
-import TeamDashboard from "./user/admin/TeamSearch.jsx"
-import JudgingProgress from "./user/admin/JudgingProgress.jsx"
-import Control from "./user/admin/Control.jsx"
-import SchedulePlanner from "./user/admin/schedule/SchedulePlanner.jsx"
-import Results from "./user/admin/results/Results.jsx"
-import PrintableSchedule from "./user/admin/schedule/PrintableSchedule.jsx"
+import JudgeRegistration from "./JudgeRegistration"
 import { ROLES, hasRole, mergeRoleProfiles } from "./roles.js"
+
+/**
+ * Every page but the three front doors is its own chunk.
+ *
+ * Everything used to ship in one 1.7 MB bundle, so a student opening the
+ * registration form on their phone downloaded the schedule planner, the results
+ * charts and the QR scanner before seeing a single field. The two registration
+ * forms and sign-in stay in the main bundle because they are where visits
+ * start, judges' from a link in an email.
+ *
+ * Once someone is signed in, every other page is fetched in the background
+ * (see prefetchPages). A page that waited to be opened would fail to open on
+ * venue wifi that has just dropped, where a judge with one bundle could still
+ * move around the app, and the scoring page already copes with being offline.
+ */
+const pageLoaders = [];
+
+function page(load) {
+  pageLoaders.push(load);
+  return lazy(load);
+}
+
+const ForgotPassword = page(() => import("./ForgotPassword.jsx"))
+const UserHome = page(() => import("./user/Home"))
+const UserProfile = page(() => import("./user/Profile"))
+const CheckIn = page(() => import("./user/CheckIn"))
+const Assignments = page(() => import("./user/judge/Assignments.jsx"))
+const Team = page(() => import("./user/team/Team.jsx"))
+const NewJoinTeam = page(() => import("./user/team/NewJoinTeam.jsx"))
+const CreateTeam = page(() => import("./user/team/CreateTeam.jsx"))
+const RegisteredAtDisplay = page(() => import("./RegisteredAtDisplay"))
+const AdminScan = page(() => import("./user/admin/Scan"))
+const Search = page(() => import("./user/admin/Search.jsx"))
+const JudgeDashboard = page(() => import("./user/admin/JudgeSearch.jsx"))
+const Mentors = page(() => import("./user/admin/Mentors.jsx"))
+const TeamDashboard = page(() => import("./user/admin/TeamSearch.jsx"))
+const JudgingProgress = page(() => import("./user/admin/JudgingProgress.jsx"))
+const SchedulePlanner = page(() => import("./user/admin/schedule/SchedulePlanner.jsx"))
+const PrintableSchedule = page(() => import("./user/admin/schedule/PrintableSchedule.jsx"))
+const Results = page(() => import("./user/admin/results/Results.jsx"))
+const Control = page(() => import("./user/admin/Control.jsx"))
+
+/**
+ * Fetch every page's chunk once the browser is idle. A module that has loaded
+ * once resolves from memory afterwards, so opening any page later needs no
+ * network. A failure here is ignored: the page fetches again when opened.
+ *
+ * Returns a cancel, for the effect that schedules it.
+ */
+function prefetchPages() {
+  const run = () => pageLoaders.forEach((load) => load().catch(() => {}));
+  // Safari has no requestIdleCallback
+  if (window.requestIdleCallback) {
+    const id = window.requestIdleCallback(run, { timeout: 5000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = setTimeout(run, 2000);
+  return () => clearTimeout(id);
+}
+
+/**
+ * A deploy replaces every chunk's hashed file name, so a tab opened before it
+ * asks for files that are gone and the page fails to load. Reloading picks up
+ * the new build. Once per minute at most, so a chunk that is genuinely
+ * unreachable ends at the error screen instead of reloading forever.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    const KEY = "ideax:reloadedForChunk";
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem(KEY)) || 0;
+    } catch {
+      // storage blocked: reload anyway, the once-a-minute guard is a nicety
+    }
+    // offline, a reload would swap the app for the browser's own error page
+    if (!navigator.onLine || Date.now() - last < 60_000) return;
+    try {
+      sessionStorage.setItem(KEY, String(Date.now()));
+    } catch {
+      // as above
+    }
+    event.preventDefault();
+    window.location.reload();
+  });
+}
 
 const AuthContext = createContext(null);
 
 /**
- * Whether the phone drawer is open, held above the route rather than inside the
- * nav.
+ * Whether the phone drawer, or the desktop account menu, is open, held above
+ * the route rather than inside the nav.
  *
  * `ProtectedRoute` renders `<Layout>` with a placeholder while it waits for a
  * role, and the page it then renders brings its own `Layout`. React sees a
@@ -51,7 +118,11 @@ const NavDrawerContext = createContext(null);
 
 function NavDrawerProvider({ children }) {
   const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ open, setOpen }), [open]);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const value = useMemo(
+    () => ({ open, setOpen, accountOpen, setAccountOpen }),
+    [open, accountOpen]
+  );
   return <NavDrawerContext.Provider value={value}>{children}</NavDrawerContext.Provider>;
 }
 
@@ -59,15 +130,20 @@ function useAuth() {
   return useContext(AuthContext);
 }
 
+/** The frame a signed-in page shows while it waits, for a role or for its code. */
+function LoadingFrame() {
+  return (
+    <Layout>
+      <PageSkeleton label="Loading" />
+    </Layout>
+  );
+}
+
 function ProtectedRoute({ children, requiredRoles }) {
   const { userCredential, userTypes, loadingAuth, loadingUserData } = useAuth();
 
   if (loadingAuth || loadingUserData) {
-    return (
-      <Layout>
-        <PageSkeleton label="Loading" />
-      </Layout>
-    );
+    return <LoadingFrame />;
   }
 
   if (!userCredential) {
@@ -78,7 +154,9 @@ function ProtectedRoute({ children, requiredRoles }) {
     return <Navigate to="/user/home" replace />;
   }
 
-  return children;
+  // the same frame as the role check above, so fetching the page's chunk
+  // reads as one continuous load rather than a second, different one
+  return <Suspense fallback={<LoadingFrame />}>{children}</Suspense>;
 }
 
 function AuthProvider({ children }) {
@@ -145,6 +223,12 @@ function AuthProvider({ children }) {
     }
   }, [userCredential]);
 
+  // signed in, so the rest of the app is about to be needed
+  useEffect(() => {
+    if (!userCredential) return undefined;
+    return prefetchPages();
+  }, [userCredential]);
+
   useEffect(() => {
     // wait for firebase to report the initial auth state, otherwise a signed-in
     // user is briefly treated as signed out and bounced to /login
@@ -176,6 +260,10 @@ function App() {
   return (
     <AuthProvider>
       <NavDrawerProvider>
+      {/* only the public lazy pages reach this one; signed-in pages suspend
+          inside ProtectedRoute. Blank for the moment it takes, because a
+          skeleton outside the page's own shell would jump when it arrives. */}
+      <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<Registration />} />
         <Route path="/ideathon-registration" element={<Registration />} />
@@ -215,6 +303,7 @@ function App() {
             app being broken rather than the address being wrong */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       </NavDrawerProvider>
     </AuthProvider>
   )

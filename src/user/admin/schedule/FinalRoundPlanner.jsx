@@ -221,7 +221,7 @@ export default function FinalRoundPlanner() {
           </Typography>
           <Stack spacing={0.5}>
             {drift.map((issue) => (
-              <Stack key={issue.message} direction="row" spacing={1} alignItems="center">
+              <Stack key={issue.message} direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Typography variant="body2">{issue.message}</Typography>
                 {issue.repair === "removeJudge" && (
                   <Button size="small" onClick={() => edit({
@@ -254,7 +254,7 @@ export default function FinalRoundPlanner() {
       ))}
 
       <Card sx={{ p: 2 }}>
-        <Stack sx={{ gap: 2 }} direction="row" flexWrap="wrap" alignItems="center">
+        <Stack direction="row" sx={{ flexWrap: "wrap", alignItems: "center", gap: 2 }}>
           <Stat label="finalists" value={`${stats.finalists} of ${stats.ranked}`} />
           <Stat label="panel" value={stats.minPanel === stats.maxPanel
             ? String(stats.minPanel)
@@ -263,14 +263,11 @@ export default function FinalRoundPlanner() {
           <Stat label="idle judges" value={stats.idle} />
           <Stat label="hand edits" value={stats.edits} />
           <Box sx={{ flexGrow: 1 }} />
-          <RoomField
-            room={plan.room}
-            onCommit={(room) => edit({ type: "setRoom", room })}
-          />
+          <RoomField room={plan.room} onCommit={(room) => edit({ type: "setRoom", room })} />
         </Stack>
       </Card>
 
-      <Stack sx={{ gap: 1 }} direction="row" flexWrap="wrap">
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
         <Button variant="contained" onClick={() => setConfirmPublish(true)} disabled={publishing || !slots.length}>
           {publishing ? "Publishing…" : "Publish the final round"}
         </Button>
@@ -290,14 +287,14 @@ export default function FinalRoundPlanner() {
             {plan.ranked.map((team, index) => {
               const inCut = Boolean(plan.assignments[team.teamId]);
               return (
-                <Stack key={team.teamId} direction="row" spacing={1} alignItems="center" sx={{ py: 0.75 }}>
+                <Stack key={team.teamId} direction="row" spacing={1} sx={{ alignItems: "center", py: 0.75 }}>
                   <Typography variant="body2" sx={{ width: 28, color: "text.secondary" }}>
                     {index + 1}
                   </Typography>
                   <Typography variant="body2" sx={{ flex: 1, fontWeight: inCut ? 600 : 400 }}>
                     {team.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
                     {team.averageScore.toFixed(1)} · {team.judgeCount} judge
                     {team.judgeCount === 1 ? "" : "s"} · {team.fundableVotes} fundable
                   </Typography>
@@ -333,13 +330,14 @@ export default function FinalRoundPlanner() {
                 key={slot.teamId}
                 direction={{ xs: "column", md: "row" }}
                 spacing={1}
-                alignItems={{ md: "center" }}
-                sx={{ py: 1 }}
-              >
+                sx={{
+                  alignItems: { md: "center" },
+                  py: 1
+                }}>
                 <Chip size="small" label={slotLabel(slot.order)} sx={{ flexShrink: 0 }} />
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{slot.teamName}</Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     {slot.judges.length
                       ? slot.judges.map((judge) => judge.judgeName).join(", ")
                       : "nobody on the panel, so it presents to an empty room"}
@@ -423,10 +421,10 @@ export default function FinalRoundPlanner() {
 function Stat({ label, value, warn = false }) {
   return (
     <Box>
-      <Typography variant="h3" sx={{ fontSize: "1.1rem" }} color={warn ? "error" : "text.primary"}>
+      <Typography variant="h3" sx={{ fontSize: "1.1rem", color: warn ? "error.main" : "text.primary" }}>
         {value}
       </Typography>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>{label}</Typography>
     </Box>
   );
 }

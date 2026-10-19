@@ -5,14 +5,10 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/material": "^5.18.0",
-    "@testing-library/dom": "^8.20.1",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
+    "@mui/material": "^9.5.0",
     "chart.js": "^4.5.1",
     "dotenv": "^16.6.1",
-    "firebase": "^9.23.0",
+    "firebase": "^13.0.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",
@@ -28,7 +24,7 @@
     "build": "vite build",
     "test": "vitest",
     "test:ci": "vitest run",
-    "test:rules": "firebase emulators:exec --only database --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
+    "test:rules": "firebase emulators:exec --only database,storage --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
     "test:rules:watch": "vitest --config vitest.rules.config.mjs",
     "emulators": "firebase emulators:start --only database,auth,storage --project demo-ideathon",
     "rules:cutover": "node scripts/make-cutover-rules.mjs",
@@ -42,21 +38,30 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:tiny": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=1 --judges=1 --unmarked-judges=1 --rooms=1 && cross-env E2E_EVENT_SIZE=tiny E2E_ROUND_ONE_JUDGES=1 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
     "test:e2e:large": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=150 --judges=160 --unmarked-judges=10 --rooms=50 && cross-env E2E_EVENT_SIZE=large E2E_ROUND_ONE_JUDGES=160 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:visual:linux": "bash scripts/visual-linux.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
-    "@firebase/rules-unit-testing": "^2.0.7",
-    "@playwright/test": "^1.64.1",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@playwright/test": "1.62.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/react": "^18.3.31",
     "@vitejs/plugin-react": "^6.1.2",
     "cross-env": "^7.0.3",
-    "firebase-tools": "^13.35.1",
+    "firebase-tools": "^15.34.0",
     "gh-pages": "^4.0.0",
     "jsdom": "^26.1.0",
     "vite": "^8.3.4",
     "vitest": "^5.0.5"
   },
   "engines": {
-    "node": ">=22.12 <23"
+    "node": ">=24.12 <25"
+  },
+  "overrides": {
+    "react-is": "^18.2.0"
   }
 }

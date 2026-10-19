@@ -22,7 +22,7 @@ const db = await import("../../testing/fakeDatabase");
 // right one; what each writes is tested in judge/assignmentEdits.test.js
 const mockEdits = { assign: vi.fn(), unassign: vi.fn(), swap: vi.fn() };
 vi.mock("../judge/assignmentEdits", async () => ({
-  ...await vi.importActual("../judge/assignmentEdits"),
+  ...(await vi.importActual("../judge/assignmentEdits")),
   assignJudgeToTeam: (...a) => mockEdits.assign(...a),
   unassignJudgeFromTeam: (...a) => mockEdits.unassign(...a),
   swapJudges: (...a) => mockEdits.swap(...a),

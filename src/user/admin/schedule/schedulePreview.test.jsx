@@ -139,7 +139,10 @@ function makePlan(overrides = {}) {
   };
 }
 
+let user;
+
 beforeEach(() => {
+  user = userEvent.setup();
   mockSaveDraft.mockResolvedValue({ ok: true, version: 2 });
   mockClearDraft.mockResolvedValue({ ok: true });
   mockReadDraft.mockResolvedValue(null);
@@ -201,8 +204,8 @@ test("a refused edit surfaces its error message in the drawer", async () => {
 
   // Borealis (t2) has exactly one judge -- applyEdit refuses to remove the
   // only judge on a team, for real, with no mocking needed to force it.
-  userEvent.click(screen.getByRole("button", { name: "Open Borealis" }));
-  userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  await user.click(screen.getByRole("button", { name: "Open Borealis" }));
+  await user.click(await screen.findByRole("button", { name: "Remove" }));
 
   expect(await screen.findByText(/only judge assigned/i)).toBeInTheDocument();
   expect(mockSaveDraft).not.toHaveBeenCalled();
@@ -221,9 +224,9 @@ test("a saveDraft failure is returned to the drawer, not swallowed as success", 
 
   // Aurora (t1) has two judges, so applyEdit accepts removing one -- the
   // failure this test forces comes from saveDraft, not applyEdit.
-  userEvent.click(screen.getByRole("button", { name: "Open Aurora" }));
+  await user.click(screen.getByRole("button", { name: "Open Aurora" }));
   const removeButtons = await screen.findAllByRole("button", { name: "Remove" });
-  userEvent.click(removeButtons[0]);
+  await user.click(removeButtons[0]);
 
   // The same message reaches both the page Snackbar (who moved it) and the
   // drawer (its own save failed) -- neither one alone used to be wrong, but
@@ -262,7 +265,7 @@ test("undo is enabled and labelled with the newest edit once there are some", as
 
 // ---- 5. DriftPanel renders each blocking item individually -------------------
 
-test("DriftPanel renders a separate repair control for each blocking item on the same removed room", () => {
+test("DriftPanel renders a separate repair control for each blocking item on the same removed room", async () => {
   const drift = {
     blocking: [
       {
@@ -286,8 +289,8 @@ test("DriftPanel renders a separate repair control for each blocking item on the
   const buttons = screen.getAllByRole("button", { name: "Place" });
   expect(buttons).toHaveLength(2);
 
-  userEvent.click(buttons[0]);
-  userEvent.click(buttons[1]);
+  await user.click(buttons[0]);
+  await user.click(buttons[1]);
 
   expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t1", batch: 1, room: "R3" });
   expect(onRepair).toHaveBeenCalledWith({ type: "moveTeam", teamId: "t2", batch: 1, room: "R4" });
@@ -302,7 +305,7 @@ test("a failed schedule-meta read still requires the typed confirmation to publi
   renderPage(<SchedulePreview />);
   await screen.findByText("Aurora");
 
-  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
+  await user.click(screen.getByRole("button", { name: "Publish schedule" }));
 
   // computeStats(makePlan()).teams is 2, and no config/eventName is stubbed
   // to exist, so the required phrase falls back to "2" -- the point under
@@ -311,13 +314,13 @@ test("a failed schedule-meta read still requires the typed confirmation to publi
   const confirmButton = screen.getByRole("button", { name: "Publish" });
   expect(confirmButton).toBeDisabled();
 
-  userEvent.type(screen.getByLabelText(/type/i), "2");
+  await user.type(screen.getByLabelText(/type/i), "2");
   expect(confirmButton).toBeEnabled();
 });
 
 // ---- Fix round 1, item 2: Drop is gated behind its own confirmation --------
 
-test("the Drop repair opens a confirmation instead of dropping immediately", () => {
+test("the Drop repair opens a confirmation instead of dropping immediately", async () => {
   const drift = {
     blocking: [{
       kind: "teamWithdrew",
@@ -330,11 +333,11 @@ test("the Drop repair opens a confirmation instead of dropping immediately", () 
 
   renderPage(<DriftPanel drift={drift} onRepair={onRepair} onRebuild={vi.fn()} />);
 
-  userEvent.click(screen.getByRole("button", { name: "Drop" }));
+  await user.click(screen.getByRole("button", { name: "Drop" }));
   expect(onRepair).not.toHaveBeenCalled();
   expect(screen.getByText(/cannot be undone with Undo/i)).toBeInTheDocument();
 
-  userEvent.click(screen.getByRole("button", { name: "Drop the team" }));
+  await user.click(screen.getByRole("button", { name: "Drop the team" }));
   expect(onRepair).toHaveBeenCalledWith({ type: "dropTeam", teamId: "t2" });
 });
 
@@ -360,11 +363,11 @@ test("dropping a team through drift repair also removes it from basis.teamIds", 
   renderPage(<SchedulePreview />);
   await screen.findByText("Aurora");
 
-  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
-  userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+  await user.click(screen.getByRole("button", { name: "Publish schedule" }));
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
 
-  userEvent.click(await screen.findByRole("button", { name: "Drop" }));
-  userEvent.click(await screen.findByRole("button", { name: "Drop the team" }));
+  await user.click(await screen.findByRole("button", { name: "Drop" }));
+  await user.click(await screen.findByRole("button", { name: "Drop the team" }));
 
   await waitFor(() => expect(mockSaveDraft).toHaveBeenCalled());
   const [savedPlan] = mockSaveDraft.mock.calls[0];
@@ -422,12 +425,12 @@ test("applying two repairs in a row builds the second on top of the first, not t
   renderPage(<SchedulePreview />);
   await screen.findByText("Aurora");
 
-  userEvent.click(screen.getByRole("button", { name: "Publish schedule" }));
-  userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+  await user.click(screen.getByRole("button", { name: "Publish schedule" }));
+  await user.click(await screen.findByRole("button", { name: "Publish" }));
 
   const firstPlace = await screen.findAllByRole("button", { name: "Place" });
   expect(firstPlace).toHaveLength(2);
-  userEvent.click(firstPlace[0]);
+  await user.click(firstPlace[0]);
 
   // Wait for the DOM, not just the mock call count -- `mockSaveDraft`'s call
   // count ticks up the instant it is INVOKED, before its promise resolves and
@@ -438,7 +441,7 @@ test("applying two repairs in a row builds the second on top of the first, not t
     expect(screen.getAllByRole("button", { name: "Place" })).toHaveLength(1);
   });
   const secondPlace = screen.getAllByRole("button", { name: "Place" });
-  userEvent.click(secondPlace[0]);
+  await user.click(secondPlace[0]);
   await waitFor(() => expect(mockSaveDraft).toHaveBeenCalledTimes(2));
 
   const [firstCallPlan] = mockSaveDraft.mock.calls[0];

@@ -67,7 +67,13 @@ function NextStep({ icon, title, body, actions }) {
         </Stack>
     );
     return (
-        <Stack direction="row" alignItems={{ xs: "flex-start", sm: "center" }} sx={{ gap: 2, p: { xs: 2, sm: 2.5 } }}>
+        <Stack
+            direction="row"
+            sx={{
+                alignItems: { xs: "flex-start", sm: "center" },
+                gap: 2,
+                p: { xs: 2, sm: 2.5 }
+            }}>
             <Box
                 aria-hidden
                 sx={{
@@ -239,7 +245,7 @@ function Home() {
                                 <Stack
                                     direction="row"
                                     spacing={{ xs: 1, sm: 3 }}
-                                    justifyContent="center"
+                                    sx={{ justifyContent: "center" }}
                                 >
                                     <Unit value={time.days} label="days" />
                                     <Unit value={time.hours} label="hours" />
@@ -248,7 +254,7 @@ function Home() {
                                 </Stack>
                             </>
                         ) : (
-                            <Stack spacing={0.75} alignItems="center">
+                            <Stack spacing={0.75} sx={{ alignItems: "center" }}>
                                 {/* The badge is a claim, so it is only made while it is
                                     true. The countdown reaching zero used to be the only
                                     condition, which meant the site said the event was

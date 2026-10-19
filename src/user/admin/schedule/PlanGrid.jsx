@@ -40,7 +40,7 @@ function TeamCard({ assignment, minPerTeam, onOpenTeam }) {
         "&:hover": { borderColor: judgeCount === 0 ? "error.dark" : judgeCount < minPerTeam ? "warning.dark" : "primary.main" },
       }}
     >
-      <Typography variant="caption" color="text.secondary">{assignment.room}</Typography>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>{assignment.room}</Typography>
       <Typography sx={{ fontWeight: 600 }}>{assignment.teamName}</Typography>
       <Stack direction="row" sx={{ mt: 0.75, flexWrap: "wrap", gap: 0.5 }}>
         {judgeCount === 0 ? (
@@ -99,10 +99,10 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
       <StatStrip stats={headerStats} sx={{ mb: 3 }} />
 
       <Grid container spacing={2}>
-        <Grid item xs={12} md={9}>
+        <Grid size={{ xs: 12, md: 9 }}>
           <Grid container spacing={2}>
             {batches.map((batch) => (
-              <Grid item xs={12} sm={6} md={4} key={batch}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={batch}>
                 <Stack spacing={1}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     Batch {batch}
@@ -118,7 +118,7 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
                       />
                     ))}
                     {!(byBatch.get(batch) ?? []).length && (
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>
                         No teams in this batch.
                       </Typography>
                     )}
@@ -129,7 +129,7 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
           </Grid>
         </Grid>
 
-        <Grid item xs={12} md={3}>
+        <Grid size={{ xs: 12, md: 3 }}>
           <Stack spacing={2}>
             {spareJudges.length > 0 && (
               <Card variant="outlined" sx={{ p: 1.5 }}>
@@ -151,7 +151,11 @@ export default function PlanGrid({ plan, stats, onOpenTeam }) {
                 </Typography>
                 <Stack spacing={0.75}>
                   {unscheduledTeams.map((team) => (
-                    <Stack key={team.id} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Stack
+                      key={team.id}
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", justifyContent: "space-between" }}>
                       <Typography variant="body2">{team.name}</Typography>
                       <Button size="small" onClick={() => onOpenTeam(team.id)}>
                         Place

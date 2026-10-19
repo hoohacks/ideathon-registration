@@ -15,6 +15,8 @@ import {
   withTimeout,
   subscribeToPending,
   STORAGE_KEY,
+  LOCK_NAME,
+  LOCK_TIMEOUT_MS,
 } from "./pendingScores";
 import { saveDraft, loadDraft, clearDraft } from "./scoreDraft";
 import { readJson, writeJson, isAvailable } from "./localStore";
@@ -357,5 +359,213 @@ describe("a flush racing the judge", () => {
     await Promise.all([first, second]);
 
     expect(listPending("judge-1")).toHaveLength(0);
+  });
+});
+
+/**
+ * Closing the gap the re-read loop above can only narrow.
+ *
+ * `localStorage` has no compare-and-swap, so two tabs' read-modify-write of the
+ * queue can still interleave and lose a card. `pendingScores` now runs each
+ * mutation inside an origin-wide exclusive Web Lock, which serializes every
+ * tab. jsdom ships no `navigator.locks`, so these tests install a faithful
+ * one -- a real per-name mutual-exclusion chain -- to exercise the lock path,
+ * and also assert the fallback that keeps unsupported environments working.
+ */
+describe("the cross-tab Web Lock", () => {
+  // A stand-in for navigator.locks with genuine mutual exclusion: a request for
+  // a name waits for the previous holder of that name to release before its
+  // callback runs. Returns the spy so a test can assert how it was called.
+  function installSerialLocks() {
+    const tails = new Map();
+    const request = vi.fn((name, options, callback) => {
+      if (typeof options === "function") {
+        callback = options;
+        options = {};
+      }
+      const prev = tails.get(name) || Promise.resolve();
+      let release;
+      const held = new Promise((resolve) => {
+        release = resolve;
+      });
+      tails.set(name, held);
+      return prev.then(async () => {
+        try {
+          return await callback({ name, mode: options?.mode ?? "exclusive" });
+        } finally {
+          release();
+        }
+      });
+    });
+    Object.defineProperty(navigator, "locks", {
+      value: { request },
+      configurable: true,
+      writable: true,
+    });
+    return request;
+  }
+
+  afterEach(() => {
+    delete navigator.locks;
+  });
+
+  test("every queue mutation takes the one exclusive lock, and concurrent callers all survive", async () => {
+    const request = installSerialLocks();
+
+    // five tabs each queue a different card at the same moment
+    const teams = ["t1", "t2", "t3", "t4", "t5"];
+    await Promise.all(teams.map((teamId) => enqueue(entry({ teamId }))));
+
+    expect(request).toHaveBeenCalledTimes(teams.length);
+    for (const call of request.mock.calls) {
+      expect(call[0]).toBe(LOCK_NAME);
+      expect(call[1]).toMatchObject({ mode: "exclusive" });
+    }
+    // serialized by the lock, so not one of the five clobbered another
+    expect(listPending("judge-1").map((e) => e.teamId).sort()).toEqual([...teams].sort());
+  });
+
+  test("under the lock a single enqueue reads the queue once, skipping the compare-and-swap loop", async () => {
+    installSerialLocks();
+    const realGet = Storage.prototype.getItem;
+    let reads = 0;
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(function getItem(key) {
+      if (key === STORAGE_KEY) reads += 1;
+      return realGet.call(this, key);
+    });
+
+    await enqueue(entry({ teamId: "solo" }));
+
+    // The lock makes concurrent mutation impossible, so the locked path is a
+    // plain read-modify-write: one read of the queue. The fallback's re-read
+    // guard (a second read plus a stringify compare) is skipped entirely.
+    expect(reads).toBe(1);
+    expect(listPending("judge-1").map((e) => e.teamId)).toEqual(["solo"]);
+  });
+
+  test("removeEntry and a flush's queue edits take the lock too", async () => {
+    const request = installSerialLocks();
+
+    await enqueue(entry({ teamId: "t1" }));
+    await enqueue(entry({ teamId: "t2" }));
+
+    request.mockClear();
+    await removeEntry("first:t1:judge-1");
+    expect(request).toHaveBeenCalledWith(
+      LOCK_NAME,
+      expect.objectContaining({ mode: "exclusive" }),
+      expect.any(Function)
+    );
+
+    request.mockClear();
+    await flushPending(async () => {}, { judgeUid: "judge-1" });
+    // the successful send removed t2 from the queue -- that edit took the lock
+    expect(request).toHaveBeenCalled();
+    expect(listPending("judge-1")).toHaveLength(0);
+  });
+
+  test("applies the mutation synchronously, but still returns a promise, when Web Locks is unavailable", async () => {
+    expect(navigator.locks).toBeUndefined();
+
+    // With no lock to await, the write still lands synchronously -- the queue
+    // is updated before enqueue returns, which the pre-lock callers relied on.
+    const result = enqueue(entry({ teamId: "team-sync" }));
+    expect(listPending("judge-1").map((e) => e.teamId)).toEqual(["team-sync"]);
+
+    // The return value is a promise in every environment, though, resolving to
+    // the storage-ok boolean. That one type is deliberate: a caller who forgets
+    // to await fails the same way here as in a real browser, instead of the
+    // always-truthy promise hiding the storage-refused `false` only in prod.
+    await expect(result).resolves.toBe(true);
+  });
+
+  test("a frozen tab holding the lock cannot block the queue past the timeout", async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // a lock that is never granted but honors its abort signal like the real
+      // API -- i.e. another tab that took the lock and then froze
+      const request = vi.fn(
+        (name, options) =>
+          new Promise((_, reject) => {
+            options.signal.addEventListener("abort", () =>
+              reject(new DOMException("aborted", "AbortError"))
+            );
+          })
+      );
+      Object.defineProperty(navigator, "locks", {
+        value: { request },
+        configurable: true,
+        writable: true,
+      });
+
+      const pending = enqueue(entry({ teamId: "team-frozen" }));
+      // the acquisition times out, and the mutation proceeds without the lock
+      // rather than hanging forever
+      await vi.advanceTimersByTimeAsync(LOCK_TIMEOUT_MS + 1);
+
+      await expect(pending).resolves.toBe(true);
+      expect(request).toHaveBeenCalledWith(
+        LOCK_NAME,
+        expect.objectContaining({ mode: "exclusive" }),
+        expect.any(Function)
+      );
+      expect(listPending("judge-1").map((e) => e.teamId)).toEqual(["team-frozen"]);
+      // running un-locked reopens the race, so it must leave a breadcrumb
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // `locks.request` rejects not only on the timeout abort but also when the
+  // lock simply cannot be granted: InvalidStateError when the document is not
+  // fully active (bfcache, prerender), or SecurityError. Before the lock,
+  // enqueue could not fail that way; it must not start now. Each of these must
+  // fall through to the un-locked mutation, not surface a raw DOMException to
+  // the judge in place of "saved".
+  for (const name of ["InvalidStateError", "SecurityError"]) {
+    test(`a ${name} acquiring the lock still queues the card`, async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const request = vi.fn(() =>
+        Promise.reject(new DOMException(name.toLowerCase(), name))
+      );
+      Object.defineProperty(navigator, "locks", {
+        value: { request },
+        configurable: true,
+        writable: true,
+      });
+
+      await expect(enqueue(entry({ teamId: "team-inactive" }))).resolves.toBe(true);
+      expect(request).toHaveBeenCalled();
+      expect(listPending("judge-1").map((e) => e.teamId)).toEqual(["team-inactive"]);
+      expect(warn).toHaveBeenCalled();
+    });
+  }
+
+  test("an error thrown inside the locked mutation propagates rather than silently retrying", async () => {
+    // The lock is granted and the callback runs, but the mutation itself
+    // throws. That is a genuine failure the caller must see -- it must not be
+    // swallowed and re-run un-locked like an acquisition failure.
+    const request = vi.fn(async (name, options, callback) => {
+      if (typeof options === "function") callback = options;
+      return callback({ name });
+    });
+    Object.defineProperty(navigator, "locks", {
+      value: { request },
+      configurable: true,
+      writable: true,
+    });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const boom = new Error("storage exploded mid-write");
+    vi.spyOn(localStore, "writeJson").mockImplementation(() => {
+      throw boom;
+    });
+
+    await expect(enqueue(entry({ teamId: "team-throws" }))).rejects.toBe(boom);
+    // a genuine mutation failure propagates -- it is not the un-locked
+    // fallback, so it must not emit the race warning
+    expect(warn).not.toHaveBeenCalled();
   });
 });

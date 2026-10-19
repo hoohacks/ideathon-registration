@@ -105,9 +105,10 @@ export default function AdminHome() {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1}
-            justifyContent="space-between"
-            alignItems={{ sm: "center" }}
-          >
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { sm: "center" }
+            }}>
             <Box>
               <Typography variant="overline" component="p">
                 Event status
@@ -166,7 +167,7 @@ export default function AdminHome() {
 
       <Card>
         <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "baseline", mb: 1 }}>
             <Typography variant="overline" component="p">
               Before judging can run
             </Typography>
@@ -177,13 +178,7 @@ export default function AdminHome() {
 
           <Stack divider={<Divider />}>
             {state.checks.map((check) => (
-              <Stack
-                key={check.id}
-                direction="row"
-                spacing={1.5}
-                alignItems="center"
-                sx={{ py: 1 }}
-              >
+              <Stack key={check.id} direction="row" spacing={1.5} sx={{ alignItems: "center", py: 1 }}>
                 <Box
                   aria-hidden="true"
                   sx={{

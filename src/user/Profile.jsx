@@ -33,9 +33,11 @@ function Row({ label, children }) {
     return (
         <Stack
             direction={{ xs: "column", sm: "row" }}
-            sx={{ py: 1.25, gap: { xs: 0.25, sm: 2 } }}
-            alignItems={{ xs: "flex-start", sm: "center" }}
-        >
+            sx={{
+                alignItems: { xs: "flex-start", sm: "center" },
+                py: 1.25,
+                gap: { xs: 0.25, sm: 2 }
+            }}>
             <Typography variant="body2" sx={{ minWidth: 150 }}>
                 {label}
             </Typography>
@@ -125,7 +127,7 @@ function Profile() {
                     </Row>
                     <Divider />
                     <Row label="Role">
-                        <Stack sx={{ gap: 0.75 }} direction="row" flexWrap="wrap">
+                        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
                             {roles.length ? (
                                 roles.map((role) => (
                                     <Chip
@@ -146,9 +148,9 @@ function Profile() {
                             <Divider />
                             <Row label="Dietary restrictions">
                                 <FormControl sx={{ minWidth: 200 }}>
-                                    <InputLabel id="profile-dietary-label">Dietary restrictions</InputLabel>
+                                    <InputLabel id="dietary-label">Dietary restrictions</InputLabel>
                                     <Select
-                                        labelId="profile-dietary-label"
+                                        labelId="dietary-label"
                                         label="Dietary restrictions"
                                         value={dietaryRestriction}
                                         onChange={(e) => setDietaryRestrictions(e.target.value)}

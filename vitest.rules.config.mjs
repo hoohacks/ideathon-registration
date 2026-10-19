@@ -16,8 +16,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["test/rules/**/*.test.mjs"],
-    // every file talks to the same emulator namespace and calls clearDatabase
-    // between tests, so they must not run concurrently
+    // every file shares one emulator, the database namespace or the bucket,
+    // and wipes it between tests, so they must not run concurrently
     fileParallelism: false,
     testTimeout: 20000,
     hookTimeout: 20000,

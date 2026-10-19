@@ -155,7 +155,7 @@ export default function TeamSlotDrawer({ open, plan, teamId, onEdit, onClose }) 
 
           <Stack spacing={1.5}>
             {judges.map((judge) => (
-              <Stack key={judge.judgeId} direction="row" spacing={1} alignItems="center">
+              <Stack key={judge.judgeId} direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Typography variant="body2" sx={{ flex: 1 }}>{judge.judgeName}</Typography>
                 <TextField
                   select

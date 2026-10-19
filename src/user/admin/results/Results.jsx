@@ -217,9 +217,10 @@ function StandingRow({ team, place, final }) {
     <Stack
       direction={{ xs: "column", sm: "row" }}
       spacing={{ xs: 0.5, sm: 2 }}
-      alignItems={{ sm: "center" }}
-      sx={{ py: 1.5 }}
-    >
+      sx={{
+        alignItems: { sm: "center" },
+        py: 1.5
+      }}>
       <Typography variant="data" sx={{ width: 24, color: "text.secondary" }}>
         {scored ? place : "-"}
       </Typography>
@@ -244,7 +245,7 @@ function StandingRow({ team, place, final }) {
         </Typography>
       </Box>
 
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
         <Box sx={{ textAlign: "right", minWidth: 64 }}>
           <Typography variant="data" sx={{ fontSize: "1rem", fontWeight: 600 }}>
             {scored ? team.averageScore.toFixed(1) : "-"}

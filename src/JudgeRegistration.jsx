@@ -450,7 +450,7 @@ const JudgeRegistrationForm = () => {
 
       <Box component="form" ref={formRef} onSubmit={handleSubmit} noValidate>
         <Grid container spacing={{ xs: 4, md: 6 }}>
-          <Grid item xs={12} md={7} lg={8}>
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
             <Stack spacing={5}>
               <Section id="account" label="Account">
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -634,7 +634,7 @@ const JudgeRegistrationForm = () => {
             <MobileSubmitBar {...rail} />
           </Grid>
 
-          <Grid item xs={12} md={5} lg={4} sx={{ display: { xs: "none", md: "block" } }}>
+          <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
             <SubmitRail
               {...rail}
               footer={

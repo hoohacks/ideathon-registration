@@ -273,16 +273,15 @@ function JudgingProgress() {
           { label: "judges checked in", value: `${totals.checkedIn}/${totals.judges}` },
         ]}
       >
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <TextField
             select
             size="small"
             value={round}
             onChange={(e) => setRound(e.target.value)}
-            // no visible label, so it needs a name of its own; older MUI let the
-            // selected value stand in for one, and newer MUI does not
-            SelectProps={{ inputProps: { "aria-label": "Round" } }}
             sx={{ minWidth: 150 }}
+            // no visible label: the value says which round, this says what it picks
+            slotProps={{ select: { inputProps: { "aria-label": "Round" } } }}
           >
             <MenuItem value={FIRST_ROUND}>First round</MenuItem>
             <MenuItem value={FINAL_ROUND}>Final round</MenuItem>
@@ -336,12 +335,13 @@ function JudgingProgress() {
               <Row key={team.teamId} accent={team.status !== TEAM_OK}>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
-                  justifyContent="space-between"
-                  alignItems={{ xs: "flex-start", sm: "center" }}
                   spacing={1}
-                >
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: { xs: "flex-start", sm: "center" }
+                  }}>
                   <Box sx={{ minWidth: 0 }}>
-                    <Stack sx={{ gap: 1 }} direction="row" alignItems="baseline" flexWrap="wrap">
+                    <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
                       <Typography variant="h5">{team.name}</Typography>
                       {chip.label && (
                         <Chip label={chip.label} size="small" color={chip.color} />
@@ -393,12 +393,10 @@ function JudgingProgress() {
               <Row key={judge.judgeId} accent={left > 0 && !judge.checkedIn}>
                 <Stack
                   direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
                   spacing={1}
-                >
+                  sx={{ justifyContent: "space-between", alignItems: "center" }}>
                   <Box sx={{ minWidth: 0 }}>
-                    <Stack sx={{ gap: 1 }} direction="row" alignItems="baseline" flexWrap="wrap">
+                    <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
                       <Typography variant="h5">{judge.name}</Typography>
                       {!judge.checkedIn && (
                         <Chip label="Not checked in" size="small" color="warning" />

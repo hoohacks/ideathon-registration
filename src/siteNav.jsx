@@ -154,8 +154,6 @@ export function Wordmark({ height = 30, to = "/user/home", href, onDark = false 
     );
 }
 
-// PaperProps, not slotProps: MUI only taught Menu and Drawer about slotProps
-// in 5.15 and this project is on 5.10, so the whole object would be dropped.
 const menuPaper = { sx: { minWidth: 220, py: 0.5 } };
 
 /**
@@ -211,7 +209,9 @@ function Nav({ variant = "app", overlay = false }) {
     const userTypes = context?.userTypes ?? [];
     const userData = context?.userData;
 
-    const [accountAnchor, setAccountAnchor] = useState(null);
+    // the menu's open flag is hoisted with the drawer's (below), so it survives
+    // the nav being remounted; the anchor is whichever button is mounted now
+    const [accountButton, setAccountButton] = useState(null);
 
     // Above the route, so a tap that lands while the page is still resolving a
     // role is not thrown away with the nav that received it. See the note on
@@ -221,6 +221,9 @@ function Nav({ variant = "app", overlay = false }) {
     const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
     const drawerOpen = hoisted ? hoisted.open : localDrawerOpen;
     const setDrawerOpen = hoisted ? hoisted.setOpen : setLocalDrawerOpen;
+    const [localAccountOpen, setLocalAccountOpen] = useState(false);
+    const accountOpen = hoisted ? hoisted.accountOpen : localAccountOpen;
+    const setAccountOpen = hoisted ? hoisted.setAccountOpen : setLocalAccountOpen;
 
     const isAdmin = hasRole(userTypes, "admin");
     const primary = PRIMARY.filter(
@@ -231,13 +234,13 @@ function Nav({ variant = "app", overlay = false }) {
         to === "/user/home" ? pathname === to : pathname.startsWith(to);
 
     const go = (to) => {
-        setAccountAnchor(null);
+        setAccountOpen(false);
         setDrawerOpen(false);
         navigate(to);
     };
 
     const logOut = async () => {
-        setAccountAnchor(null);
+        setAccountOpen(false);
         setDrawerOpen(false);
         try {
             await auth.signOut();
@@ -359,16 +362,26 @@ function Nav({ variant = "app", overlay = false }) {
                 {/* scrolls on a short window rather than pushing the account
                     button off the bottom */}
                 <Stack
-                    alignItems="center"
-                    sx={{ flex: 1, gap: 0.5, overflowY: "auto", overflowX: "hidden", width: "100%", px: 1 }}
-                >
+                    sx={{
+                        alignItems: "center",
+                        flex: 1,
+                        gap: 0.5,
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        width: "100%",
+                        px: 1
+                    }}>
                     {primary.map((link) => (
                         <NavItem key={link.to} {...link} active={isActive(link.to)} />
                     ))}
 
                     {isAdmin &&
                         ADMIN_GROUPS.map((group) => (
-                            <Stack key={group.id} alignItems="center" sx={{ gap: 0.5 }} role="group" aria-label={group.label}>
+                            <Stack
+                                key={group.id}
+                                role="group"
+                                aria-label={group.label}
+                                sx={{ alignItems: "center", gap: 0.5 }}>
                                 <Box aria-hidden sx={{ width: 32, height: "1px", bgcolor: tokens.LINE, my: 0.75 }} />
                                 {group.links.map((link) => (
                                     <NavItem
@@ -386,7 +399,8 @@ function Nav({ variant = "app", overlay = false }) {
                     visibly shows initials, and a label that leaves out the
                     visible text is a WCAG 2.5.3 failure. */}
                 <IconButton
-                    onClick={(e) => setAccountAnchor(e.currentTarget)}
+                    ref={setAccountButton}
+                    onClick={() => setAccountOpen(true)}
                     sx={{ mt: 1, p: 0.5 }}
                 >
                     {avatar(40)}
@@ -407,12 +421,12 @@ function Nav({ variant = "app", overlay = false }) {
             </Box>
 
             <Menu
-                anchorEl={accountAnchor}
-                open={Boolean(accountAnchor)}
-                onClose={() => setAccountAnchor(null)}
+                anchorEl={accountButton}
+                open={accountOpen && Boolean(accountButton)}
+                onClose={() => setAccountOpen(false)}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-                PaperProps={{ ...menuPaper, sx: { ...menuPaper.sx, ml: 1.5 } }}
+                slotProps={{ paper: { ...menuPaper, sx: { ...menuPaper.sx, ml: 1.5 } } }}
             >
                 <Box sx={{ px: 2, py: 1 }}>
                     <Typography sx={{ fontWeight: 700, color: tokens.INK }}>{fullName || "Signed in"}</Typography>
@@ -484,17 +498,19 @@ function Nav({ variant = "app", overlay = false }) {
                 anchor="bottom"
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
-                PaperProps={{
-                    sx: {
-                        borderTopLeftRadius: 32,
-                        borderTopRightRadius: 32,
-                        maxHeight: "85dvh",
-                        pb: "env(safe-area-inset-bottom, 0px)",
-                    },
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderTopLeftRadius: 32,
+                            borderTopRightRadius: 32,
+                            maxHeight: "85dvh",
+                            pb: "env(safe-area-inset-bottom, 0px)",
+                        },
+                    }
                 }}
             >
                 <Box aria-hidden sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: tokens.SECONDARY_BG, mx: "auto", mt: 1.25 }} />
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", px: 2.5, pt: 2, pb: 1.5 }}>
                     {avatar(44)}
                     <Box sx={{ minWidth: 0 }}>
                         <Typography sx={{ fontWeight: 700, color: tokens.INK }}>{fullName || "Signed in"}</Typography>

@@ -47,7 +47,7 @@ function when(time) {
 function PitchLine({ label, time, room }) {
     const { lead, value } = when(time);
     return (
-        <Stack direction="row" alignItems="flex-start" sx={{ gap: 1.5 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", gap: 1.5 }}>
             <Box aria-hidden sx={{ fontSize: 24, lineHeight: 0, mt: 0.25, color: "primary.main" }}>
                 <PiPresentationChart />
             </Box>
@@ -74,7 +74,7 @@ function PitchLine({ label, time, room }) {
 export default function PitchCard({ schedule, finalSlot }) {
     if (!schedule && !finalSlot) return null;
     return (
-        <Card sx={{ borderRadius: 4, border: 2, borderColor: "primary.main" }}>
+        <Card component="section" aria-label="When you pitch" sx={{ borderRadius: 4, border: 2, borderColor: "primary.main" }}>
             <CardContent sx={{ p: { xs: 2.5, sm: 3 }, "&:last-child": { pb: { xs: 2.5, sm: 3 } } }}>
                 <Stack spacing={1.25}>
                     {schedule && (

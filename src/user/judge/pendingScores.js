@@ -29,6 +29,100 @@ export const STORAGE_KEY = "ideathon:pendingScores:v1";
  */
 export const SUBMIT_TIMEOUT_MS = 8000;
 
+/**
+ * The cross-tab lock name. All tabs on this origin that mutate the queue ask
+ * for the same name, so the browser lets only one of them inside at a time.
+ */
+export const LOCK_NAME = "ideathon:pendingScores";
+
+/**
+ * How long to wait to acquire the lock before giving up and mutating anyway.
+ *
+ * A tab that froze or crashed while holding the lock must not jam the queue for
+ * every other tab for the rest of the event. If the lock cannot be had in this
+ * long, the mutation proceeds without it -- back to the pre-lock behavior,
+ * which was a narrow race, rather than a permanent hang. Comfortably longer
+ * than any real read-modify-write, which is a handful of synchronous
+ * localStorage calls.
+ */
+export const LOCK_TIMEOUT_MS = 3000;
+
+/**
+ * Run `fn` inside the cross-tab exclusive lock when the Web Locks API is
+ * available, and run it directly when it is not.
+ *
+ * Web Locks is the cross-tab primitive `localStorage` lacks: an exclusive lock
+ * serializes every tab's read-modify-write of the queue, so the gap `enqueue`
+ * could only ever narrow (see its comment) is closed. Where the API is missing
+ * -- Node/jsdom test runners, older browsers -- this falls back to running the
+ * mutation directly, exactly as before, with the optimistic re-read in
+ * `enqueue` as the only guard.
+ *
+ * It always returns a promise of `fn`'s value -- under a lock and in the
+ * fallback alike. The mutation itself still runs synchronously when there is
+ * no lock: `fn` is called straight away, so the queue is written before this
+ * returns, exactly as before; only the *return value* is wrapped. Keeping one
+ * return type matters because a promise is always truthy. If the fallback
+ * returned a bare boolean while the lock path returned a promise, a caller
+ * writing `if (!enqueue(card))` without `await` would correctly catch the
+ * storage-refused `false` in jsdom tests but silently miss it in a real
+ * browser -- a lost-score bug that no test could see. One type, awaited
+ * everywhere, fails the same way in both.
+ *
+ * `fn` is called with one argument: `true` when it runs holding the lock,
+ * `false` when it runs without one (no Web Locks, or a lock we failed to
+ * acquire). A caller can use it to skip work that only guards the lock-less
+ * race -- `enqueue`'s compare-and-swap retry, which can never trip while the
+ * lock is held.
+ */
+async function withQueueLock(fn) {
+  const locks = typeof navigator !== "undefined" && navigator.locks;
+  if (!locks || typeof locks.request !== "function") return fn(false);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOCK_TIMEOUT_MS);
+
+  // `locks.request` rejects for two very different reasons, and only one of
+  // them is a real failure. It rejects when the lock cannot be ACQUIRED --
+  // the timeout abort above, but also InvalidStateError when the document is
+  // not fully active (bfcache, prerender) or SecurityError -- and it rejects
+  // when `fn` itself throws once it holds the lock. Losing the lock must never
+  // cost us the mutation: enqueue could not fail this way before the lock
+  // existed, and a judge seeing a raw DOMException instead of "saved" is the
+  // regression. So we record whether `fn` actually ran, and in the catch run
+  // it (un-locked, back to the narrow pre-lock race) whenever it did not --
+  // rethrowing only errors `fn` raised itself.
+  let fnRan = false;
+  const runFn = () => {
+    fnRan = true;
+    return fn(true);
+  };
+
+  try {
+    return await locks.request(
+      LOCK_NAME,
+      { mode: "exclusive", signal: controller.signal },
+      runFn
+    );
+  } catch (error) {
+    if (fnRan) throw error;
+    // The lock could not be acquired: the timeout above fired (a frozen
+    // holder), or the document is not lockable (InvalidStateError from
+    // bfcache/prerender, SecurityError). We run the mutation anyway rather
+    // than drop the card -- but this is the one path that reopens the HOO-66
+    // race: another tab that also timed out can be mid read-modify-write this
+    // same moment, so a write can still clobber. Warn so this last-resort path
+    // is visible in logs instead of silently losing a score.
+    console.warn(
+      "[pendingScores] proceeding without the cross-tab lock; queue writes may race",
+      controller.signal.aborted ? "(lock acquisition timed out)" : error
+    );
+    return fn(false);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const listeners = new Set();
 
 let revisionCounter = 0;
@@ -115,14 +209,15 @@ const MAX_ENQUEUE_ATTEMPTS = 5;
  * user-facing refusal, because there is no "reload and try again" to show a
  * judge for a queue they never looked at directly.
  *
- * This NARROWS the race; it does not close it. `localStorage` has no
- * compare-and-swap: `getItem` and `setItem` are two separate calls, and
- * nothing stops a second tab's own read-modify-write from landing in the
- * gap between this call's last read and its `writeAll`, however short that
- * gap is made. Closing it fully would need a cross-tab lock this file does
- * not have access to on its own -- the Web Locks API, or moving this queue
- * into IndexedDB, whose transactions actually are atomic across tabs. Either
- * is a bigger change than this module's one localStorage key.
+ * On its own the re-read only NARROWS the race -- `localStorage` has no
+ * compare-and-swap, so `getItem` and `setItem` are two separate calls and a
+ * second tab's write can still land in the gap between this call's last read
+ * and its `writeAll`, however short that gap is made. `withQueueLock` closes
+ * it: when the Web Locks API is available the whole read-modify-write below
+ * runs inside an origin-wide exclusive lock, so no other tab can be reading or
+ * writing the queue at the same time. Where Web Locks is missing -- older
+ * browsers, the Node/jsdom test runner -- the lock is a no-op and the re-read
+ * loop is exactly the narrowing guard it always was.
  */
 export function enqueue({ round, teamId, teamName, judgeUid, score }) {
   const cardEntry = {
@@ -149,31 +244,41 @@ export function enqueue({ round, teamId, teamName, judgeUid, score }) {
     lastError: null,
   };
 
-  let before = readAll();
-  for (let attempt = 0; attempt < MAX_ENQUEUE_ATTEMPTS; attempt += 1) {
-    const rest = nextQueue(before, cardEntry);
+  return withQueueLock((locked) => {
+    // Under the lock no other tab can touch the queue between this read and
+    // this write, so a plain read-modify-write is already safe and the
+    // compare-and-swap loop below would only ever run a single pass -- two
+    // wasted reads and a pair of JSON.stringify calls on every submit. Skip it.
+    if (locked) return writeAll(nextQueue(readAll(), cardEntry));
 
-    // Re-read right up against the write. If another tab's enqueue (or a
-    // flush's remove) landed since `before` was read, `rest` was built on a
-    // queue that no longer exists -- re-base on what is actually there now
-    // and try again, instead of overwriting it.
-    const justBefore = readAll();
-    if (JSON.stringify(justBefore) !== JSON.stringify(before)) {
-      before = justBefore;
-      continue;
+    // No lock held (older browser, jsdom, or a lock we failed to acquire).
+    // `localStorage` has no compare-and-swap, so another tab's write can land
+    // in the gap between our read and our `writeAll`. Re-read right up against
+    // the write and, if the queue changed since the read this edit was based
+    // on, re-base the same edit onto the fresh read and try again rather than
+    // overwriting it. This only NARROWS the race; it cannot close it.
+    let before = readAll();
+    for (let attempt = 0; attempt < MAX_ENQUEUE_ATTEMPTS; attempt += 1) {
+      const rest = nextQueue(before, cardEntry);
+
+      const justBefore = readAll();
+      if (JSON.stringify(justBefore) !== JSON.stringify(before)) {
+        before = justBefore;
+        continue;
+      }
+
+      return writeAll(rest);
     }
 
-    return writeAll(rest);
-  }
-
-  // Retries exhausted under sustained contention: commit against the
-  // freshest read available rather than drop the card or hang forever. This
-  // carries the same residual risk every attempt above already carried.
-  return writeAll(nextQueue(readAll(), cardEntry));
+    // Retries exhausted under sustained contention: commit against the
+    // freshest read available rather than drop the card or hang forever. This
+    // carries the same residual risk every attempt above already carried.
+    return writeAll(nextQueue(readAll(), cardEntry));
+  });
 }
 
 export function removeEntry(id) {
-  writeAll(readAll().filter((entry) => entry.id !== id));
+  return withQueueLock(() => writeAll(readAll().filter((entry) => entry.id !== id)));
 }
 
 /**
@@ -184,10 +289,12 @@ export function removeEntry(id) {
  * landed was the old one.
  */
 function removeIfCurrent(sent) {
-  const all = readAll();
-  const stored = all.find((entry) => entry.id === sent.id);
-  if (stored && stored.revision !== sent.revision) return;
-  writeAll(all.filter((entry) => entry.id !== sent.id));
+  return withQueueLock(() => {
+    const all = readAll();
+    const stored = all.find((entry) => entry.id === sent.id);
+    if (stored && stored.revision !== sent.revision) return;
+    writeAll(all.filter((entry) => entry.id !== sent.id));
+  });
 }
 
 /**
@@ -228,18 +335,35 @@ async function flushQueue(write, { judgeUid } = {}) {
   for (const entry of queue) {
     try {
       await write(entry);
-      removeIfCurrent(entry);
-      synced += 1;
     } catch (error) {
+      // The SEND failed. This is the only thing the try guards, and the only
+      // path that treats the card as failed: bump its attempt count, leave it
+      // queued for the next flush, and move on. Nothing that can abort the loop
+      // and strand the cards behind it belongs here.
       failed += 1;
-      const all = readAll();
-      const target = all.find((candidate) => candidate.id === entry.id);
-      if (target) {
-        target.attempts += 1;
-        target.lastError = error?.message ?? String(error);
-        writeAll(all);
-      }
+      await withQueueLock(() => {
+        const all = readAll();
+        const target = all.find((candidate) => candidate.id === entry.id);
+        if (target) {
+          target.attempts += 1;
+          target.lastError = error?.message ?? String(error);
+          writeAll(all);
+        }
+      });
+      continue;
     }
+
+    // The send landed. Dropping the card from the queue is cleanup, kept OUT of
+    // the try above on purpose: a storage or lock hiccup while removing a card
+    // that already synced must never reclassify it as failed or bump its
+    // attempts. Worst case the entry lingers and the next flush re-sends it,
+    // which is harmless -- the write is idempotent at its path.
+    //
+    // The send itself is kept outside the lock too: it can hang for up to
+    // SUBMIT_TIMEOUT_MS, and holding a cross-tab lock across it would time out
+    // every other tab's enqueue. Only the storage edit below takes the lock.
+    await removeIfCurrent(entry);
+    synced += 1;
   }
 
   return { synced, failed };

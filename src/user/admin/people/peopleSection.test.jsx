@@ -26,7 +26,7 @@ const mockService = {
   bulkSet: vi.fn(),
 };
 vi.mock("./peopleService", async () => ({
-  ...await vi.importActual("./peopleService"),
+  ...(await vi.importActual("./peopleService")),
   listPeople: (...a) => mockService.listPeople(...a),
   setSoleRole: (...a) => mockService.setSoleRole(...a),
   setOrganizer: (...a) => mockService.setOrganizer(...a),
@@ -104,7 +104,7 @@ test("search matches on email", async () => {
 test("the admin switch sits beside the role and flips only admin access", async () => {
   await open();
   const priya = row("Priya Raman");
-  const admin = priya.getByRole("checkbox", { name: "Admin" });
+  const admin = priya.getByRole("switch", { name: "Admin" });
   expect(admin).not.toBeChecked();
 
   fireEvent.click(admin);
@@ -118,7 +118,7 @@ test("the admin switch sits beside the role and flips only admin access", async 
 test("an admin's switch is on, and the role underneath it still shows", async () => {
   await open();
   const olu = row("Olu Admin");
-  expect(olu.getByRole("checkbox", { name: "Admin" })).toBeChecked();
+  expect(olu.getByRole("switch", { name: "Admin" })).toBeChecked();
   expect(rolePicker("Olu Admin")).toHaveTextContent("Judge");
 });
 

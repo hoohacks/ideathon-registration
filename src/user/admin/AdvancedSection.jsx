@@ -105,7 +105,7 @@ export default function AdvancedSection({ config = {}, onResult }) {
         <Stack spacing={2}>
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Create an empty team</Typography>
-            <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+            <Typography variant="caption" component="div" sx={{ color: "text.secondary", mb: 1 }}>
               For a group who turned up without registering one. Add their members from the
               Competitors dashboard afterwards.
             </Typography>
