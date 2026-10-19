@@ -311,8 +311,11 @@ function Nav({ variant = "app", overlay = false }) {
         ? [...primary, ADMIN_GROUPS[0].links[0]].slice(0, 3)
         : primary.slice(0, 3);
 
+    // initials are decoration: the button around one is already named
+    // "Account", and the sheet shows the full name beside it
     const avatar = (size) => (
         <Avatar
+            aria-hidden
             sx={{
                 width: size,
                 height: size,
@@ -392,13 +395,28 @@ function Nav({ variant = "app", overlay = false }) {
                         ))}
                 </Stack>
 
+                {/* Named by hidden text rather than aria-label: the button
+                    visibly shows initials, and a label that leaves out the
+                    visible text is a WCAG 2.5.3 failure. */}
                 <IconButton
                     ref={setAccountButton}
                     onClick={() => setAccountOpen(true)}
-                    aria-label="Account"
                     sx={{ mt: 1, p: 0.5 }}
                 >
                     {avatar(40)}
+                    <Box
+                        component="span"
+                        sx={{
+                            position: "absolute",
+                            width: "1px",
+                            height: "1px",
+                            overflow: "hidden",
+                            clip: "rect(0 0 0 0)",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        Account
+                    </Box>
                 </IconButton>
             </Box>
 
