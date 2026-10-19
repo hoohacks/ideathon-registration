@@ -2,7 +2,7 @@
 
 ## Setup
 
-You need **Node 22** (the version is in `.nvmrc`) and **JDK 17 or newer** (the
+You need **Node 24** (the version is in `.nvmrc`) and **JDK 21 or newer** (the
 Firebase emulators run on Java).
 
 ```
