@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       # Keyed on the lockfile, so the cache is rebuilt when firebase-tools or the
       # set of emulators changes. A fixed key is a hit forever, and a hit is
@@ -95,7 +95,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Cache the Firebase emulator
         uses: actions/cache@v4
