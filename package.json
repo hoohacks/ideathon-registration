@@ -41,12 +41,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:tiny": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=1 --judges=1 --unmarked-judges=1 --rooms=1 && cross-env E2E_EVENT_SIZE=tiny E2E_ROUND_ONE_JUDGES=1 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
     "test:e2e:large": "firebase emulators:exec --only database,auth,storage --project demo-ideathon \"node scripts/seed-event.mjs --teams=150 --judges=160 --unmarked-judges=10 --rooms=50 && cross-env E2E_EVENT_SIZE=large E2E_ROUND_ONE_JUDGES=160 playwright test e2e/event-sizes.spec.mjs --project=desktop\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:visual:linux": "bash scripts/visual-linux.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@firebase/rules-unit-testing": "^2.0.7",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "1.62.1",
     "@vitejs/plugin-react": "^6.1.2",
     "cross-env": "^7.0.3",
     "firebase-tools": "^13.29.1",

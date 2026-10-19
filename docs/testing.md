@@ -105,10 +105,28 @@ Two more specs check what assertions cannot:
   every role, and the score dialog, for WCAG 2.1 A and AA.
 - **Screenshots** (`e2e/visual.spec.mjs`) compare the registration, sign-in and
   home pages to baselines. Fonts render differently per platform, so baselines are
-  per platform, and a platform with none skips with a note. Only Windows baselines
-  are committed, so these skip on CI until someone records Linux ones.
-  `npx playwright test e2e/visual.spec.mjs --update-snapshots` records them, and
-  accepts an intended change.
+  per platform, and a platform with none skips with a note. Windows and Linux
+  baselines are committed, and CI compares against the Linux ones.
+  `npx playwright test e2e/visual.spec.mjs --update-snapshots` records or accepts
+  a change for your own platform.
+
+  The Linux baselines have to come from the Playwright image CI's browser job
+  runs in, not from any Linux machine, or the fonts will not match. After an
+  intended design change, with Docker running:
+
+  ```
+  npm run test:visual:linux -- --update-snapshots
+  ```
+
+  Commit the changed `*-linux.png` files with the change. Without the flag the
+  same command checks them. It runs the screenshots on a freshly seeded event,
+  while CI takes them after every other spec has run, so it reproduces a CI
+  failure caused by rendering but not one caused by what an earlier spec left
+  behind. For that, read the diff in CI's report. Anything on these pages that
+  depends on earlier specs (the competitor's pitch card is one) has to be kept
+  out of the screenshot. When `@playwright/test` is upgraded, bump the image tag in
+  `scripts/visual-linux.sh` and `.github/workflows/ci.yml` together and
+  re-record.
 
 ### Habits it taught
 
