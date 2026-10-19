@@ -73,9 +73,9 @@ describe("what is in the queue", () => {
 });
 
 describe("queueing a card", () => {
-  test("stores it with an id, a revision, the time, and no attempts yet", () => {
+  test("stores it with an id, a revision, the time, and no attempts yet", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1000);
-    expect(enqueue(card())).toBe(true);
+    await expect(enqueue(card())).resolves.toBe(true);
     expect(stored()).toEqual([
       {
         ...card(),
@@ -120,7 +120,7 @@ describe("queueing a card", () => {
     expect(stored().map((e) => e.teamId).sort()).toEqual(["other", "t1", "tab2"]);
   });
 
-  test("under contention that never stops it still queues the card after a few tries", () => {
+  test("under contention that never stops it still queues the card after a few tries", async () => {
     const realGet = Storage.prototype.getItem;
     let reads = 0;
     const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function getItem(key) {
@@ -128,18 +128,18 @@ describe("queueing a card", () => {
       reads += 1;
       return JSON.stringify([{ ...card({ teamId: `noise${reads}` }), id: `n${reads}` }]);
     });
-    expect(enqueue(card())).toBe(true);
+    await expect(enqueue(card())).resolves.toBe(true);
     get.mockRestore();
     expect(stored().map((e) => e.teamId)).toContain("t1");
     // a first read, then five rounds of re-checks, then the final read it commits against
     expect(reads).toBe(7);
   });
 
-  test("a device that refuses storage reports it", () => {
+  test("a device that refuses storage reports it", async () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
-    expect(enqueue(card())).toBe(false);
+    await expect(enqueue(card())).resolves.toBe(false);
   });
 });
 

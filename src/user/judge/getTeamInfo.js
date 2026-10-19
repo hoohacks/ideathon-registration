@@ -78,7 +78,13 @@ export async function submitScore({ round, teamId, teamName, score }) {
     await withTimeout(writeScore(entry));
     return { status: "saved" };
   } catch (error) {
-    if (!enqueue(entry)) {
+    // `enqueue` may wait up to LOCK_TIMEOUT_MS for the cross-tab lock on top of
+    // the write timeout above, so in the worst case the judge waits ~11s before
+    // the card is persisted and they see "queued". That extra wait only
+    // materializes when a sibling tab froze while holding the lock -- a real
+    // read-modify-write is sub-millisecond -- so it is a rare, bounded cost we
+    // accept rather than persist the card outside the lock and reopen the race.
+    if (!(await enqueue(entry))) {
       throw new Error(
         "Could not reach the database, and this device will not let the score be " +
           "saved locally either. Write the scores down and give them to an organizer."
