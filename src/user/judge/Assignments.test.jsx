@@ -11,7 +11,7 @@
  */
 import React from "react";
 import { render, screen, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "../../theme";
 import { AuthContext } from "../../App";

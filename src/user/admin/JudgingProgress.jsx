@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { onValue, ref } from "firebase/database";
 import { database } from "../../firebase";
 import Layout from "../Layout";

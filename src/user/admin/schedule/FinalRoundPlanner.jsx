@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { LinesSkeleton } from "../../../loadingUi";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "react-router";
 import {
   Alert, Box, Button, Card, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, IconButton, MenuItem, Snackbar, Stack, TextField, Tooltip, Typography,

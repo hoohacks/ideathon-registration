@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import Layout from "../Layout.jsx";
-import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { useNavigate, Link as RouterLink } from "react-router";
 import { AuthContext } from "../../App";
 import { joinTeam } from "./teamMembership.js";
 import {

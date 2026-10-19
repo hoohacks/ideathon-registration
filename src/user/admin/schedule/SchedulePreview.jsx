@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LinesSkeleton } from "../../../loadingUi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { ref, get, onValue } from "firebase/database";
 import {
   Alert, Box, Button, Card, Checkbox, FormControlLabel, Snackbar, Stack, Typography,

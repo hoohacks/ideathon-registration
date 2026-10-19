@@ -52,7 +52,7 @@ test("closing and reopening the dialog resets the typed phrase", async () => {
   expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
   // leave the field first: user-event fires its change-on-blur when focus
   // moves, and closing would otherwise move it in the middle of a render
-  await user.tab();
+  await user.tab({ shift: true });
 
   rerender(
     <ConfirmDialog {...props} open={false} typeToConfirm="HooHacks Ideathon" onConfirm={vi.fn()} />
