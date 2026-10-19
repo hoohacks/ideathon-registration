@@ -171,6 +171,12 @@ test("a teammate's stale save does not overwrite a submission it never saw", asy
     target: { files: [new File(["deck bytes"], "updated-deck.pdf", { type: "application/pdf" })] },
   });
 
+  fireEvent.click(
+    screen.getByRole("checkbox", {
+      name: /By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only/i,
+    })
+  );
+
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
   });
@@ -213,6 +219,12 @@ test("an uncontested save still writes normally", async () => {
   fireEvent.change(fileInput, {
     target: { files: [new File(["deck bytes"], "deck.pdf", { type: "application/pdf" })] },
   });
+
+  fireEvent.click(
+    screen.getByRole("checkbox", {
+      name: /By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only/i,
+    })
+  );
 
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
@@ -312,3 +324,91 @@ describe("the submission deadline", () => {
     expect(screen.getByText(/Submissions closed at 3:00 PM\./)).toBeInTheDocument();
   });
 });
+
+describe("the pitch deck waiver", () => {
+  const openTeam = async () => {
+    store["teams/t1"] = { name: "Lumen", members: { me: true } };
+    renderTeam();
+    await waitFor(() => expect(teamSnapshotCallback).not.toBeNull());
+    await act(async () => {
+      await emitTeamSnapshot();
+    });
+  };
+
+  test("renders the waiver checkbox before the save button with the required text", async () => {
+    await openTeam();
+    const checkbox = screen.getByRole("checkbox", {
+      name: "By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only and will not be distributed externally.",
+    });
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+  });
+
+  test("refuses submission and shows an error when the waiver is not checked", async () => {
+    await openTeam();
+
+    fireEvent.change(screen.getByLabelText(/idea name/i), {
+      target: { value: "My Idea" },
+    });
+    fireEvent.change(screen.getByLabelText(/problem statement/i), {
+      target: { value: "A problem worth solving." },
+    });
+    fireEvent.change(screen.getByLabelText(/target industry/i), {
+      target: { value: "Education" },
+    });
+
+    const fileInput = document.querySelector('input[type="file"]');
+    fireEvent.change(fileInput, {
+      target: { files: [new File(["deck bytes"], "deck.pdf", { type: "application/pdf" })] },
+    });
+
+    // Do NOT check the waiver checkbox
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Please acknowledge that your presentation will be used for HooHacks internal use only/i
+    );
+    expect(store["teams/t1/submission"]).toBeUndefined();
+    expect(store["teams/t1/submitted"]).toBeUndefined();
+  });
+
+  test("submits successfully when the waiver is checked", async () => {
+    await openTeam();
+
+    fireEvent.change(screen.getByLabelText(/idea name/i), {
+      target: { value: "My Idea" },
+    });
+    fireEvent.change(screen.getByLabelText(/problem statement/i), {
+      target: { value: "A problem worth solving." },
+    });
+    fireEvent.change(screen.getByLabelText(/target industry/i), {
+      target: { value: "Education" },
+    });
+
+    const fileInput = document.querySelector('input[type="file"]');
+    fireEvent.change(fileInput, {
+      target: { files: [new File(["deck bytes"], "deck.pdf", { type: "application/pdf" })] },
+    });
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: "By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only and will not be distributed externally.",
+    });
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
+    });
+
+    await waitFor(() => {
+      expect(store["teams/t1/submission"]).toMatchObject({
+        ideaName: "My Idea",
+        waiverAcknowledged: true,
+      });
+    });
+    expect(store["teams/t1/submitted"]).toBe(true);
+  });
+});
+

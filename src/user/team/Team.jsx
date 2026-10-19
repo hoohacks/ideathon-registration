@@ -18,12 +18,14 @@ import {
     Button,
     Card,
     CardContent,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     Divider,
+    FormControlLabel,
     LinearProgress,
     Stack,
     TextField,
@@ -51,6 +53,7 @@ function Team() {
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
+    const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
     // null until the flag arrives, so the form does not flash up and vanish
     const [submissionsOpen, setSubmissionsOpen] = useState(null);
 
@@ -141,6 +144,11 @@ function Team() {
             return;
         }
 
+        if (!waiverAcknowledged) {
+            setUploadError("Please acknowledge that your presentation will be used for HooHacks internal use only before submitting.");
+            return;
+        }
+
         setSubmitting(true);
         setUploadError("");
         try {
@@ -195,6 +203,7 @@ function Team() {
                         targetIndustry,
                         pitchDeckName: deckName,
                         pitchDeckURL,
+                        waiverAcknowledged: true,
                     };
                 },
                 { applyLocally: false }
@@ -303,6 +312,9 @@ function Team() {
                 setProblemStatement(seededProblem);
                 setTargetIndustry(seededIndustry);
                 setPitchDeckName(teamData.submission?.pitchDeckName || "");
+                if (teamData.submission?.waiverAcknowledged || teamData.submitted) {
+                    setWaiverAcknowledged(true);
+                }
             }
 
             setTeamData(teamData);
@@ -469,6 +481,19 @@ function Team() {
                                                 />
                                             )}
                                         </Box>
+
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={waiverAcknowledged}
+                                                    onChange={(e) => {
+                                                        setWaiverAcknowledged(e.target.checked);
+                                                        if (uploadError) setUploadError("");
+                                                    }}
+                                                />
+                                            }
+                                            label="By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only and will not be distributed externally."
+                                        />
 
                                         {uploadError && <Alert severity="error">{uploadError}</Alert>}
 
