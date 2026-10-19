@@ -67,12 +67,15 @@ function announceAutofill(name) {
   document.querySelector(`[name="${name}"]`).dispatchEvent(event);
 }
 
+// set up fresh for each test in the beforeEach below
+let user;
+
 // MUI 5.10 gives a Select role="button", and names it from its label plus
 // whatever it is currently showing -- hence the loose match.
 async function pickOption(selectName, optionName) {
-  userEvent.click(screen.getByRole("button", { name: new RegExp(selectName) }));
+  await user.click(screen.getByRole("button", { name: new RegExp(selectName) }));
   const listbox = await screen.findByRole("listbox");
-  userEvent.click(within(listbox).getByRole("option", { name: optionName }));
+  await user.click(within(listbox).getByRole("option", { name: optionName }));
   await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 }
 
@@ -80,13 +83,13 @@ async function pickOption(selectName, optionName) {
  * The one answer nothing fills for you: no browser autofills a checkbox and no
  * select offers it, so every successful submission has to tick it by hand.
  */
-function confirmEligibility() {
-  userEvent.click(screen.getByRole("checkbox", { name: /18 years or older/ }));
+async function confirmEligibility() {
+  await user.click(screen.getByRole("checkbox", { name: /18 years or older/ }));
 }
 
-function answer(legend, choice) {
+async function answer(legend, choice) {
   const group = screen.getByRole("radiogroup", { name: legend });
-  userEvent.click(within(group).getByRole("radio", { name: choice }));
+  await user.click(within(group).getByRole("radio", { name: choice }));
 }
 
 const COMPETITOR = {
@@ -107,6 +110,7 @@ const JUDGE = {
 // `mockReset: true` (vite.config.mjs) wipes what a test set on a mock, not
 // just its call log, so the implementations are put back before each test.
 beforeEach(() => {
+  user = userEvent.setup();
   mockCreateUser.mockReset().mockImplementation(async () => ({ user: { uid: "new-uid" } }));
   mockDbUpdate.mockReset().mockImplementation(async () => {});
 });
@@ -124,7 +128,7 @@ describe("competitor registration", () => {
   test("an empty form counts what is outstanding instead of failing silently", async () => {
     renderPage(Registration);
 
-    userEvent.click(submit("Register"));
+    await user.click(submit("Register"));
 
     expect(mockCreateUser).not.toHaveBeenCalled();
     // seven nouns would be a paragraph, so past three it reports the count
@@ -141,8 +145,8 @@ describe("competitor registration", () => {
     // everything but the major and the gender select
     autofill({ ...COMPETITOR, major: "" });
     announceAutofill("firstName");
-    confirmEligibility();
-    userEvent.click(submit("Register"));
+    await confirmEligibility();
+    await user.click(submit("Register"));
 
     expect(mockCreateUser).not.toHaveBeenCalled();
     expect(
@@ -157,9 +161,9 @@ describe("competitor registration", () => {
     autofill(COMPETITOR);
     // gender is a select, which no browser autofills, so it is answered by hand
     await pickOption("Gender", "Prefer not to say");
-    confirmEligibility();
+    await confirmEligibility();
 
-    userEvent.click(submit("Register"));
+    await user.click(submit("Register"));
 
     await waitFor(() => expect(mockCreateUser).toHaveBeenCalled());
     expect(mockCreateUser).toHaveBeenCalledWith({}, "mj@virginia.edu", "hunter2!");
@@ -183,8 +187,8 @@ describe("competitor registration", () => {
 
     autofill(COMPETITOR);
     await pickOption("Gender", "Female");
-    confirmEligibility();
-    userEvent.click(submit("Register"));
+    await confirmEligibility();
+    await user.click(submit("Register"));
 
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     const record = mockDbUpdate.mock.calls[0][1]["/competitors/new-uid"];
@@ -202,8 +206,8 @@ describe("competitor registration", () => {
 
     autofill({ ...COMPETITOR, email: "mj@virginia" });
     await pickOption("Gender", "Male");
-    confirmEligibility();
-    userEvent.click(submit("Register"));
+    await confirmEligibility();
+    await user.click(submit("Register"));
 
     expect(mockCreateUser).not.toHaveBeenCalled();
     expect(await screen.findByText(/Enter a complete address/)).toBeInTheDocument();
@@ -214,8 +218,8 @@ describe("competitor registration", () => {
 
     autofill({ ...COMPETITOR, email: "mj@startup.technology" });
     await pickOption("Gender", "Other");
-    confirmEligibility();
-    userEvent.click(submit("Register"));
+    await confirmEligibility();
+    await user.click(submit("Register"));
 
     await waitFor(() => expect(mockCreateUser).toHaveBeenCalled());
   });
@@ -225,7 +229,7 @@ describe("competitor registration", () => {
 
     autofill(COMPETITOR);
     await pickOption("Gender", "Female");
-    userEvent.click(submit("Register"));
+    await user.click(submit("Register"));
 
     expect(mockCreateUser).not.toHaveBeenCalled();
     expect(
@@ -241,8 +245,8 @@ describe("competitor registration", () => {
 
     autofill(COMPETITOR);
     await pickOption("Gender", "Female");
-    confirmEligibility();
-    userEvent.click(submit("Register"));
+    await confirmEligibility();
+    await user.click(submit("Register"));
 
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     const record = mockDbUpdate.mock.calls[0][1]["/competitors/new-uid"];
@@ -252,7 +256,7 @@ describe("competitor registration", () => {
   test("the school list no longer offers a way to say you do not go to UVA", async () => {
     renderPage(Registration);
 
-    userEvent.click(screen.getByRole("button", { name: /School/ }));
+    await user.click(screen.getByRole("button", { name: /School/ }));
     const listbox = await screen.findByRole("listbox");
 
     expect(within(listbox).queryByRole("option", { name: /don.t go to UVA/i })).toBeNull();
@@ -271,10 +275,10 @@ describe("judge and mentor registration", () => {
   test("asks for a company only when there is one", async () => {
     renderPage(JudgeRegistration);
 
-    answer(/on behalf of a company/, "Yes");
+    await answer(/on behalf of a company/, "Yes");
     expect(await screen.findByRole("textbox", { name: /Company/ })).toBeInTheDocument();
 
-    answer(/on behalf of a company/, "No");
+    await answer(/on behalf of a company/, "No");
     await waitFor(() =>
       expect(screen.queryByRole("textbox", { name: /Company/ })).not.toBeInTheDocument()
     );
@@ -284,17 +288,17 @@ describe("judge and mentor registration", () => {
     renderPage(JudgeRegistration);
 
     autofill(JUDGE);
-    answer(/on behalf of a company/, "No");
-    answer(/Would you like to mentor/, "Yes");
-    answer(/Would you like to judge/, "Yes");
+    await answer(/on behalf of a company/, "No");
+    await answer(/Would you like to mentor/, "Yes");
+    await answer(/Would you like to judge/, "Yes");
 
-    userEvent.click(submit("Create account"));
+    await user.click(submit("Create account"));
     expect(mockCreateUser).not.toHaveBeenCalled();
     expect(await screen.findByText(/Pick at least 2 shifts/)).toBeInTheDocument();
 
-    userEvent.click(screen.getByRole("checkbox", { name: "11:00 AM" }));
-    userEvent.click(screen.getByRole("checkbox", { name: "1:00 PM" }));
-    userEvent.click(submit("Create account"));
+    await user.click(screen.getByRole("checkbox", { name: "11:00 AM" }));
+    await user.click(screen.getByRole("checkbox", { name: "1:00 PM" }));
+    await user.click(submit("Create account"));
 
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     const record = mockDbUpdate.mock.calls[0][1]["/judges/new-uid"];
@@ -309,13 +313,13 @@ describe("judge and mentor registration", () => {
     renderPage(JudgeRegistration);
 
     autofill({ ...JUDGE, email: "sam@acme.com" });
-    answer(/on behalf of a company/, "No");
-    answer(/Would you like to mentor/, "No");
-    answer(/Would you like to judge/, "Yes");
+    await answer(/on behalf of a company/, "No");
+    await answer(/Would you like to mentor/, "No");
+    await answer(/Would you like to judge/, "Yes");
 
     expect(screen.queryByText(/Which shifts/)).not.toBeInTheDocument();
 
-    userEvent.click(submit("Create account"));
+    await user.click(submit("Create account"));
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     expect(mockDbUpdate.mock.calls[0][1]["/judges/new-uid"].timeslots).toEqual([]);
   });

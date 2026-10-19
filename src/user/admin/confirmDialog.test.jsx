@@ -18,34 +18,37 @@ test("it lists what will happen", () => {
   expect(screen.getByText(/Every assignment will be replaced/)).toBeInTheDocument();
 });
 
-test("without a phrase, confirming is immediate", () => {
+test("without a phrase, confirming is immediate", async () => {
+  const user = userEvent.setup();
   const onConfirm = vi.fn();
   render(<ConfirmDialog {...props} onConfirm={onConfirm} />);
-  userEvent.click(screen.getByRole("button", { name: "Publish" }));
+  await user.click(screen.getByRole("button", { name: "Publish" }));
   expect(onConfirm).toHaveBeenCalled();
 });
 
-test("with a phrase, confirming is refused until it matches", () => {
+test("with a phrase, confirming is refused until it matches", async () => {
+  const user = userEvent.setup();
   const onConfirm = vi.fn();
   render(<ConfirmDialog {...props} typeToConfirm="HooHacks Ideathon" onConfirm={onConfirm} />);
   const button = screen.getByRole("button", { name: "Publish" });
   expect(button).toBeDisabled();
 
-  userEvent.type(screen.getByLabelText(/type/i), "hoohacks ideathon");
+  await user.type(screen.getByLabelText(/type/i), "hoohacks ideathon");
   expect(button).toBeDisabled();
 
-  userEvent.clear(screen.getByLabelText(/type/i));
-  userEvent.type(screen.getByLabelText(/type/i), "HooHacks Ideathon");
+  await user.clear(screen.getByLabelText(/type/i));
+  await user.type(screen.getByLabelText(/type/i), "HooHacks Ideathon");
   expect(button).toBeEnabled();
-  userEvent.click(button);
+  await user.click(button);
   expect(onConfirm).toHaveBeenCalled();
 });
 
-test("closing and reopening the dialog resets the typed phrase", () => {
+test("closing and reopening the dialog resets the typed phrase", async () => {
+  const user = userEvent.setup();
   const { rerender } = render(
     <ConfirmDialog {...props} typeToConfirm="HooHacks Ideathon" onConfirm={vi.fn()} />
   );
-  userEvent.type(screen.getByLabelText(/type/i), "HooHacks Ideathon");
+  await user.type(screen.getByLabelText(/type/i), "HooHacks Ideathon");
   expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
 
   rerender(

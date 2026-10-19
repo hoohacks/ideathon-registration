@@ -261,11 +261,12 @@ describe("the phone drawer across the loading swap", () => {
   }
 
   test("stays open when the role arrives and the page replaces the frame", async () => {
+    const user = userEvent.setup();
     const { rerender } = render(renderChrome(true));
 
     // the frame is up but the page is not: exactly when a first tap lands
     expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
 
     rerender(renderChrome(false));
