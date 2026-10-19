@@ -7,7 +7,7 @@
 | Pure logic | `npm run test:ci` | the arithmetic: scheduling, ranking, time zones | the database and the screen |
 | Service tests | `npm run test:ci` | the shape of each write, with the database mocked | **permission denials: every read succeeds** |
 | Page tests | `npm run test:ci` | each admin page against an in-memory database (`src/testing/fakeDatabase.js`) | **layout: jsdom has no viewport** |
-| Rules | `npm run test:rules` | the real rules engine, as different users | the app |
+| Rules | `npm run test:rules` | the real rules engine, as different users, for `database.rules.json` and `storage.rules` | the app |
 | Browser | `npm run test:e2e` | a real browser, real rules, real routing, desktop and phone | nothing above it, but slow |
 
 The first three run on [Vitest](https://vitest.dev) in jsdom, configured in

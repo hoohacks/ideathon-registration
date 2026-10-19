@@ -31,18 +31,21 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # The Realtime Database emulator, which the security rules suite runs
-      # against, is a Java jar.
+      # The Realtime Database and Storage emulators, which the security rules
+      # suite runs against, are Java jars.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+      # Keyed on the lockfile, so the cache is rebuilt when firebase-tools or the
+      # set of emulators changes. A fixed key is a hit forever, and a hit is
+      # never saved again: a newly needed jar would be downloaded every run.
       - name: Cache the Firebase emulator
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ runner.os }}
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       # `npm ci` honours the lockfile. The previous workflow used
       # `npm install --force`, which ignores it and resolves peer conflicts by
@@ -54,7 +57,7 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
-      # These execute database.rules.json against the emulator. The rules are
+      # These execute database.rules.json and storage.rules against the emulators. The rules are
       # the only real authorization in this app -- there is no server -- so a
       # change here is a change to who can read what.
       - name: Security rules
@@ -98,7 +101,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ runner.os }}
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install
         run: npm ci
