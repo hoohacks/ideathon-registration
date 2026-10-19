@@ -64,15 +64,17 @@ export default function ScheduleSection({ config, onResult }) {
     >
       <Card sx={{ p: 2.5 }}>
         <SettingList>
-          <SettingRow label="Batches" hint="Teams are split into this many presentation rounds." >
+          <SettingRow label="Batches" hint="Teams are split into this many presentation rounds.">
             <TextField
               type="number"
               value={count}
               onChange={(event) => setCount(event.target.value)}
               sx={{ width: FIELD.count }}
-              slotProps={{
-                htmlInput: { min: 1, max: 12, "aria-label": "Batches" }
-              }}
+              // the row's label is the visible one; this is what names the
+              // input itself, and it has to go on the htmlInput slot -- on a
+              // TextField a bare aria-label lands on the wrapper div, where no
+              // screen reader and no test will find it
+              slotProps={{ htmlInput: { min: 1, max: 12, "aria-label": "Batches" } }}
             />
             <Button
               variant="outlined"
@@ -128,9 +130,7 @@ export default function ScheduleSection({ config, onResult }) {
               value={minJudges}
               onChange={(event) => setMinJudges(event.target.value)}
               sx={{ width: FIELD.count }}
-              slotProps={{
-                htmlInput: { min: 1, "aria-label": "Min judges per team" }
-              }}
+              slotProps={{ htmlInput: { min: 1, "aria-label": "Min judges per team" } }}
             />
             <TextField
               type="number"
@@ -163,9 +163,7 @@ export default function ScheduleSection({ config, onResult }) {
               value={room}
               onChange={(event) => setRoom(event.target.value)}
               sx={{ width: FIELD.name }}
-              slotProps={{
-                htmlInput: { "aria-label": "Final round room" }
-              }}
+              slotProps={{ htmlInput: { "aria-label": "Final round room" } }}
             />
             <Button
               variant="outlined"

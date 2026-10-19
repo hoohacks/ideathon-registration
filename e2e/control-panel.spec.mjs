@@ -77,7 +77,7 @@ test("admin access is a switch that sits on top of the role", async ({ page }) =
   await people.getByRole("textbox").first().fill("judge2@example.com");
   await expect(people.getByText("judge2@example.com")).toBeVisible({ timeout: 15_000 });
 
-  // a MUI Switch, so a checkbox -- the page also has an "Admin" nav button
+  // a MUI Switch, so role switch -- the page also has an "Admin" nav button
   const admin = people.getByRole("switch", { name: "Admin" });
   await expect(admin).toBeVisible();
 

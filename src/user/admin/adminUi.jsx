@@ -140,7 +140,7 @@ export function Section({
     action, children,
 }) {
     const heading = (
-        <Typography variant="sectionTitle" sx={tone === "danger" ? { color: "error.main" } : undefined} >
+        <Typography variant="sectionTitle" sx={tone === "danger" ? { color: "error.main" } : undefined}>
             {title}
         </Typography>
     );
@@ -164,9 +164,6 @@ export function Section({
                     elevation={0}
                     defaultExpanded={defaultExpanded}
                     sx={{ "&:before": { display: "none" }, bgcolor: "transparent" }}
-                    // MUI wraps the summary in an h3 of its own; the section
-                    // title inside it is already the heading
-                    slotProps={{ heading: { component: "div" } }}
                 >
                     <AccordionSummary
                         expandIcon={<PiCaretDown />}

@@ -421,7 +421,7 @@ export default function FinalRoundPlanner() {
 function Stat({ label, value, warn = false }) {
   return (
     <Box>
-      <Typography variant="h3" sx={{ fontSize: "1.1rem" }} color={warn ? "error" : "text.primary"}>
+      <Typography variant="h3" sx={{ fontSize: "1.1rem", color: warn ? "error.main" : "text.primary" }}>
         {value}
       </Typography>
       <Typography variant="caption" sx={{ color: "text.secondary" }}>{label}</Typography>

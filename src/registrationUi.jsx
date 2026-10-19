@@ -66,15 +66,18 @@ function FeaturedPhoto({ photo, caption }) {
         component="img"
         src={photo.src}
         alt={photo.alt}
+        // plain img attributes, so the browser reserves the photo's shape
+        // before it loads; sizing is in sx
+        width={photo.width}
+        height={photo.height}
         sx={{
-          width: photo.width,
-          height: photo.height,
           display: "block",
           width: "100%",
           height: "auto",
           borderRadius: 4,
-          bgcolor: "action.hover"
-        }} />
+          bgcolor: "action.hover",
+        }}
+      />
       {caption && (
         <Typography component="figcaption" variant="body2" sx={{ mt: 1, px: 0.5 }}>
           {caption}
@@ -418,7 +421,7 @@ export function PublicShell({ children, maxWidth = "lg", pad = false, backdrop =
   }
 
   return (
-    <Box sx={{ ...pageMinHeight, display: "flex", flexDirection: "column", bgcolor: "background.default" }} >
+    <Box sx={{ ...pageMinHeight, display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
       <Nav variant="public" />
       <Container
         maxWidth={maxWidth}

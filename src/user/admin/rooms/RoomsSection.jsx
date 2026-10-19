@@ -62,9 +62,7 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
           value={newRoom}
           onChange={(event) => setNewRoom(event.target.value)}
           sx={{ width: FIELD.name }}
-          slotProps={{
-            htmlInput: { "aria-label": "Add a room" }
-          }}
+          slotProps={{ htmlInput: { "aria-label": "Add a room" } }}
         />
         <Button
           variant="contained"
@@ -105,9 +103,7 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
                       onChange={(event) => setRenameTo(event.target.value)}
                       sx={{ width: FIELD.name, maxWidth: "100%" }}
                       autoFocus
-                      slotProps={{
-                        htmlInput: { "aria-label": `Rename ${room}` }
-                      }}
+                      slotProps={{ htmlInput: { "aria-label": `Rename ${room}` } }}
                     />
                   </Box>
                 ) : (

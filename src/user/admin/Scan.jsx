@@ -273,10 +273,10 @@ function AdminScan() {
                                     bgcolor: outcome.tone,
                                     color: "#fff"
                                 }}>
-                                <Typography variant="overline" sx={{ color: "rgba(255,255,255,0.85)" }} >
+                                <Typography variant="overline" sx={{ color: "rgba(255,255,255,0.85)" }}>
                                     {outcome.title}
                                 </Typography>
-                                <Typography variant="h2" sx={{ color: "#fff", wordBreak: "break-word" }} >
+                                <Typography variant="h2" sx={{ color: "#fff", wordBreak: "break-word" }}>
                                     {result.name}
                                 </Typography>
                                 <Typography sx={{ color: "rgba(255,255,255,0.9)" }}>

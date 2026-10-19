@@ -147,7 +147,7 @@ function ScheduleCard({
                       <Typography variant="body2">{submission.problemStatement}</Typography>
                     )}
                     {submission.pitchDeckURL && (
-                      <Link href={submission.pitchDeckURL} target="_blank" rel="noreferrer" variant="body2" >
+                      <Link href={submission.pitchDeckURL} target="_blank" rel="noreferrer" variant="body2">
                         {submission.pitchDeckName || "Pitch deck"}
                       </Link>
                     )}

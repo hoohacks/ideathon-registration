@@ -273,8 +273,9 @@ const theme = createTheme({
         input: {
           paddingBlock: 11,
           paddingInline: 15,
-          // was the inputSizeSmall key, which MUI 9 removed
-          ".MuiInputBase-sizeSmall > &": { paddingBlock: 10, paddingInline: 14 },
+          // was the inputSizeSmall key, which MUI 9 removed. A variant keeps
+          // its single-class weight, so a call site's sx still wins over it.
+          variants: [{ props: { size: "small" }, style: { paddingBlock: 10, paddingInline: 14 } }],
         },
         // the label lives above the field, so the border has no gap to leave
         notchedOutline: {
@@ -458,7 +459,10 @@ const theme = createTheme({
     },
 
     MuiAccordion: {
-      defaultProps: { elevation: 0, disableGutters: true },
+      // MUI wraps every summary in an h3 of its own. Here a summary is a
+      // section title that is already a heading, or a row of figures that is
+      // not one, so the wrapper is a plain div.
+      defaultProps: { elevation: 0, disableGutters: true, slotProps: { heading: { component: "div" } } },
       styleOverrides: {
         root: {
           backgroundColor: "transparent",

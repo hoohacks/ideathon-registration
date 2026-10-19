@@ -557,7 +557,7 @@ const RegistrationForm = () => {
                     5 MB.
                   </Typography>
                   <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                    <Button variant="outlined" component="label" nativeButton={false}>
+                    <Button variant="outlined" component="label">
                       {resumeName ? "Replace file" : "Choose a file"}
                       <input
                         type="file"

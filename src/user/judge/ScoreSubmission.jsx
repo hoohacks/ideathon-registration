@@ -232,9 +232,9 @@ function ScoreSubmission({
               multiline
               minRows={2}
               fullWidth
-              slotProps={{
-                htmlInput: { maxLength: NOTES_MAX_LENGTH }
-              }}
+              // the rules reject anything longer, so stop the judge at the
+              // limit rather than losing the card on submit
+              slotProps={{ htmlInput: { maxLength: NOTES_MAX_LENGTH } }}
             />
           </Stack>
         </DialogContent>

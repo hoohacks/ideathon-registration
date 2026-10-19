@@ -123,9 +123,7 @@ export default function PeopleSection({ onResult }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               sx={{ flex: 1 }}
-              slotProps={{
-                htmlInput: { "aria-label": "Search name, email or uid" }
-              }}
+              slotProps={{ htmlInput: { "aria-label": "Search name, email or uid" } }}
             />
             <Button variant="contained" onClick={() => setCreating(true)} sx={{ flexShrink: 0 }}>
               Add person
@@ -409,9 +407,7 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
         checked={selected}
         onChange={onToggle}
         sx={{ gridArea: "check", m: -0.5 }}
-        slotProps={{
-          input: { "aria-label": `Select ${person.name}` }
-        }}
+        slotProps={{ input: { "aria-label": `Select ${person.name}` } }}
       />
 
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", gridArea: "who", minWidth: 0 }}>
@@ -451,9 +447,7 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
             "& .MuiOutlinedInput-notchedOutline": { borderColor: "transparent" },
             "& .MuiSelect-select": { py: 0.9, fontWeight: 600, fontSize: "0.875rem" },
           }}
-          slotProps={{
-            select: { inputProps: { "aria-label": `Role for ${person.name}` } }
-          }}
+          slotProps={{ select: { inputProps: { "aria-label": `Role for ${person.name}` } } }}
         >
           {roleValue(person) === "multiple" && (
             // they predate one-role-per-account; the value has to be
@@ -487,9 +481,9 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
                 size="small"
                 checked={isAdmin}
                 onChange={(event) => onAdmin(event.target.checked)}
-                slotProps={{
-                  input: { "aria-label": "Admin" }
-                }}
+                // named directly: inside a tooltip the label's own text is not
+                // reliably what assistive technology announces
+                slotProps={{ input: { "aria-label": "Admin" } }}
               />
             }
           />

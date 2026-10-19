@@ -451,7 +451,7 @@ function Team() {
                                         />
 
                                         <Box>
-                                            <Button variant="outlined" component="label" nativeButton={false} fullWidth>
+                                            <Button variant="outlined" component="label" fullWidth>
                                                 {pitchDeckName || "Upload pitch deck (.ppt, .pptx, .pdf)"}
                                                 <input
                                                     type="file"

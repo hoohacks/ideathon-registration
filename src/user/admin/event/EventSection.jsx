@@ -57,10 +57,7 @@ export default function EventSection({ config, onResult }) {
               value={value}
               onChange={(event) => setValue(event.target.value)}
               sx={{ width: FIELD.datetime }}
-              slotProps={{
-                htmlInput: { "aria-label": "Starts" },
-                inputLabel: { shrink: true }
-              }} />
+              slotProps={{ htmlInput: { "aria-label": "Starts" }, inputLabel: { shrink: true } }} />
             <Button
               variant="outlined"
               disabled={busy || value === instantToEventLocal(stored)}

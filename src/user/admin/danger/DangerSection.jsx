@@ -93,9 +93,7 @@ export default function DangerSection({ onResult }) {
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
               sx={{ width: { xs: "100%", sm: FIELD.key } }}
-              slotProps={{
-                htmlInput: { "aria-label": `Type "${confirmWord}" to confirm` }
-              }}
+              slotProps={{ htmlInput: { "aria-label": `Type "${confirmWord}" to confirm` } }}
             />
             <Button
               variant="contained"

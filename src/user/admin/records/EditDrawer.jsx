@@ -23,9 +23,7 @@ export default function EditDrawer({
       anchor="right"
       open={open}
       onClose={saving ? undefined : onClose}
-      slotProps={{
-        paper: { sx: { width: { xs: "100%", sm: 420 }, p: 3 } }
-      }}
+      slotProps={{ paper: { sx: { width: { xs: "100%", sm: 420 }, p: 3 } } }}
     >
       <Stack spacing={2} sx={{ height: "100%" }}>
         <Box>

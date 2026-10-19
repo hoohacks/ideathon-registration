@@ -209,7 +209,9 @@ function Nav({ variant = "app", overlay = false }) {
     const userTypes = context?.userTypes ?? [];
     const userData = context?.userData;
 
-    const [accountAnchor, setAccountAnchor] = useState(null);
+    // the menu's open flag is hoisted with the drawer's (below), so it survives
+    // the nav being remounted; the anchor is whichever button is mounted now
+    const [accountButton, setAccountButton] = useState(null);
 
     // Above the route, so a tap that lands while the page is still resolving a
     // role is not thrown away with the nav that received it. See the note on
@@ -219,6 +221,9 @@ function Nav({ variant = "app", overlay = false }) {
     const [localDrawerOpen, setLocalDrawerOpen] = useState(false);
     const drawerOpen = hoisted ? hoisted.open : localDrawerOpen;
     const setDrawerOpen = hoisted ? hoisted.setOpen : setLocalDrawerOpen;
+    const [localAccountOpen, setLocalAccountOpen] = useState(false);
+    const accountOpen = hoisted ? hoisted.accountOpen : localAccountOpen;
+    const setAccountOpen = hoisted ? hoisted.setAccountOpen : setLocalAccountOpen;
 
     const isAdmin = hasRole(userTypes, "admin");
     const primary = PRIMARY.filter(
@@ -229,13 +234,13 @@ function Nav({ variant = "app", overlay = false }) {
         to === "/user/home" ? pathname === to : pathname.startsWith(to);
 
     const go = (to) => {
-        setAccountAnchor(null);
+        setAccountOpen(false);
         setDrawerOpen(false);
         navigate(to);
     };
 
     const logOut = async () => {
-        setAccountAnchor(null);
+        setAccountOpen(false);
         setDrawerOpen(false);
         try {
             await auth.signOut();
@@ -388,7 +393,8 @@ function Nav({ variant = "app", overlay = false }) {
                 </Stack>
 
                 <IconButton
-                    onClick={(e) => setAccountAnchor(e.currentTarget)}
+                    ref={setAccountButton}
+                    onClick={() => setAccountOpen(true)}
                     aria-label="Account"
                     sx={{ mt: 1, p: 0.5 }}
                 >
@@ -397,9 +403,9 @@ function Nav({ variant = "app", overlay = false }) {
             </Box>
 
             <Menu
-                anchorEl={accountAnchor}
-                open={Boolean(accountAnchor)}
-                onClose={() => setAccountAnchor(null)}
+                anchorEl={accountButton}
+                open={accountOpen && Boolean(accountButton)}
+                onClose={() => setAccountOpen(false)}
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "bottom", horizontal: "left" }}
                 slotProps={{ paper: { ...menuPaper, sx: { ...menuPaper.sx, ml: 1.5 } } }}
