@@ -299,7 +299,7 @@ describe("the submission deadline", () => {
   });
 
   test("the form closes by itself when the deadline passes, without a reload", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(new Date("2026-10-25T14:59:50-04:00"));
     store["config/submissionsCloseAt"] = new Date("2026-10-25T15:00:00-04:00").getTime();
     await openTeam();
