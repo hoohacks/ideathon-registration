@@ -146,8 +146,9 @@ function Profile() {
                             <Divider />
                             <Row label="Dietary restrictions">
                                 <FormControl sx={{ minWidth: 200 }}>
-                                    <InputLabel>Dietary restrictions</InputLabel>
+                                    <InputLabel id="profile-dietary-label">Dietary restrictions</InputLabel>
                                     <Select
+                                        labelId="profile-dietary-label"
                                         label="Dietary restrictions"
                                         value={dietaryRestriction}
                                         onChange={(e) => setDietaryRestrictions(e.target.value)}

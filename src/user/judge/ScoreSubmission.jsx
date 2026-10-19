@@ -60,6 +60,9 @@ function Criterion({ field, spec, value, onChange }) {
         name={field}
         value={value}
         onChange={onChange}
+        // the criterion's name sits beside the field, not in a label, so the
+        // field needs its own or a screen reader announces a bare "combobox"
+        SelectProps={{ inputProps: { "aria-label": spec.label } }}
         sx={{ width: 104 }}
         // the maximum sits under the field, so a 5-point criterion cannot be
         // mistaken for a 10-point one at a glance
