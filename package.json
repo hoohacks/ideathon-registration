@@ -27,7 +27,7 @@
     "build": "vite build",
     "test": "vitest",
     "test:ci": "vitest run",
-    "test:rules": "firebase emulators:exec --only database --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
+    "test:rules": "firebase emulators:exec --only database,storage --project demo-ideathon \"vitest run --config vitest.rules.config.mjs\"",
     "test:rules:watch": "vitest --config vitest.rules.config.mjs",
     "emulators": "firebase emulators:start --only database,auth,storage --project demo-ideathon",
     "rules:cutover": "node scripts/make-cutover-rules.mjs",

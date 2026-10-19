@@ -54,7 +54,7 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
-      # These execute database.rules.json against the emulator. The rules are
+      # These execute database.rules.json and storage.rules against the emulators. The rules are
       # the only real authorization in this app -- there is no server -- so a
       # change here is a change to who can read what.
       - name: Security rules
