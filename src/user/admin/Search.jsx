@@ -50,7 +50,7 @@ function CompetitorCard({ person, teamName, onEdit, onCheckIn }) {
 
   return (
     <Card sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5, minWidth: 0 }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
         <Avatar sx={{ width: 44, height: 44, fontSize: "0.9375rem", bgcolor: "background.paper", color: "text.primary" }}>
           {initialsOf(person)}
         </Avatar>
@@ -93,7 +93,7 @@ function CompetitorCard({ person, teamName, onEdit, onCheckIn }) {
         </Stack>
       )}
 
-      <Stack direction="row" alignItems="center" sx={{ gap: 1, mt: "auto", pt: 0.5 }}>
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1, mt: "auto", pt: 0.5 }}>
         {hasResume && (
           <Button
             size="small"
@@ -126,7 +126,7 @@ function CompetitorCard({ person, teamName, onEdit, onCheckIn }) {
 /** One line of a card: a small icon and what it labels. */
 function Detail({ icon, children }) {
   return (
-    <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ minWidth: 0 }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", minWidth: 0 }}>
       <Box aria-hidden sx={{ fontSize: 18, lineHeight: 0, mt: "1px", color: "text.secondary", flexShrink: 0 }}>
         {icon}
       </Box>

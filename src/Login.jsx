@@ -108,26 +108,28 @@ function SignInForm() {
               autoComplete="current-password"
               value={formData.password}
               onChange={handleChange}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    {/* labelled without the word "password", so a label lookup
-                        for the field itself still finds exactly one thing */}
-                    <IconButton
-                      edge="end"
-                      onClick={() => setShowPassword((shown) => !shown)}
-                      aria-label={showPassword ? "Hide what you typed" : "Show what you typed"}
-                      aria-pressed={showPassword}
-                      sx={{ mr: -0.5, color: "text.secondary" }}
-                    >
-                      {showPassword ? <PiEyeSlash size={20} /> : <PiEye size={20} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {/* labelled without the word "password", so a label lookup
+                          for the field itself still finds exactly one thing */}
+                      <IconButton
+                        edge="end"
+                        onClick={() => setShowPassword((shown) => !shown)}
+                        aria-label={showPassword ? "Hide what you typed" : "Show what you typed"}
+                        aria-pressed={showPassword}
+                        sx={{ mr: -0.5, color: "text.secondary" }}
+                      >
+                        {showPassword ? <PiEyeSlash size={20} /> : <PiEye size={20} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }
               }}
             />
 
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ gap: 1 }}>
+            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox

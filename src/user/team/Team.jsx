@@ -606,7 +606,7 @@ function TeamIdCard({ teamId }) {
         <Card>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                 <Typography variant="h5" gutterBottom>Team ID</Typography>
-                <Stack direction="row" sx={{ gap: 1 }} alignItems="center" flexWrap="wrap">
+                <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Typography
                         variant="data"
                         component="code"

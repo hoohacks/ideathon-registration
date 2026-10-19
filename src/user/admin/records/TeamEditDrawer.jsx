@@ -266,11 +266,11 @@ function ScheduleIntoBatch({ teamId, run, saving }) {
         select
         label="Judges"
         size="small"
-        SelectProps={{ multiple: true }}
         value={picked}
         onChange={(event) => setPicked(event.target.value)}
         disabled={!chosen}
         helperText="Checked-in judges first. A clash in this batch is refused."
+        slotProps={{ select: { multiple: true } }}
       >
         {judges.map((judge) => (
           <MenuItem key={judge.uid} value={judge.uid}>

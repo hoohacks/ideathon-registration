@@ -274,4 +274,17 @@ describe("the phone drawer across the loading swap", () => {
     expect(screen.getByText("page content")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
   });
+
+  test("the desktop account menu stays open across the same swap", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(renderChrome(true));
+
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.getByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+
+    rerender(renderChrome(false));
+
+    expect(screen.getByText("page content")).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+  });
 });

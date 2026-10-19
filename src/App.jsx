@@ -101,8 +101,8 @@ if (typeof window !== "undefined") {
 const AuthContext = createContext(null);
 
 /**
- * Whether the phone drawer is open, held above the route rather than inside the
- * nav.
+ * Whether the phone drawer, or the desktop account menu, is open, held above
+ * the route rather than inside the nav.
  *
  * `ProtectedRoute` renders `<Layout>` with a placeholder while it waits for a
  * role, and the page it then renders brings its own `Layout`. React sees a
@@ -118,7 +118,11 @@ const NavDrawerContext = createContext(null);
 
 function NavDrawerProvider({ children }) {
   const [open, setOpen] = useState(false);
-  const value = useMemo(() => ({ open, setOpen }), [open]);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const value = useMemo(
+    () => ({ open, setOpen, accountOpen, setAccountOpen }),
+    [open, accountOpen]
+  );
   return <NavDrawerContext.Provider value={value}>{children}</NavDrawerContext.Provider>;
 }
 

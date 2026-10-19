@@ -70,10 +70,10 @@ function announceAutofill(name) {
 // set up fresh for each test in the beforeEach below
 let user;
 
-// MUI 5.10 gives a Select role="button", and names it from its label plus
+// MUI gives a Select role="combobox", and names it from its label plus
 // whatever it is currently showing -- hence the loose match.
 async function pickOption(selectName, optionName) {
-  await user.click(screen.getByRole("button", { name: new RegExp(selectName) }));
+  await user.click(screen.getByRole("combobox", { name: new RegExp(selectName) }));
   const listbox = await screen.findByRole("listbox");
   await user.click(within(listbox).getByRole("option", { name: optionName }));
   await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
@@ -256,7 +256,7 @@ describe("competitor registration", () => {
   test("the school list no longer offers a way to say you do not go to UVA", async () => {
     renderPage(Registration);
 
-    await user.click(screen.getByRole("button", { name: /School/ }));
+    await user.click(screen.getByRole("combobox", { name: /School/ }));
     const listbox = await screen.findByRole("listbox");
 
     expect(within(listbox).queryByRole("option", { name: /don.t go to UVA/i })).toBeNull();

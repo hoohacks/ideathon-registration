@@ -47,9 +47,7 @@ export default function PrintableSchedule() {
       <Stack
         className="no-print"
         direction="row"
-        alignItems="center"
-        sx={{ mb: 3, flexWrap: "wrap", gap: 1 }}
-      >
+        sx={{ alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h1" sx={{ flex: 1 }}>
           Room sheets
         </Typography>
@@ -67,10 +65,15 @@ export default function PrintableSchedule() {
           <Box key={room.name} className="sheet" sx={{ mb: 6 }}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
-              justifyContent="space-between"
-              alignItems={{ xs: "flex-start", sm: "baseline" }}
-              sx={{ borderBottom: 2, borderColor: "text.primary", pb: 1, mb: 1.5, gap: 0.25 }}
-            >
+              sx={{
+                justifyContent: "space-between",
+                alignItems: { xs: "flex-start", sm: "baseline" },
+                borderBottom: 2,
+                borderColor: "text.primary",
+                pb: 1,
+                mb: 1.5,
+                gap: 0.25
+              }}>
               <Typography variant="h2">{room.name}</Typography>
               <Typography variant="body2">
                 {EVENT.name} {EVENT.year} · judging {EVENT.judgingHours}

@@ -64,20 +64,17 @@ export default function ScheduleSection({ config, onResult }) {
     >
       <Card sx={{ p: 2.5 }}>
         <SettingList>
-          <SettingRow
-            label="Batches"
-            hint="Teams are split into this many presentation rounds."
-          >
+          <SettingRow label="Batches" hint="Teams are split into this many presentation rounds.">
             <TextField
               type="number"
               value={count}
               onChange={(event) => setCount(event.target.value)}
+              sx={{ width: FIELD.count }}
               // the row's label is the visible one; this is what names the
-              // input itself, and it has to go through inputProps -- on a
+              // input itself, and it has to go on the htmlInput slot -- on a
               // TextField a bare aria-label lands on the wrapper div, where no
               // screen reader and no test will find it
-              inputProps={{ min: 1, max: 12, "aria-label": "Batches" }}
-              sx={{ width: FIELD.count }}
+              slotProps={{ htmlInput: { min: 1, max: 12, "aria-label": "Batches" } }}
             />
             <Button
               variant="outlined"
@@ -132,8 +129,8 @@ export default function ScheduleSection({ config, onResult }) {
               label="Min"
               value={minJudges}
               onChange={(event) => setMinJudges(event.target.value)}
-              inputProps={{ min: 1, "aria-label": "Min judges per team" }}
               sx={{ width: FIELD.count }}
+              slotProps={{ htmlInput: { min: 1, "aria-label": "Min judges per team" } }}
             />
             <TextField
               type="number"
@@ -141,10 +138,11 @@ export default function ScheduleSection({ config, onResult }) {
               placeholder="No cap"
               value={maxJudges}
               onChange={(event) => setMaxJudges(event.target.value)}
-              inputProps={{ min: 1, "aria-label": "Max judges per team" }}
-              InputLabelProps={{ shrink: true }}
               sx={{ width: FIELD.count }}
-            />
+              slotProps={{
+                htmlInput: { min: 1, "aria-label": "Max judges per team" },
+                inputLabel: { shrink: true }
+              }} />
             <Button
               variant="outlined"
               disabled={busy || panelUnchanged}
@@ -162,10 +160,10 @@ export default function ScheduleSection({ config, onResult }) {
             hint="Where the finalists present. The first round uses the list above."
           >
             <TextField
-              inputProps={{ "aria-label": "Final round room" }}
               value={room}
               onChange={(event) => setRoom(event.target.value)}
               sx={{ width: FIELD.name }}
+              slotProps={{ htmlInput: { "aria-label": "Final round room" } }}
             />
             <Button
               variant="outlined"

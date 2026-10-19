@@ -42,9 +42,11 @@ export default function ActivityFeed({ log, onResult }) {
 
           return (
             <Row key={entry.id}>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "flex-start" }}>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{
+                alignItems: { md: "flex-start" }
+              }}>
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack sx={{ gap: 1 }} direction="row" alignItems="baseline" flexWrap="wrap">
+                  <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
                     <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
                       {when}
                     </Typography>

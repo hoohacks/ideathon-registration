@@ -143,11 +143,13 @@ function JudgeSearch() {
             <Row key={judge.id} accent={!isCheckedIn}>
               <Stack
                 direction={{ xs: "column", md: "row" }}
-                alignItems={{ xs: "flex-start", md: "center" }}
                 spacing={1}
+                sx={{
+                  alignItems: { xs: "flex-start", md: "center" }
+                }}
               >
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack sx={{ gap: 1 }} direction="row" alignItems="center" flexWrap="wrap">
+                  <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
                     {judge.wantsToMentor && (
                       <Chip label="mentor" size="small" variant="outlined" />

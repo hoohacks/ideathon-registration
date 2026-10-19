@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": false,
   "dependencies": {
-    "@emotion/react": "^11.11.1",
-    "@emotion/styled": "^11.11.0",
-    "@mui/material": "^5.10.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.5.0",
     "chart.js": "^4.4.0",
     "dotenv": "^16.0.3",
     "firebase": "^13.0.0",
@@ -60,5 +60,8 @@
   },
   "engines": {
     "node": ">=24.12 <25"
+  },
+  "overrides": {
+    "react-is": "^18.2.0"
   }
 }

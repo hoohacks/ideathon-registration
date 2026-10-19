@@ -39,7 +39,7 @@ import usePageTitle from "../../usePageTitle";
 function Section({ title, caption, children }) {
   return (
     <Box>
-      <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1.5 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mb: 1.5 }}>
         <Typography variant="h2">{title}</Typography>
         {caption && <Typography variant="body2">{caption}</Typography>}
       </Stack>
@@ -54,7 +54,9 @@ function Section({ title, caption, children }) {
  */
 function ScoredProgress({ scored, total }) {
   return (
-    <Stack spacing={0.75} alignItems={{ xs: "flex-start", sm: "flex-end" }}>
+    <Stack spacing={0.75} sx={{
+      alignItems: { xs: "flex-start", sm: "flex-end" }
+    }}>
       <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }} aria-live="polite">
         {scored === total ? "All teams scored" : `${scored} of ${total} scored`}
       </Typography>
@@ -403,10 +405,11 @@ function Assignments() {
       <Stack spacing={3}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
           spacing={1}
-        >
+          sx={{
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" }
+          }}>
           <Typography variant="h1">Judging</Typography>
           {canViewAssignments && personalAssignments.length > 0 && (
             <ScoredProgress
@@ -438,7 +441,9 @@ function Assignments() {
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={1}
-              alignItems={{ xs: "stretch", sm: "center" }}
+              sx={{
+                alignItems: { xs: "stretch", sm: "center" }
+              }}
             >
               <Typography variant="h5" sx={{ flex: 1 }}>
                 Run of show
@@ -495,7 +500,7 @@ function Assignments() {
               ) : (
                 <Grid container spacing={2}>
                   {personalAssignments.map((assignment, idx) => (
-                    <Grid item xs={12} sm={6} md={4} key={assignment.id ?? `${assignment.teamName}-${idx}`}>
+                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={assignment.id ?? `${assignment.teamName}-${idx}`}>
                       <ScheduleCard
                         teamId={assignment.id}
                         teamName={assignment.teamName}
@@ -525,7 +530,7 @@ function Assignments() {
                   ) : (
                     <Grid container spacing={2}>
                       {finalAssignments.map((team) => (
-                        <Grid item xs={12} sm={6} md={4} key={`final-${team.id}`}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={`final-${team.id}`}>
                           <ScheduleCard
                             teamId={team.id}
                             teamName={team.teamName}

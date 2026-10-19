@@ -54,12 +54,10 @@ export default function EventSection({ config, onResult }) {
           >
             <TextField
               type="datetime-local"
-              inputProps={{ "aria-label": "Starts" }}
               value={value}
               onChange={(event) => setValue(event.target.value)}
-              InputLabelProps={{ shrink: true }}
               sx={{ width: FIELD.datetime }}
-            />
+              slotProps={{ htmlInput: { "aria-label": "Starts" }, inputLabel: { shrink: true } }} />
             <Button
               variant="outlined"
               disabled={busy || value === instantToEventLocal(stored)}
@@ -107,12 +105,13 @@ export default function EventSection({ config, onResult }) {
           >
             <TextField
               type="datetime-local"
-              inputProps={{ "aria-label": "Submissions close" }}
               value={closeValue}
               onChange={(event) => setCloseValue(event.target.value)}
-              InputLabelProps={{ shrink: true }}
               sx={{ width: FIELD.datetime }}
-            />
+              slotProps={{
+                htmlInput: { "aria-label": "Submissions close" },
+                inputLabel: { shrink: true }
+              }} />
             <Button
               variant="outlined"
               disabled={savingClose || !closeValue || closeValue === storedClose}

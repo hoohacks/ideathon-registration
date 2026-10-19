@@ -49,7 +49,7 @@ function ScoreSummary({ label, round, teamId, teamName, scores, judgeNames = {},
   return (
     <Accordion disableGutters elevation={0} sx={{ "&:before": { display: "none" }, bgcolor: "transparent" }}>
       <AccordionSummary expandIcon={<PiCaretDown />} sx={{ px: 0, minHeight: 40 }}>
-        <Stack sx={{ gap: 1 }} direction="row" alignItems="baseline" flexWrap="wrap">
+        <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
             {label}
           </Typography>
@@ -299,8 +299,10 @@ function TeamSearch() {
             // go looking for.
             <Row key={key} accent={!team.submitted}>
               <Stack spacing={0.5}>
-                <Stack direction="row" alignItems="flex-start" sx={{ gap: 1 }}>
-                <Stack sx={{ gap: 1, flex: 1, minWidth: 0 }} direction="row" alignItems="center" flexWrap="wrap">
+                <Stack direction="row" sx={{ alignItems: "flex-start", gap: 1 }}>
+                <Stack
+                  direction="row"
+                  sx={{ alignItems: "center", flexWrap: "wrap", gap: 1, flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600 }}>{team.name || "Unnamed team"}</Typography>
                   <Chip
                     label={team.submitted ? "submitted" : "not submitted"}
@@ -336,7 +338,7 @@ function TeamSearch() {
 
                 {team.submitted && submission && (
                   <Box sx={{ mt: 0.5 }}>
-                    <Stack sx={{ gap: 1 }} direction="row" alignItems="baseline" flexWrap="wrap">
+                    <Stack direction="row" sx={{ alignItems: "baseline", flexWrap: "wrap", gap: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
                         {submission.ideaName}
                       </Typography>
