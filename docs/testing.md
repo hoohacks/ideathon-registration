@@ -119,8 +119,12 @@ Two more specs check what assertions cannot:
   ```
 
   Commit the changed `*-linux.png` files with the change. Without the flag the
-  same command checks them, which is how to reproduce a CI screenshot failure
-  locally. When `@playwright/test` is upgraded, bump the image tag in
+  same command checks them. It runs the screenshots on a freshly seeded event,
+  while CI takes them after every other spec has run, so it reproduces a CI
+  failure caused by rendering but not one caused by what an earlier spec left
+  behind. For that, read the diff in CI's report. Anything on these pages that
+  depends on earlier specs (the competitor's pitch card is one) has to be kept
+  out of the screenshot. When `@playwright/test` is upgraded, bump the image tag in
   `scripts/visual-linux.sh` and `.github/workflows/ci.yml` together and
   re-record.
 

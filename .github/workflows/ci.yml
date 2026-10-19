@@ -73,7 +73,8 @@ jobs:
     # image by `npm run test:visual:linux`, because fonts render differently from
     # one Linux install to the next. Running here rather than on the bare runner
     # is what makes them comparable. Keep the tag in step with that script and
-    # with the installed @playwright/test; the image already has the browser.
+    # with @playwright/test, which package.json pins exactly so a lockfile
+    # refresh cannot move it past the browser this image carries.
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble
       options: --ipc=host

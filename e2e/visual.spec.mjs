@@ -32,7 +32,10 @@ async function matchesBaseline(page, name, options) {
     // in CI a missing baseline is a failure: skipping there is how these went
     // unchecked for as long as only Windows baselines existed
     if (process.env.CI) {
-      throw new Error(`No ${process.platform} baseline for ${name}. Record it with npm run test:visual:linux -- --update-snapshots.`);
+      const how = process.platform === "linux"
+        ? "npm run test:visual:linux -- --update-snapshots"
+        : "npx playwright test e2e/visual.spec.mjs --update-snapshots";
+      throw new Error(`No ${process.platform} baseline for ${name}. Record it with ${how}.`);
     }
     test.skip(true, `No ${process.platform} baseline for ${name} yet. Record one with --update-snapshots.`);
   }
