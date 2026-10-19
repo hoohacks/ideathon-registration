@@ -83,10 +83,11 @@ export function PageHeader({ title, stats = [], progress, progressLabel, childre
         <Box sx={{ mb: 3 }}>
             <Stack
                 direction={{ xs: "column", sm: "row" }}
-                justifyContent="space-between"
-                alignItems={{ xs: "flex-start", sm: "center" }}
                 spacing={1}
-            >
+                sx={{
+                    justifyContent: "space-between",
+                    alignItems: { xs: "flex-start", sm: "center" }
+                }}>
                 <Typography variant="h1">{title}</Typography>
                 {children}
             </Stack>
@@ -139,10 +140,7 @@ export function Section({
     action, children,
 }) {
     const heading = (
-        <Typography
-            variant="sectionTitle"
-            sx={tone === "danger" ? { color: "error.main" } : undefined}
-        >
+        <Typography variant="sectionTitle" sx={tone === "danger" ? { color: "error.main" } : undefined} >
             {title}
         </Typography>
     );
@@ -166,6 +164,9 @@ export function Section({
                     elevation={0}
                     defaultExpanded={defaultExpanded}
                     sx={{ "&:before": { display: "none" }, bgcolor: "transparent" }}
+                    // MUI wraps the summary in an h3 of its own; the section
+                    // title inside it is already the heading
+                    slotProps={{ heading: { component: "div" } }}
                 >
                     <AccordionSummary
                         expandIcon={<PiCaretDown />}
@@ -196,12 +197,7 @@ export function Section({
 
     return (
         <Box component="section">
-            <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={2}
-            >
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between" }}>
                 {heading}
                 {action}
             </Stack>
@@ -229,10 +225,13 @@ export function SettingRow({ label, hint, children }) {
         <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={{ xs: 1, sm: 3 }}
-            alignItems={{ sm: "flex-start" }}
-            justifyContent="space-between"
-            sx={{ py: 2, "&:first-of-type": { pt: 0 }, "&:last-of-type": { pb: 0 } }}
-        >
+            sx={{
+                alignItems: { sm: "flex-start" },
+                justifyContent: "space-between",
+                py: 2,
+                "&:first-of-type": { pt: 0 },
+                "&:last-of-type": { pb: 0 }
+            }}>
             {/*
               A floor on the label and a ceiling on nothing.
 
@@ -256,24 +255,26 @@ export function SettingRow({ label, hint, children }) {
 
             <Stack
                 direction="row"
-                alignItems="flex-start"
                 sx={{
+                    alignItems: "flex-start",
                     flex: "0 1 auto",
                     minWidth: 0,
                     flexWrap: "wrap",
+
                     // wrapped rows stay against the right edge, so the column
                     // reads as one block however many lines it takes
                     justifyContent: { sm: "flex-end" },
+
                     gap: 1,
+
                     // On a phone the fields' desktop widths left ragged gaps and
                     // stranded Save buttons; there they grow to share the row.
                     "@media (max-width: 599.95px)": {
                         width: "100%",
                         "& > .MuiFormControl-root": { flex: "1 1 88px", width: "auto", minWidth: 0 },
                         "& > .MuiButton-root": { flexShrink: 0, alignSelf: "flex-end" },
-                    },
-                }}
-            >
+                    }
+                }}>
                 {children}
             </Stack>
         </Stack>
@@ -313,22 +314,23 @@ export function FilterChips({ label, value, onChange, options }) {
     return (
         <Stack
             direction="row"
-            alignItems="center"
             role="group"
             aria-label={label}
             sx={{
+                alignItems: "center",
                 gap: 0.75,
                 flexWrap: { xs: "nowrap", sm: "wrap" },
+
                 // on a phone the pills run in one line that scrolls sideways,
                 // rather than wrapping so one option sits alone on a line
                 overflowX: { xs: "auto", sm: "visible" },
+
                 mx: { xs: -2, sm: 0 },
                 px: { xs: 2, sm: 0 },
                 scrollbarWidth: "none",
                 "&::-webkit-scrollbar": { display: "none" },
-                "& > *": { flexShrink: 0 },
-            }}
-        >
+                "& > *": { flexShrink: 0 }
+            }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary", mr: 0.5 }}>
                 {label}
             </Typography>

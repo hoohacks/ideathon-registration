@@ -114,14 +114,18 @@ export default function PeopleSection({ onResult }) {
     >
       <Card sx={{ p: 2.5 }}>
         <Stack spacing={2}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{
+            alignItems: { sm: "center" }
+          }}>
             <TextField
               size="small"
               placeholder="Search name, email or uid"
-              inputProps={{ "aria-label": "Search name, email or uid" }}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               sx={{ flex: 1 }}
+              slotProps={{
+                htmlInput: { "aria-label": "Search name, email or uid" }
+              }}
             />
             <Button variant="contained" onClick={() => setCreating(true)} sx={{ flexShrink: 0 }}>
               Add person
@@ -207,7 +211,7 @@ export default function PeopleSection({ onResult }) {
           </Stack>
 
           {visible.length > 200 && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Showing the first 200. Narrow the search to see the rest.
             </Typography>
           )}
@@ -230,13 +234,7 @@ export default function PeopleSection({ onResult }) {
           ) : (
             <Stack divider={<Divider />}>
               {archived.map((entry) => (
-                <Stack
-                  key={entry.key}
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ py: 1.25 }}
-                >
+                <Stack key={entry.key} direction="row" spacing={1} sx={{ alignItems: "center", py: 1.25 }}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" sx={{ color: "text.primary" }}>
                       {ROLE_LABELS[entry.role] ?? entry.role} record
@@ -334,7 +332,7 @@ export default function PeopleSection({ onResult }) {
               control={<Checkbox checked={alsoScores} onChange={(e) => setAlsoScores(e.target.checked)} />}
               label="Also delete every score they filed"
             />
-            <Typography variant="caption" color="text.secondary" component="div">
+            <Typography variant="caption" component="div" sx={{ color: "text.secondary" }}>
               Scores are kept by default. They still count toward the averages the final round is
               picked from, and Judging progress shows them as coming from an unassigned judge.
             </Typography>
@@ -410,11 +408,13 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
         size="small"
         checked={selected}
         onChange={onToggle}
-        inputProps={{ "aria-label": `Select ${person.name}` }}
         sx={{ gridArea: "check", m: -0.5 }}
+        slotProps={{
+          input: { "aria-label": `Select ${person.name}` }
+        }}
       />
 
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ gridArea: "who", minWidth: 0 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", gridArea: "who", minWidth: 0 }}>
         <Avatar
           sx={{
             width: 40,
@@ -437,24 +437,22 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
         </Box>
       </Stack>
 
-      <Stack
-        direction="row"
-        alignItems="center"
-        sx={{ gridArea: "controls", gap: 1, flexWrap: "wrap" }}
-      >
+      <Stack direction="row" sx={{ alignItems: "center", gridArea: "controls", gap: 1, flexWrap: "wrap" }}>
         <TextField
           select
           size="small"
           disabled={busy}
           value={roleValue(person)}
           onChange={(event) => onRole(event.target.value)}
-          SelectProps={{ inputProps: { "aria-label": `Role for ${person.name}` } }}
           sx={{
             width: 148,
             // white on the cream list, so they read as controls, not text
             "& .MuiOutlinedInput-root": { bgcolor: "background.paper", borderRadius: 999 },
             "& .MuiOutlinedInput-notchedOutline": { borderColor: "transparent" },
             "& .MuiSelect-select": { py: 0.9, fontWeight: 600, fontSize: "0.875rem" },
+          }}
+          slotProps={{
+            select: { inputProps: { "aria-label": `Role for ${person.name}` } }
           }}
         >
           {roleValue(person) === "multiple" && (
@@ -489,9 +487,9 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
                 size="small"
                 checked={isAdmin}
                 onChange={(event) => onAdmin(event.target.checked)}
-                // named directly: inside a tooltip the label's own text is not
-                // reliably what assistive technology announces
-                inputProps={{ "aria-label": "Admin" }}
+                slotProps={{
+                  input: { "aria-label": "Admin" }
+                }}
               />
             }
           />
@@ -510,10 +508,12 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
       {/* the same three, laid out, once the row is wide enough to hold them */}
       <Stack
         direction="row"
-        alignItems="center"
         spacing={0.25}
-        sx={{ gridArea: "more", display: { xs: "none", md: "flex" } }}
-      >
+        sx={{
+          alignItems: "center",
+          gridArea: "more",
+          display: { xs: "none", md: "flex" }
+        }}>
         <Tooltip describeChild title={person.email ? "Email them a password reset link" : "No email on file"}>
           <span>
             <Button size="small" variant="text" disabled={busy || !person.email} onClick={onReset}>
@@ -536,7 +536,7 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset,
         onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { minWidth: 220 } }}
+        slotProps={{ paper: { sx: { minWidth: 220 } } }}
       >
         <MenuItem disabled={!person.email} onClick={() => { close(); onReset(); }}>
           Send password reset

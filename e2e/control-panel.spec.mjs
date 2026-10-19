@@ -78,14 +78,14 @@ test("admin access is a switch that sits on top of the role", async ({ page }) =
   await expect(people.getByText("judge2@example.com")).toBeVisible({ timeout: 15_000 });
 
   // a MUI Switch, so a checkbox -- the page also has an "Admin" nav button
-  const admin = people.getByRole("checkbox", { name: "Admin" });
+  const admin = people.getByRole("switch", { name: "Admin" });
   await expect(admin).toBeVisible();
 
   await admin.click();
   await expect(page.getByText(/is now an admin/)).toBeVisible({ timeout: 15_000 });
 
   // the role is untouched: admin is a flag, not a replacement for it
-  await expect(people.getByRole("button", { name: /^Role for / })).toHaveText("Judge");
+  await expect(people.getByRole("combobox", { name: /^Role for / })).toHaveText("Judge");
 
   // put it back, so the fixture is unchanged for the next run
   await admin.click();
@@ -100,7 +100,7 @@ test("changing somebody's role asks first, and names what it costs", async ({ pa
   await people.getByRole("textbox").first().fill("judge3@example.com");
   await expect(people.getByText("judge3@example.com")).toBeVisible({ timeout: 15_000 });
 
-  await people.getByRole("button", { name: /^Role for / }).click();
+  await people.getByRole("combobox", { name: /^Role for / }).click();
   await page.getByRole("option", { name: "Competitor" }).click();
 
   // the confirmation is the point: a role change deletes a record
@@ -112,7 +112,7 @@ test("changing somebody's role asks first, and names what it costs", async ({ pa
   // walk away: this spec is about the guard, not the change
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
-  await expect(people.getByRole("button", { name: /^Role for / })).toHaveText("Judge");
+  await expect(people.getByRole("combobox", { name: /^Role for / })).toHaveText("Judge");
 });
 
 test("the danger zone is behind its own tab and will not act unprompted", async ({ page }) => {

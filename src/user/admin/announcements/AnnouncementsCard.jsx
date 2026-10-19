@@ -69,15 +69,11 @@ export default function AnnouncementsCard() {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1.5}
-            justifyContent="space-between"
-            alignItems={{ sm: "center" }}
-          >
-            <FilterChips
-              label="Send to"
-              value={audience}
-              onChange={setAudience}
-              options={AUDIENCES}
-            />
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { sm: "center" }
+            }}>
+            <FilterChips label="Send to" value={audience} onChange={setAudience} options={AUDIENCES} />
             <Button
               variant="contained"
               onClick={post}
@@ -101,9 +97,7 @@ export default function AnnouncementsCard() {
                   key={announcement.id}
                   direction="row"
                   spacing={1.5}
-                  alignItems="flex-start"
-                  sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.default" }}
-                >
+                  sx={{ alignItems: "flex-start", p: 1.5, borderRadius: 2, bgcolor: "background.default" }}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" sx={{ color: "text.primary", whiteSpace: "pre-line", overflowWrap: "anywhere" }}>
                       {announcement.text}

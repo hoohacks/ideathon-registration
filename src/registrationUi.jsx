@@ -66,16 +66,15 @@ function FeaturedPhoto({ photo, caption }) {
         component="img"
         src={photo.src}
         alt={photo.alt}
-        width={photo.width}
-        height={photo.height}
         sx={{
+          width: photo.width,
+          height: photo.height,
           display: "block",
           width: "100%",
           height: "auto",
           borderRadius: 4,
-          bgcolor: "action.hover",
-        }}
-      />
+          bgcolor: "action.hover"
+        }} />
       {caption && (
         <Typography component="figcaption" variant="body2" sx={{ mt: 1, px: 0.5 }}>
           {caption}
@@ -144,7 +143,7 @@ export function Hero({ eyebrow, title, facts, summary, photo, photoCaption, chil
 export function Section({ id, label, children }) {
   return (
     <Box component="section" aria-labelledby={`${id}-heading`} sx={{ scrollMarginTop: 72 }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2.5 }}>
         <Typography id={`${id}-heading`} variant="overline" component="h2">
           {label}
         </Typography>
@@ -224,10 +223,8 @@ function RailChecklist({ sections }) {
         <Stack
           key={section.id}
           direction="row"
-          alignItems="center"
           spacing={1}
-          sx={{ py: 0.75, borderTop: 1, borderColor: "divider" }}
-        >
+          sx={{ alignItems: "center", py: 0.75, borderTop: 1, borderColor: "divider" }}>
           <Typography
             variant="body2"
             sx={{ flex: 1, color: section.remaining ? "text.primary" : "text.secondary" }}
@@ -236,10 +233,8 @@ function RailChecklist({ sections }) {
           </Typography>
           <Stack
             direction="row"
-            alignItems="center"
             spacing={0.5}
-            sx={{ color: section.remaining ? "primary.main" : "success.main" }}
-          >
+            sx={{ alignItems: "center", color: section.remaining ? "primary.main" : "success.main" }}>
             {!section.remaining && <PiCheckCircle aria-hidden size={18} />}
             <Typography
               variant="body2"
@@ -325,7 +320,7 @@ export function MobileSubmitBar({ answered, total, error, busy, submitLabel, bus
         </Alert>
       )}
       <ProgressMeter answered={answered} total={total} />
-      <Stack direction="row" alignItems="center" spacing={1.5}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
         <Typography variant="body2" sx={{ flex: 1 }} aria-live="polite">
           {countLabel(total - answered)}
         </Typography>
@@ -423,14 +418,7 @@ export function PublicShell({ children, maxWidth = "lg", pad = false, backdrop =
   }
 
   return (
-    <Box
-      sx={{
-        ...pageMinHeight,
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: "background.default",
-      }}
-    >
+    <Box sx={{ ...pageMinHeight, display: "flex", flexDirection: "column", bgcolor: "background.default" }} >
       <Nav variant="public" />
       <Container
         maxWidth={maxWidth}
@@ -488,7 +476,7 @@ export function AuthCard({ title, subtitle, footer, children }) {
         animation: "authRise 360ms cubic-bezier(0.16, 1, 0.3, 1) both",
       }}
     >
-      <Stack alignItems="center" sx={{ textAlign: "center" }}>
+      <Stack sx={{ alignItems: "center", textAlign: "center" }}>
         <Box
           component="img"
           src={`${import.meta.env.BASE_URL}ideathon-bulb.png`}

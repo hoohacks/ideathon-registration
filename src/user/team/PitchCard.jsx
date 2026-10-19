@@ -47,7 +47,7 @@ function when(time) {
 function PitchLine({ label, time, room }) {
     const { lead, value } = when(time);
     return (
-        <Stack direction="row" alignItems="flex-start" sx={{ gap: 1.5 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", gap: 1.5 }}>
             <Box aria-hidden sx={{ fontSize: 24, lineHeight: 0, mt: 0.25, color: "primary.main" }}>
                 <PiPresentationChart />
             </Box>

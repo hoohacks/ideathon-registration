@@ -90,10 +90,12 @@ export default function DangerSection({ onResult }) {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
               placeholder={`Type "${confirmWord}" to confirm`}
-              inputProps={{ "aria-label": `Type "${confirmWord}" to confirm` }}
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
               sx={{ width: { xs: "100%", sm: FIELD.key } }}
+              slotProps={{
+                htmlInput: { "aria-label": `Type "${confirmWord}" to confirm` }
+              }}
             />
             <Button
               variant="contained"

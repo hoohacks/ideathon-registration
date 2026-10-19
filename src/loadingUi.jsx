@@ -33,7 +33,7 @@ export function CardGridSkeleton({ label = "Loading", count = 3 }) {
     return (
         <Grid container spacing={2} role="status" aria-label={label}>
             {Array.from({ length: count }, (_, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
                     <Skeleton variant="rounded" height={180} sx={{ ...bone, borderRadius: 4 }} />
                 </Grid>
             ))}

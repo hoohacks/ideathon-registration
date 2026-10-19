@@ -22,7 +22,7 @@ const db = await import("../../testing/fakeDatabase");
 // right one; what each writes is tested in judge/assignmentEdits.test.js
 const mockEdits = { assign: vi.fn(), unassign: vi.fn(), swap: vi.fn() };
 vi.mock("../judge/assignmentEdits", async () => ({
-  ...await vi.importActual("../judge/assignmentEdits"),
+  ...(await vi.importActual("../judge/assignmentEdits")),
   assignJudgeToTeam: (...a) => mockEdits.assign(...a),
   unassignJudgeFromTeam: (...a) => mockEdits.unassign(...a),
   swapJudges: (...a) => mockEdits.swap(...a),
@@ -106,7 +106,7 @@ test("the judges tab says who has cards outstanding", () => {
 
 test("the final round, before it is activated, says there are no finalists yet", () => {
   renderPage(<JudgingProgress />);
-  fireEvent.mouseDown(screen.getByRole("button", { name: /First round/ }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
   fireEvent.click(screen.getByRole("option", { name: "Final round" }));
   expect(screen.getByText(/The final round has not been activated/)).toBeInTheDocument();
 });
@@ -116,7 +116,7 @@ test("the final round shows the finalists and their own panel, not the first rou
   db.setData("teams/a/finalSlot", { room: "Rice 011", timeslot: "6:30 PM" });
   renderPage(<JudgingProgress />);
 
-  fireEvent.mouseDown(screen.getByRole("button", { name: /First round/ }));
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
   fireEvent.click(screen.getByRole("option", { name: "Final round" }));
 
   expect(teamOrder()).toEqual(["Almanac"]);

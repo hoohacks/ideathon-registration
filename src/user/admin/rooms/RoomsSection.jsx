@@ -59,10 +59,12 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
       <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
         <TextField
           placeholder="Add a room, e.g. Rice 110"
-          inputProps={{ "aria-label": "Add a room" }}
           value={newRoom}
           onChange={(event) => setNewRoom(event.target.value)}
           sx={{ width: FIELD.name }}
+          slotProps={{
+            htmlInput: { "aria-label": "Add a room" }
+          }}
         />
         <Button
           variant="contained"
@@ -90,7 +92,9 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
 
           return (
             <Row key={room}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{
+                alignItems: { sm: "center" }
+              }}>
                 {isRenaming ? (
                   // flex on the wrapper, width on the field: the actions stay
                   // where they were rather than sliding left the moment a row
@@ -98,14 +102,16 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <TextField
                       value={renameTo}
-                      inputProps={{ "aria-label": `Rename ${room}` }}
                       onChange={(event) => setRenameTo(event.target.value)}
                       sx={{ width: FIELD.name, maxWidth: "100%" }}
                       autoFocus
+                      slotProps={{
+                        htmlInput: { "aria-label": `Rename ${room}` }
+                      }}
                     />
                   </Box>
                 ) : (
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", flex: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>{room}</Typography>
                     {occupants.length > 0 && (
                       <Chip size="small" variant="outlined" label={`in use ×${occupants.length}`} />

@@ -400,7 +400,7 @@ const RegistrationForm = () => {
 
       <Box component="form" ref={formRef} onSubmit={handleSubmit} noValidate>
         <Grid container spacing={{ xs: 4, md: 6 }}>
-          <Grid item xs={12} md={7} lg={8}>
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
             <Stack spacing={5}>
               <Section id="account" label="Account">
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -556,8 +556,8 @@ const RegistrationForm = () => {
                     Optional. Sponsors ask for these when they are hiring. PDF or Word, up to
                     5 MB.
                   </Typography>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Button variant="outlined" component="label">
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                    <Button variant="outlined" component="label" nativeButton={false}>
                       {resumeName ? "Replace file" : "Choose a file"}
                       <input
                         type="file"
@@ -609,7 +609,7 @@ const RegistrationForm = () => {
                 </FormControl>
               </Section>
 
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 We do not discriminate in membership or participation in events on the basis
                 of age, color, disability, gender identity or expression, marital status,
                 military status (including active-duty service members, reserve service
@@ -622,7 +622,7 @@ const RegistrationForm = () => {
             <MobileSubmitBar {...rail} />
           </Grid>
 
-          <Grid item xs={12} md={5} lg={4} sx={{ display: { xs: "none", md: "block" } }}>
+          <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
             <SubmitRail
               {...rail}
               footer={

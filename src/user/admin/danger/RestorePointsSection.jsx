@@ -260,7 +260,7 @@ export default function RestorePointsSection({ onResult }) {
       <Card sx={{ p: 2.5 }}>
         <Stack spacing={2}>
           {points.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
               None yet. One appears here the first time a schedule is generated.
             </Typography>
           ) : (
@@ -270,15 +270,16 @@ export default function RestorePointsSection({ onResult }) {
                   key={point.id}
                   direction={{ xs: "column", sm: "row" }}
                   spacing={1}
-                  alignItems={{ sm: "center" }}
-                  justifyContent="space-between"
-                  sx={{ py: 1.25 }}
-                >
+                  sx={{
+                    alignItems: { sm: "center" },
+                    justifyContent: "space-between",
+                    py: 1.25
+                  }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {point.label ?? point.id}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" component="div">
+                    <Typography variant="caption" component="div" sx={{ color: "text.secondary" }}>
                       {when(point.at)} · {point.byName ?? point.by} · {bytes(point.bytes)}
                     </Typography>
                     <Stack direction="row" sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
@@ -309,7 +310,7 @@ export default function RestorePointsSection({ onResult }) {
         <DialogContent>
           <DialogContentText component="div">
             {previewLoading && (
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", py: 2 }}>
                 <CircularProgress size={18} />
                 <Typography variant="body2">Comparing against the live data…</Typography>
               </Stack>

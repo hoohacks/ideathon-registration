@@ -133,7 +133,9 @@ function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid,
             multiline
             minRows={2}
             fullWidth
-            inputProps={{ maxLength: NOTES_MAX_LENGTH }}
+            slotProps={{
+              htmlInput: { maxLength: NOTES_MAX_LENGTH }
+            }}
           />
 
           {error && <Alert severity="error">{error}</Alert>}

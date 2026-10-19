@@ -38,8 +38,8 @@ const EMPTY = {
 
 function Criterion({ field, spec, value, onChange }) {
   return (
-    <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
-      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
         <Typography variant="body1">{spec.label}</Typography>
         {/* A focusable button, so a keyboard or screen reader can reach the
             explanation too; it was an aria-label on a bare span, which is not
@@ -64,7 +64,11 @@ function Criterion({ field, spec, value, onChange }) {
         // the maximum sits under the field, so a 5-point criterion cannot be
         // mistaken for a 10-point one at a glance
         helperText={`of ${spec.range}`}
-        FormHelperTextProps={{ sx: { textAlign: "right", mr: 0 } }}
+        slotProps={{
+          formHelperText: { sx: { textAlign: "right", mr: 0 } },
+          // the criterion's name is beside it as plain text, not a label
+          select: { inputProps: { "aria-label": spec.label } },
+        }}
       >
         {Array.from({ length: spec.range }, (_, i) => String(i + 1)).map((n) => (
           <MenuItem key={n} value={n}>
@@ -203,7 +207,7 @@ function ScoreSubmission({
 
             <Divider />
 
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="body1">Worth funding?</Typography>
               <ToggleButtonGroup
                 exclusive
@@ -228,9 +232,9 @@ function ScoreSubmission({
               multiline
               minRows={2}
               fullWidth
-              // the rules reject anything longer, so stop the judge at the
-              // limit rather than losing the card on submit
-              inputProps={{ maxLength: NOTES_MAX_LENGTH }}
+              slotProps={{
+                htmlInput: { maxLength: NOTES_MAX_LENGTH }
+              }}
             />
           </Stack>
         </DialogContent>

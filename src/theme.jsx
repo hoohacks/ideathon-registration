@@ -181,13 +181,18 @@ const theme = createTheme({
           transition: "background-color 150ms ease, transform 120ms ease",
           "&:active:not(.Mui-disabled)": { transform: "scale(0.98)" },
           "&.Mui-disabled": { backgroundColor: SURFACE_CARD, color: ASH, borderColor: "transparent" },
-        },
-        containedPrimary: {
-          "&:hover": { backgroundColor: BRAND_DARK },
-          "&:active": { backgroundColor: BRAND_DARK },
-        },
-        containedSecondary: {
-          "&:hover": { backgroundColor: INK_HOVER },
+          // variant-and-colour pairs, which MUI 9 no longer has class keys for.
+          // As variants they keep the single-class weight the keys had, so the
+          // disabled look above still wins over them.
+          variants: [
+            {
+              props: { variant: "contained", color: "primary" },
+              style: { "&:hover": { backgroundColor: BRAND_DARK }, "&:active": { backgroundColor: BRAND_DARK } },
+            },
+            { props: { variant: "contained", color: "secondary" }, style: { "&:hover": { backgroundColor: INK_HOVER } } },
+            { props: { variant: "outlined", color: "primary" }, style: { color: INK } },
+            { props: { variant: "text", color: "primary" }, style: { color: INK } },
+          ],
         },
         // No outlined buttons in this system: "outlined" is the grey-cream
         // secondary button, so every existing call site gets it for free.
@@ -197,12 +202,10 @@ const theme = createTheme({
           color: INK,
           "&:hover": { backgroundColor: SECONDARY_PRESSED, border: "1px solid transparent" },
         },
-        outlinedPrimary: { color: INK },
         text: {
           color: INK,
           "&:hover": { backgroundColor: SURFACE_CARD },
         },
-        textPrimary: { color: INK },
         sizeSmall: { minHeight: 32, paddingInline: 12, fontSize: "0.8125rem", borderRadius: RADIUS },
         sizeLarge: { minHeight: 48, fontSize: "1rem", paddingInline: 20 },
       },
@@ -234,7 +237,7 @@ const theme = createTheme({
       // Labels sit above the field. Besides reading more cleanly, it sidesteps
       // Chrome autofilling a value before React sees a change event, which left
       // a floating label sitting on top of it.
-      defaultProps: { size: "small", InputLabelProps: { shrink: true } },
+      defaultProps: { size: "small", slotProps: { inputLabel: { shrink: true } } },
     },
     // displayEmpty so a filter whose "Any" option has the value "" shows that
     // label; without it MUI renders "" as a blank box that looks broken.
@@ -267,8 +270,12 @@ const theme = createTheme({
           "&.Mui-focused": { boxShadow: `0 0 0 3px ${SURFACE}, 0 0 0 5px ${FOCUS}` },
           "&.Mui-error .MuiOutlinedInput-notchedOutline": { borderColor: DANGER },
         },
-        input: { paddingBlock: 11, paddingInline: 15 },
-        inputSizeSmall: { paddingBlock: 10, paddingInline: 14 },
+        input: {
+          paddingBlock: 11,
+          paddingInline: 15,
+          // was the inputSizeSmall key, which MUI 9 removed
+          ".MuiInputBase-sizeSmall > &": { paddingBlock: 10, paddingInline: 14 },
+        },
         // the label lives above the field, so the border has no gap to leave
         notchedOutline: {
           borderColor: ASH,
@@ -379,16 +386,20 @@ const theme = createTheme({
             "& .MuiAlert-message": { flex: "1 1 0", minWidth: 0 },
             "& .MuiAlert-action": { flexBasis: "100%", ml: 0, pl: "34px", pt: 0, mt: -0.5 },
           },
+          // per variant and severity, as the standardError-style class keys
+          // did before MUI 9 removed them
+          variants: [
+            { props: { variant: "standard", severity: "error" }, style: { backgroundColor: DANGER_PALE, color: DANGER, "& .MuiAlert-icon": { color: DANGER } } },
+            { props: { variant: "standard", severity: "warning" }, style: { backgroundColor: CAUTION_PALE, color: CAUTION, "& .MuiAlert-icon": { color: CAUTION } } },
+            { props: { variant: "standard", severity: "success" }, style: { backgroundColor: GOOD_PALE, color: GOOD, "& .MuiAlert-icon": { color: GOOD } } },
+            { props: { variant: "standard", severity: "info" }, style: { backgroundColor: SURFACE_CARD, color: INK, "& .MuiAlert-icon": { color: INK } } },
+            // outlined alerts still exist at a few call sites; they get the same look
+            { props: { variant: "outlined", severity: "error" }, style: { backgroundColor: DANGER_PALE, color: DANGER, border: "none" } },
+            { props: { variant: "outlined", severity: "warning" }, style: { backgroundColor: CAUTION_PALE, color: CAUTION, border: "none" } },
+            { props: { variant: "outlined", severity: "success" }, style: { backgroundColor: GOOD_PALE, color: GOOD, border: "none" } },
+            { props: { variant: "outlined", severity: "info" }, style: { backgroundColor: SURFACE_CARD, color: INK, border: "none" } },
+          ],
         },
-        standardError: { backgroundColor: DANGER_PALE, color: DANGER, "& .MuiAlert-icon": { color: DANGER } },
-        standardWarning: { backgroundColor: CAUTION_PALE, color: CAUTION, "& .MuiAlert-icon": { color: CAUTION } },
-        standardSuccess: { backgroundColor: GOOD_PALE, color: GOOD, "& .MuiAlert-icon": { color: GOOD } },
-        standardInfo: { backgroundColor: SURFACE_CARD, color: INK, "& .MuiAlert-icon": { color: INK } },
-        // outlined alerts still exist at a few call sites; they get the same look
-        outlinedError: { backgroundColor: DANGER_PALE, color: DANGER, border: "none" },
-        outlinedWarning: { backgroundColor: CAUTION_PALE, color: CAUTION, border: "none" },
-        outlinedSuccess: { backgroundColor: GOOD_PALE, color: GOOD, border: "none" },
-        outlinedInfo: { backgroundColor: SURFACE_CARD, color: INK, border: "none" },
         message: { fontSize: "0.875rem" },
       },
     },
@@ -409,8 +420,7 @@ const theme = createTheme({
           "&.MuiChip-colorError": { backgroundColor: DANGER_PALE, color: DANGER },
           "&.MuiChip-colorWarning": { backgroundColor: CAUTION_PALE, color: CAUTION },
         },
-        sizeSmall: { height: 24, fontSize: "0.75rem" },
-        labelSmall: { paddingInline: 10 },
+        sizeSmall: { height: 24, fontSize: "0.75rem", "& .MuiChip-label": { paddingInline: 10 } },
       },
     },
 
