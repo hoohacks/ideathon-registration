@@ -10,11 +10,7 @@ PR is what closes that gap. Both workflows can also be run by hand from the
 Actions tab.
 
 1. Open a PR, let CI go green, merge.
-2. If `database.rules.json` changed, publish it (below).
-3. If `storage.rules` changed, publish it. `npm run test:rules` checks the file,
-   but nothing checks that the console has it, and forgetting it silently breaks
-   uploads.
-4. Publish a release.
+2. Publish a release.
 
 The deploy job runs the unit and rules tests again before building, so a red
 suite never ships. Its summary says whether registration is open, and reminds you
@@ -30,9 +26,7 @@ from the Actions tab are not announced.
 
 ## Publishing the database rules
 
-`database.rules.json` is the only real authorization, and **nothing deploys it for
-you.** Paste it into the Firebase console (Realtime Database, Rules), or run
-`firebase deploy --only database`.
+`database.rules.json` is the only real authorization, and it is automatically tested in CI. The rules are deployed to Firebase by the deploy workflow on a release or on the `main` branch.
 
 The file starts with a `// rulesVersion:` number. After publishing, record the
 same number at `config/rulesVersion` (Control panel, Event setup, Advanced). The
