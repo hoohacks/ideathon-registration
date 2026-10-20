@@ -199,6 +199,7 @@ async function main() {
   // ---- accounts ----
   process.stdout.write("  creating accounts... ");
   const adminUid = await createAccount("admin@example.com");
+  const organizerUid = await createAccount("organizer@example.com");
 
   // The first JUDGES are marked for round one; the rest are left unmarked, so
   // they only judge the final and a seeded event exercises the generator's
@@ -226,7 +227,7 @@ async function main() {
       index: i,
     });
   }
-  console.log(`${1 + judges.length + competitors.length} created`);
+  console.log(`${2 + judges.length + competitors.length} created`);
 
   // ---- tree ----
   const now = Date.now();
@@ -245,6 +246,7 @@ async function main() {
 
   const tree = {
     admins: { [adminUid]: true },
+    organizers: { [organizerUid]: true },
     config: {
       judgingRooms: Array.from({ length: ROOMS }, (_, i) => `Rice ${340 + i * 2}`),
       batchCount: BATCHES,
