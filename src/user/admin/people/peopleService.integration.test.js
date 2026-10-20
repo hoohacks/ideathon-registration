@@ -89,7 +89,7 @@ const lastLog = () => {
 describe("constants and blank records", () => {
   test("role nodes, labels and the swappable roles", () => {
     expect(people.ROLE_NODES).toEqual({ admin: "admins", judge: "judges", competitor: "competitors" });
-    expect(people.ROLE_LABELS).toEqual({ admin: "Admin", judge: "Judge", competitor: "Competitor" });
+    expect(people.ROLE_LABELS).toEqual({ admin: "Admin", organizer: "Organizer", judge: "Judge", competitor: "Competitor" });
     expect(people.PERSON_ROLES).toEqual(["judge", "competitor"]);
   });
 
@@ -347,12 +347,26 @@ describe("the archive", () => {
   });
 });
 
+describe("admin access", () => {
+  test("is granted and revoked through the admin service", async () => {
+    await expect(people.setAdmin({ uid: "bo", name: "Bo", enabled: true })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("admins/bo")).toBe(true);
+    await expect(people.setAdmin({ uid: "bo", name: "Bo", enabled: false })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("admins/bo")).toBeNull();
+    expect(db.getData("competitors/bo")).toMatchObject({ firstName: "Bo" });
+  });
+
+  test("needs a person", async () => {
+    await expect(people.setAdmin({ uid: "", enabled: true })).resolves.toEqual({ ok: false, error: "Pick a person first." });
+  });
+});
+
 describe("organizer access", () => {
   test("is granted and revoked through the organizer service", async () => {
     await expect(people.setOrganizer({ uid: "bo", name: "Bo", enabled: true })).resolves.toMatchObject({ ok: true });
-    expect(db.getData("admins/bo")).toBe(true);
+    expect(db.getData("organizers/bo")).toBe(true);
     await expect(people.setOrganizer({ uid: "bo", name: "Bo", enabled: false })).resolves.toMatchObject({ ok: true });
-    expect(db.getData("admins/bo")).toBeNull();
+    expect(db.getData("organizers/bo")).toBeNull();
     expect(db.getData("competitors/bo")).toMatchObject({ firstName: "Bo" });
   });
 
@@ -689,18 +703,28 @@ describe("edges found by mutation testing", () => {
     expect(lastLog().changes.map((c) => c.path)).toEqual(["judges/admin-2"]);
   });
 
+  test("turning admin access off without a person is refused the same way as on", async () => {
+    await expect(people.setAdmin({ uid: "", enabled: false })).resolves.toEqual({ ok: false, error: "Pick a person first." });
+  });
+
   test("turning organizer access off without a person is refused the same way as on", async () => {
     await expect(people.setOrganizer({ uid: "", enabled: false })).resolves.toEqual({ ok: false, error: "Pick a person first." });
   });
 
   test("revoking through the People page names the person in the feed", async () => {
-    await people.setOrganizer({ uid: "admin-2", name: "Two", enabled: false });
+    await people.setAdmin({ uid: "admin-2", name: "Two", enabled: false });
     expect(lastLog().summary).toBe("Removed admin access from Two");
   });
 
-  test("deleting an organizer records their flag as it was", async () => {
+  test("deleting an admin records their flag as it was", async () => {
     await people.deletePerson({ uid: "admin-2", name: "Two" });
     expect(lastLog().changes).toEqual([{ path: "admins/admin-2", before: true, after: null }]);
+  });
+
+  test("deleting an organizer records their flag as it was", async () => {
+    db.setData("organizers/org-2", true);
+    await people.deletePerson({ uid: "org-2", name: "Org Two" });
+    expect(lastLog().changes).toEqual([{ path: "organizers/org-2", before: true, after: null }]);
   });
 
   test("a judge created or attached without a company has none", async () => {

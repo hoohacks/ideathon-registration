@@ -25,16 +25,16 @@ const roundOne = (n, extra = {}) =>
 
 const RULES_UNRECORDED = {
   id: "rules",
-  title: "Publish database rules version 10",
+  title: "Publish database rules version 11",
   detail:
-    "Nobody has recorded which version is deployed. Until 10 is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.",
+    "Nobody has recorded which version is deployed. Until 11 is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.",
   how: "Paste database.rules.json into Realtime Database → Rules, then set config/rulesVersion to match.",
   to: "/user/admin/control?tab=setup",
 };
 const CHECK_IN = { label: "Check people in", to: "/user/admin/scan" };
 
 test("the rules this build needs, and the phase names", () => {
-  expect(REQUIRED_RULES_VERSION).toBe(10);
+  expect(REQUIRED_RULES_VERSION).toBe(11);
   expect([SETUP, READY, SCHEDULED, JUDGING, FINAL]).toEqual(["setup", "ready", "scheduled", "judging", "final"]);
   expect([SETUP, READY, SCHEDULED, JUDGING, FINAL].map(phaseLabel)).toEqual([
     "Setting up",
@@ -94,7 +94,7 @@ describe("a brand new event", () => {
 
 describe("an event ready to schedule", () => {
   const input = {
-    config: { judgingRooms: rooms, eventStart: "2026-10-25T10:00", rulesVersion: 10, submissionsOpen: true },
+    config: { judgingRooms: rooms, eventStart: "2026-10-25T10:00", rulesVersion: 11, submissionsOpen: true },
     teams: { ...submitted(3), draft: { name: "Draft" } },
     judges: {
       ...roundOne(3, { checkedIn: true }),
@@ -156,7 +156,7 @@ describe("an event ready to schedule", () => {
 describe("setup that cannot be scheduled yet", () => {
   test("judges marked but too few is not a passing check, and setup is not primary under a draft", () => {
     const state = readEventState({
-      config: { judgingRooms: ["Rice 340"], batchCount: 1, rulesVersion: 10 },
+      config: { judgingRooms: ["Rice 340"], batchCount: 1, rulesVersion: 11 },
       teams: submitted(1),
       judges: {},
       hasDraft: true,
@@ -214,7 +214,7 @@ describe("setup that cannot be scheduled yet", () => {
 
 describe("once the schedule is out", () => {
   const scheduled = {
-    config: { judgingRooms: rooms, rulesVersion: 10 },
+    config: { judgingRooms: rooms, rulesVersion: 11 },
     teams: submitted(3, { schedule: { batch: 1 } }),
     judges: roundOne(3),
   };
@@ -267,7 +267,7 @@ describe("blockers", () => {
       {
         ...RULES_UNRECORDED,
         detail:
-          "Version 4 is recorded as published. Until 10 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted, and restoring a restore point that contains scores fails and changes nothing.",
+          "Version 4 is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted, and restoring a restore point that contains scores fails and changes nothing.",
       },
     ]);
   });
@@ -275,21 +275,21 @@ describe("blockers", () => {
   test("version 5 or later only warns about submissions and announcements", () => {
     for (const version of [5, "9"]) {
       expect(blockers({ rulesVersion: version })[0].detail).toBe(
-        `Version ${version} is recorded as published. Until 10 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.`
+        `Version ${version} is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.`
       );
     }
   });
 
   test("a newer version than this build knows is still flagged", () => {
-    expect(blockers({ rulesVersion: 11 })).toHaveLength(1);
+    expect(blockers({ rulesVersion: 12 })).toHaveLength(1);
   });
 
   test("the version recorded as text still clears it", () => {
-    expect(blockers({ rulesVersion: "10" })).toEqual([]);
+    expect(blockers({ rulesVersion: "11" })).toEqual([]);
   });
 
   test("legacy score cards are counted in the right grammar", () => {
-    const migration = (n) => blockers({ rulesVersion: 10 }, n);
+    const migration = (n) => blockers({ rulesVersion: 11 }, n);
     expect(migration(1)).toEqual([
       {
         id: "migration",
