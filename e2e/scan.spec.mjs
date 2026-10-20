@@ -83,5 +83,5 @@ test("an organizer cannot open other admin routes and is redirected home", async
   await signIn(page, "organizer");
   await goto(page, "/user/admin/control");
   await expect(page.getByRole("heading", { name: "Control panel" })).toHaveCount(0);
-  await expect(page).toHaveURL(/#/user/home/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/#\/user\/home/, { timeout: 20_000 });
 });
