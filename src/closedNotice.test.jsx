@@ -12,7 +12,7 @@
  * file keeps the original, and two Reacts means every hook throws.
  */
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "./theme";
 

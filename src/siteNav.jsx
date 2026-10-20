@@ -15,7 +15,7 @@ import {
     Toolbar,
     Typography,
 } from "@mui/material";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
     PiChalkboardTeacher,
     PiChalkboardTeacherFill,

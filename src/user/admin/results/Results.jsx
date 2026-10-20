@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useSearchParams } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router";
 import {
   Alert, Box, Button, Card, Chip, Divider, Stack, Tab, Tabs, Typography,
 } from "@mui/material";

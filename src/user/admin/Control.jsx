@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { Alert, Snackbar, Stack, Tab, Tabs } from "@mui/material";
 import { onValue, ref, query, limitToLast } from "firebase/database";
 import { database } from "../../firebase";

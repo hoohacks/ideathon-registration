@@ -1,4 +1,4 @@
-import { Navigate, Routes, Route } from "react-router-dom"
+import { Navigate, Routes, Route } from "react-router"
 import { createContext, lazy, Suspense, useContext, useMemo, useState, useEffect, useCallback } from "react"
 import Registration from "./Registration"
 import { auth } from "./firebase";

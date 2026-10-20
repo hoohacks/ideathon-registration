@@ -72,12 +72,15 @@ const pick = async (label, option) => {
   fireEvent.click(await screen.findByRole("option", { name: option }));
 };
 
-test("it opens on the team, with the idea underneath", () => {
+test("it opens on the team, with the idea underneath", async () => {
   open();
   expect(screen.getByText("Lantern", { selector: "h2, h6, p, span, div" })).toBeInTheDocument();
   expect(screen.getByText("Night bus tracker")).toBeInTheDocument();
   expect(screen.getByLabelText("Team name")).toHaveValue("Lantern");
   expect(screen.getByText("Batch 1 · moves every assigned judge too")).toBeInTheDocument();
+  // the rooms to move to load after it opens
+  fireEvent.mouseDown(screen.getByLabelText("Room"));
+  expect(await screen.findByRole("option", { name: "Rice 342" })).toBeInTheDocument();
 });
 
 test("nothing changed means nothing to save", () => {
