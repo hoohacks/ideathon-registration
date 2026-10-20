@@ -82,18 +82,11 @@ jobs:
           publish_dir: ./build
           commit_message: "Deploy ${{ github.event.release.tag_name || github.sha }}"
 
-      # database.rules.json and storage.rules are NOT deployed here -- they are
-      # published by hand in the Firebase console, by choice. src/schema.test.js
-      # fails when the rules change without the version marker being bumped, so
-      # this is the reminder that goes with that.
-      - name: Remind about the rules
-        run: |
-          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "If \`database.rules.json\` or \`storage.rules\` changed in this release," >> $GITHUB_STEP_SUMMARY
-          echo "publish them in the Firebase console now. Nothing here does it for you." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          grep -o 'rulesVersion: [0-9]*' database.rules.json >> $GITHUB_STEP_SUMMARY || true
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy Realtime Database Rules
+        run: firebase deploy --only database --token "${{ secrets.FIREBASE_TOKEN }}" --project ${{ vars.FIREBASE_PROJECT }}
 
   # Tells the team's Discord what happened to a release: live, or failed and
   # why to look. A job of its own, after the deploy, so it can report either
