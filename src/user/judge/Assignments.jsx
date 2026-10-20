@@ -111,7 +111,7 @@ function Assignments() {
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
   const canManageSchedule = hasRole(userTypes, "admin");
-  const canViewAssignments = hasRole(userTypes, "judge");
+  const canViewAssignments = hasRole(userTypes, "judge") || hasRole(userTypes, "organizer");
 
   const { online, pendingCount, pendingTeamIdsByRound, syncing, retry } = useJudgingSync(
     canViewAssignments ? currentUserId : null

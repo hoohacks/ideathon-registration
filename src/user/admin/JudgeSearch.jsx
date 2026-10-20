@@ -8,27 +8,36 @@ import Layout from "../Layout";
 import { assignmentList } from "../judge/assignmentList";
 import { PageHeader, FilterBar, FilterChips, FilterGroups, SearchField, RowList, Row, StateToggle } from "./adminUi";
 import JudgeEditDrawer from "./records/JudgeEditDrawer";
+import { setOrganizer } from "./people/peopleService";
 import usePageTitle from "../../usePageTitle";
 
 function JudgeSearch() {
   const [query, setQuery] = useState("");
   const [checkedInFilter, setCheckedInFilter] = useState("");
   const [roundOneFilter, setRoundOneFilter] = useState("");
+  const [organizerFilter, setOrganizerFilter] = useState("");
   const [judges, setJudges] = useState([]);
+  const [organizers, setOrganizers] = useState({});
   const [editing, setEditing] = useState(null);
   const [toast, setToast] = useState(null);
 
   usePageTitle("Judges");
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, "/judges/"), (snapshot) => {
+    const unsubscribeJudges = onValue(ref(database, "/judges/"), (snapshot) => {
       const data = snapshot.val();
       setJudges(
         data ? Object.entries(data).map(([id, details]) => ({ id, ...details })) : []
       );
     });
+    const unsubscribeOrganizers = onValue(ref(database, "/organizers/"), (snapshot) => {
+      setOrganizers(snapshot.val() ?? {});
+    });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeJudges();
+      unsubscribeOrganizers();
+    };
   }, []);
 
   const checkedInCount = judges.filter((judge) => judge.checkedIn).length;
@@ -47,6 +56,37 @@ function JudgeSearch() {
     update(ref(database, `/judges/${judge.id}`), {
       isRound1Judge: judge.isRound1Judge !== true,
     });
+  };
+
+  const handleToggleOrganizer = async (judge) => {
+    const isJudgeOrganizer = Boolean(organizers[judge.id]);
+    const fullName =
+      `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim() || judge.email || "judge";
+    try {
+      const result = await setOrganizer({
+        uid: judge.id,
+        name: fullName,
+        enabled: !isJudgeOrganizer,
+      });
+      if (!result?.ok) {
+        setToast({
+          severity: "error",
+          message: result?.error ?? "Failed to update organizer role.",
+        });
+      } else {
+        setToast({
+          severity: "success",
+          message: isJudgeOrganizer
+            ? `Removed organizer access from ${fullName}`
+            : `Made ${fullName} an organizer`,
+        });
+      }
+    } catch (err) {
+      setToast({
+        severity: "error",
+        message: err.message || "Failed to update organizer role.",
+      });
+    }
   };
 
   const results = useMemo(() => {
@@ -68,14 +108,20 @@ function JudgeSearch() {
           (roundOneFilter === "round1" && roundOne) ||
           (roundOneFilter === "none" && !roundOne);
 
-        return matchesQuery && matchesCheckedIn && matchesRole;
+        const isJudgeOrganizer = Boolean(organizers[judge.id]);
+        const matchesOrganizer =
+          organizerFilter === "" ||
+          (organizerFilter === "organizer" && isJudgeOrganizer) ||
+          (organizerFilter === "none" && !isJudgeOrganizer);
+
+        return matchesQuery && matchesCheckedIn && matchesRole && matchesOrganizer;
       })
       .sort((a, b) =>
         `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
           `${b.firstName ?? ""} ${b.lastName ?? ""}`
         )
       );
-  }, [judges, query, checkedInFilter, roundOneFilter]);
+  }, [judges, organizers, query, checkedInFilter, roundOneFilter, organizerFilter]);
 
   return (
     <Layout maxWidth="lg">
@@ -123,6 +169,16 @@ function JudgeSearch() {
               { value: "none", label: "Not first round" },
             ]}
           />
+          <FilterChips
+            label="Organizer"
+            value={organizerFilter}
+            onChange={setOrganizerFilter}
+            options={[
+              { value: "", label: "Any" },
+              { value: "organizer", label: "Organizer" },
+              { value: "none", label: "Not organizer" },
+            ]}
+          />
         </FilterGroups>
       </FilterBar>
 
@@ -132,6 +188,7 @@ function JudgeSearch() {
             `${judge.firstName ?? ""} ${judge.lastName ?? ""}`.trim() || "Unnamed judge";
           const isCheckedIn = Boolean(judge.checkedIn);
           const isRoundOne = judge.isRound1Judge === true;
+          const isJudgeOrganizer = Boolean(organizers[judge.id]);
           const assignments = assignmentList(judge.teamAssignments);
 
           return (
@@ -151,6 +208,9 @@ function JudgeSearch() {
                 <Stack sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                    {isJudgeOrganizer && (
+                      <Chip label="organizer" size="small" variant="outlined" />
+                    )}
                     {judge.wantsToMentor && (
                       <Chip label="mentor" size="small" variant="outlined" />
                     )}
@@ -181,7 +241,7 @@ function JudgeSearch() {
                     display: "grid",
                     gap: 1,
                     width: { xs: "100%", md: "auto" },
-                    gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, auto)" },
+                    gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(2, auto)", md: "repeat(4, auto)" },
                     "& > .MuiButton-root": { minWidth: 0 },
                   }}
                 >
@@ -203,6 +263,13 @@ function JudgeSearch() {
                     offLabel="Check in"
                     onClick={() => handleCheckIn(judge)}
                     minWidth={124}
+                  />
+                  <StateToggle
+                    on={isJudgeOrganizer}
+                    onLabel="Organizer"
+                    offLabel="Make organizer"
+                    onClick={() => handleToggleOrganizer(judge)}
+                    minWidth={130}
                   />
                 </Box>
               </Stack>

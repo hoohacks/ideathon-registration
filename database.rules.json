@@ -1,5 +1,5 @@
 {
-  // rulesVersion: 11 -- bump this, and REQUIRED_RULES_VERSION in
+  // rulesVersion: 12 -- bump this, and REQUIRED_RULES_VERSION in
   // src/user/admin/eventReadiness.js, when the app needs a change below. The
   // deploy workflow publishes this file and records this number at
   // config/rulesVersion; `npm test` fails if the two numbers disagree. See
@@ -17,6 +17,15 @@
       // Anyone signed in may check whether they themselves are an admin, and
       // nothing more. The app probes this on every login to build the role
       // list; without it every non-admin login logs a permission error.
+      "$uid": {
+        ".read": "auth != null && $uid === auth.uid"
+      }
+    },
+
+    "organizers": {
+      // Anyone signed in may check whether they themselves are an organizer, and
+      // nothing more. The app probes this on every login to build the role
+      // list; without it every non-organizer login logs a permission error.
       "$uid": {
         ".read": "auth != null && $uid === auth.uid"
       }
@@ -86,6 +95,29 @@
         // field, still refused so the deployed rules did not have to change.
         ".write": "auth != null && $uid === auth.uid && !data.exists() && !newData.hasChild('isRound1Judge') && !newData.hasChild('isFinalRoundJudge') && !newData.hasChild('teamAssignments') && !newData.hasChild('finalAssignments') && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false",
 
+        "firstName": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()"
+        },
+        "lastName": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()"
+        },
+        "checkedIn": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
+          ".validate": "newData.isBoolean()"
+        },
+        "foodCheckIn": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
+          ".validate": "newData.isBoolean()"
+        },
+
         // Final round assignments, denormalised the same way teamAssignments
         // is, so a judge can load them from a node they already read. Keyed by
         // team id, never an array: the score rules address one by
@@ -124,7 +156,30 @@
         ".read": "auth != null && ($uid === auth.uid || (root.child('competitors').child(auth.uid).child('teamId').exists() && root.child('teams').child(root.child('competitors').child(auth.uid).child('teamId').val()).child('members').hasChild(auth.uid) && root.child('teams').child(root.child('competitors').child(auth.uid).child('teamId').val()).child('members').hasChild($uid)))",
 
         // Own record only, and never your own check-in state.
-        ".write": "auth != null && $uid === auth.uid && ((!data.exists() && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false) || (data.exists() && newData.child('checkedIn').val() === data.child('checkedIn').val() && newData.child('foodCheckIn').val() === data.child('foodCheckIn').val()))"
+        ".write": "auth != null && $uid === auth.uid && ((!data.exists() && newData.child('checkedIn').val() === false && newData.child('foodCheckIn').val() === false) || (data.exists() && newData.child('checkedIn').val() === data.child('checkedIn').val() && newData.child('foodCheckIn').val() === data.child('foodCheckIn').val()))",
+
+        "firstName": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()"
+        },
+        "lastName": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()"
+        },
+        "checkedIn": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
+          ".validate": "newData.isBoolean()"
+        },
+        "foodCheckIn": {
+          ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
+          ".validate": "newData.isBoolean()"
+        }
       }
     },
 

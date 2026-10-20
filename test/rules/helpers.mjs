@@ -114,6 +114,7 @@ export function finalAssignment(teamId) {
 export function baseWorld() {
   return {
     admins: { admin: true },
+    organizers: { organizer1: true },
     config: { judgingRooms: ["Rice 110", "Rice 109"], submissionsOpen: true },
 
     judges: {

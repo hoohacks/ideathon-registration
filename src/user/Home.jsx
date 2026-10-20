@@ -149,6 +149,7 @@ function Home() {
     const isAdmin = hasRole(userTypes, "admin");
     const isCompetitor = hasRole(userTypes, "competitor");
     const isJudge = hasRole(userTypes, "judge");
+    const isOrganizer = hasRole(userTypes, "organizer");
     const onATeam = Boolean(userData?.teamId);
     const pitch = useTeamPitch(isCompetitor ? userData?.teamId : null);
 
@@ -187,7 +188,7 @@ function Home() {
         );
     }
 
-    if (isJudge) {
+    if (isJudge || isOrganizer) {
         steps.push({
             key: "judging",
             icon: <PiPresentationChart />,

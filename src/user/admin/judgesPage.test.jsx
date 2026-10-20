@@ -14,6 +14,9 @@ vi.mock("../../firebase", () => ({
   storage: {},
   auth: { currentUser: { uid: "admin-1", email: "admin@example.com" } },
 }));
+vi.mock("firebase/auth", () => ({
+  getAuth: () => ({ currentUser: { uid: "admin-1", email: "admin@example.com" } }),
+}));
 vi.mock("firebase/database", async () => (await import("../../testing/fakeDatabase")).module);
 const db = await import("../../testing/fakeDatabase");
 
@@ -30,7 +33,7 @@ const judges = {
   j3: { firstName: "Noor", lastName: "Haddad", email: "noor@example.com", checkedIn: false },
 };
 
-beforeEach(() => db.reset({ judges }));
+beforeEach(() => db.reset({ admins: { "admin-1": true }, judges }));
 
 // a judge's row: the name's nearest ancestor that also holds the row's buttons
 const row = (name) => {
@@ -83,6 +86,39 @@ test("a flag that is on turns off, and says it is on while it is", async () => {
   );
 });
 
+test("toggling organizer on grants organizer role and shows the chip", async () => {
+  renderPage(<JudgeSearch />);
+
+  const button = row("Noor Haddad").getByRole("button", { name: "Make organizer" });
+  expect(button).toHaveAttribute("aria-pressed", "false");
+  expect(row("Noor Haddad").queryByText("organizer")).not.toBeInTheDocument();
+
+  fireEvent.click(button);
+
+  await waitFor(() => {
+    expect(row("Noor Haddad").getByRole("button", { name: "Organizer" })).toHaveAttribute("aria-pressed", "true");
+  });
+  expect(row("Noor Haddad").getByText("organizer")).toBeInTheDocument();
+  expect(db.getData("organizers/j3")).toBe(true);
+});
+
+test("toggling organizer off revokes organizer role", async () => {
+  db.reset({ admins: { "admin-1": true }, judges, organizers: { j1: true } });
+  renderPage(<JudgeSearch />);
+
+  expect(row("Priya Raman").getByText("organizer")).toBeInTheDocument();
+  const button = row("Priya Raman").getByRole("button", { name: "Organizer" });
+  expect(button).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(button);
+
+  await waitFor(() => {
+    expect(row("Priya Raman").getByRole("button", { name: "Make organizer" })).toHaveAttribute("aria-pressed", "false");
+  });
+  expect(row("Priya Raman").queryByText("organizer")).not.toBeInTheDocument();
+  expect(db.getData("organizers/j1")).toBeNull();
+});
+
 test("the round filter separates the first-round pool from everyone else", () => {
   renderPage(<JudgeSearch />);
 
@@ -93,6 +129,21 @@ test("the round filter separates the first-round pool from everyone else", () =>
   fireEvent.click(filter("Round", "Not first round"));
   expect(screen.getByText("Noor Haddad")).toBeInTheDocument();
   expect(screen.getByText("Sam Whitaker")).toBeInTheDocument();
+  expect(screen.queryByText("Priya Raman")).not.toBeInTheDocument();
+});
+
+test("the organizer filter separates organizers from other judges", () => {
+  db.reset({ admins: { "admin-1": true }, judges, organizers: { j1: true } });
+  renderPage(<JudgeSearch />);
+
+  fireEvent.click(filter("Organizer", "Organizer"));
+  expect(screen.getByText("Priya Raman")).toBeInTheDocument();
+  expect(screen.queryByText("Sam Whitaker")).not.toBeInTheDocument();
+  expect(screen.queryByText("Noor Haddad")).not.toBeInTheDocument();
+
+  fireEvent.click(filter("Organizer", "Not organizer"));
+  expect(screen.getByText("Sam Whitaker")).toBeInTheDocument();
+  expect(screen.getByText("Noor Haddad")).toBeInTheDocument();
   expect(screen.queryByText("Priya Raman")).not.toBeInTheDocument();
 });
 

@@ -6,7 +6,7 @@ readiness check on the dashboard can link straight to the section that fixes it.
 | Tab | Sections |
 | --- | --- |
 | Event setup | Judging rooms; batch count and times; min and max judges per team; final round room; event start; project submissions switch and deadline; Advanced (write any `config` key) |
-| People | Roles, admin access, accounts, password resets, bulk check-in, delete |
+| People | Roles, admin access, organizer access, accounts, password resets, bulk check-in, delete |
 | Data and activity | Exports; recent activity, with undo |
 | Recovery | Restore points; danger zone (clear the schedule, optionally with every score) |
 
@@ -23,10 +23,11 @@ do, not an assignment, and a record is still changed from the Judges page.
 A role is membership of a node: `/judges/{uid}` or `/competitors/{uid}`. **One
 account holds exactly one of them**, picked from the role dropdown on each row.
 
-**Admin is a flag on top, not a role.** `/admins/{uid}` is `true` and nothing else,
-with its own switch. It has to sit on top: an admin who also judges needs the
+**Admin and Organizer are flags on top, not roles.**
+- `/admins/{uid}` is `true` and gives full admin access, with its own switch. It has to sit on top: an admin who also judges needs the
 judge record, because being scheduled, seeing cards and filing a score under your
 own name all key off it.
+- `/organizers/{uid}` is `true` and gives scan check-in access at `/user/admin/scan` as well as the ability to judge projects at `/user/judging`. It also sits on top, with its own switch beside Admin in People and an Organizer toggle on each judge row on the Judges admin screen. Both grant and revoke actions appear in the activity log (`organizer.grant`, `organizer.revoke`). Someone who is both admin and organizer keeps full admin access.
 
 Changing a role deletes the old record and creates the new one, carrying name,
 email and company across. The confirmation names what goes with it: their team,
@@ -41,7 +42,7 @@ Two limits are real, and shown in the UI:
 
 - **Deleting someone does not delete their login.** A browser cannot delete a
   Firebase Auth account. They can still sign in, and will see an account with no
-  role. Remove it in the console if it matters.
+  role. Remove it in the console if it matters. Deleting someone clears their admin and organizer flags if present.
 - **You cannot set a password.** Send a reset email instead.
 
 Moving someone off judge also clears them from every schedule card and from the

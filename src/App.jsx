@@ -287,7 +287,7 @@ function App() {
           <Route index element={<Navigate to="/user/home" replace />} />
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin"]}><Assignments /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin", "organizer"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
           <Route path="team">
             <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><Team /></ProtectedRoute>} />
@@ -297,7 +297,7 @@ function App() {
           <Route path="admin">
             <Route index element={<Navigate to="/user/home" replace />} />
             <Route path="metrics" element={<ProtectedRoute requiredRoles={["admin"]}><RegisteredAtDisplay /></ProtectedRoute>} />
-            <Route path="scan" element={<ProtectedRoute requiredRoles={["admin"]}><AdminScan /></ProtectedRoute>} />
+            <Route path="scan" element={<ProtectedRoute requiredRoles={["admin", "organizer"]}><AdminScan /></ProtectedRoute>} />
             <Route path="search" element={<ProtectedRoute requiredRoles={["admin"]}><Search /></ProtectedRoute>} />
             <Route path="judges" element={<ProtectedRoute requiredRoles={["admin"]}><JudgeDashboard /></ProtectedRoute>} />
             <Route path="mentors" element={<ProtectedRoute requiredRoles={["admin"]}><Mentors /></ProtectedRoute>} />

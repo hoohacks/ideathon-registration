@@ -55,3 +55,33 @@ test("a judge cannot open the scanner", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Scan check-in" })).toHaveCount(0);
   await expect(page).toHaveURL(/#\/user\/home/, { timeout: 20_000 });
 });
+
+
+test("an organizer can open the scanner and use the event/food switch", async ({ page }) => {
+  await signIn(page, "organizer");
+  await goto(page, "/user/admin/scan");
+  await expectPagePainted(page);
+
+  await expect(page.getByRole("heading", { level: 1, name: "Scan check-in" })).toBeVisible();
+  await expect(page.locator("video")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Event" })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Food" }).click();
+  await expect(page.getByRole("button", { name: "Food" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/Recording food/)).toBeVisible();
+});
+
+test("an organizer sees only Scan from the admin section in the rail", async ({ page }) => {
+  await signIn(page, "organizer");
+  const nav = page.getByRole("navigation", { name: "Main" });
+  await expect(nav.getByRole("link", { name: "Scan" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Competitors" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Control" })).toHaveCount(0);
+});
+
+test("an organizer cannot open other admin routes and is redirected home", async ({ page }) => {
+  await signIn(page, "organizer");
+  await goto(page, "/user/admin/control");
+  await expect(page.getByRole("heading", { name: "Control panel" })).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/user\/home/, { timeout: 20_000 });
+});

@@ -79,6 +79,26 @@ export function resolveCheckIn({ competitor, judge, field }) {
     };
 }
 
+export async function loadCheckInPerson(role, userId) {
+    const [firstSnap, lastSnap, checkedSnap, foodSnap] = await Promise.all([
+        get(ref(database, `${role}/${userId}/firstName`)),
+        get(ref(database, `${role}/${userId}/lastName`)),
+        get(ref(database, `${role}/${userId}/checkedIn`)),
+        get(ref(database, `${role}/${userId}/foodCheckIn`)),
+    ]);
+
+    if (!firstSnap.exists() && !lastSnap.exists() && !checkedSnap.exists() && !foodSnap.exists()) {
+        return null;
+    }
+
+    return {
+        firstName: firstSnap.val() ?? "",
+        lastName: lastSnap.val() ?? "",
+        checkedIn: checkedSnap.val() ?? false,
+        foodCheckIn: foodSnap.val() ?? false,
+    };
+}
+
 function AdminScan() {
     const [paused, setPaused] = useState(false);
     const [result, setResult] = useState(null);
@@ -99,17 +119,23 @@ function AdminScan() {
             try {
                 // could be either a judge or a competitor -- or, since roles are
                 // additive (roles.js), both at once
-                const [competitorSnap, judgeSnap] = await Promise.all([
-                    get(ref(database, `competitors/${userId}`)),
-                    get(ref(database, `judges/${userId}`)),
+                const [competitor, judge] = await Promise.all([
+                    loadCheckInPerson("competitors", userId),
+                    loadCheckInPerson("judges", userId),
                 ]);
 
+
                 const decision = resolveCheckIn({
-                    competitor: competitorSnap.exists() ? competitorSnap.val() : null,
-                    judge: judgeSnap.exists() ? judgeSnap.val() : null,
+                    competitor,
+                    judge,
                     field,
                 });
 
+
+
+
+
+                
                 if (!decision.found) {
                     setResult({
                         kind: "missing",
@@ -314,3 +340,4 @@ function Reticle() {
 }
 
 export default AdminScan;
+
