@@ -17,14 +17,18 @@ import theme from "./theme";
 vi.mock("./firebase", () => ({ database: {}, storage: {}, auth: {} }));
 
 const mockCreateUser = vi.fn(async () => ({ user: { uid: "new-uid" } }));
+const mockDeleteUser = vi.fn(async () => {});
+const mockGet = vi.fn(async () => ({ exists: () => false }));
 const mockDbUpdate = vi.fn(async () => {});
 
 vi.mock("firebase/auth", () => ({
+  deleteUser: (...args) => mockDeleteUser(...args),
   createUserWithEmailAndPassword: (...args) => mockCreateUser(...args),
 }));
 
 vi.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path }),
+  get: (...args) => mockGet(...args),
   update: (...args) => mockDbUpdate(...args),
   serverTimestamp: () => 1234,
 }));
@@ -38,11 +42,11 @@ vi.mock("firebase/storage", () => ({
 const Registration = (await import("./Registration")).default;
 const JudgeRegistration = (await import("./JudgeRegistration")).default;
 
-function renderPage(Component) {
+function renderPage(Component, props = {}) {
   return render(
     <ThemeProvider theme={theme}>
       <MemoryRouter>
-        <Component />
+        <Component {...props} />
       </MemoryRouter>
     </ThemeProvider>
   );
@@ -322,5 +326,94 @@ describe("judge and mentor registration", () => {
     await user.click(submit("Create account"));
     await waitFor(() => expect(mockDbUpdate).toHaveBeenCalled());
     expect(mockDbUpdate.mock.calls[0][1]["/judges/new-uid"].timeslots).toEqual([]);
+  });
+});
+
+
+describe.each([
+  ["student", Registration, "Register", "competitors"],
+  ["judge", JudgeRegistration, "Create account", "judges"],
+])("%s registration failure and recovery", (kind, Component, label, role) => {
+  async function fill(recovery = false) {
+    const { password, email, ...answers } = kind === "student" ? COMPETITOR : JUDGE;
+    autofill(recovery ? answers : { ...answers, password, email });
+    if (kind === "student") {
+      await pickOption("Gender", "Prefer not to say");
+      await confirmEligibility();
+    } else {
+      await answer(/on behalf of a company/, "No");
+      await answer(/Would you like to mentor/, "No");
+      await answer(/Would you like to judge/, "Yes");
+    }
+  }
+
+  test("rolls back a failed database write and retries with the same form values", async () => {
+    mockDbUpdate.mockRejectedValueOnce(new Error("database unavailable"));
+    renderPage(Component);
+    await fill();
+    await user.click(submit(label));
+    await waitFor(() => expect(mockDeleteUser).toHaveBeenCalledWith({ uid: "new-uid" }));
+    expect((await screen.findAllByText(/try submitting again with the same email/))[0]).toBeVisible();
+    expect(screen.getByLabelText(/First name/)).toHaveValue(kind === "student" ? COMPETITOR.firstName : JUDGE.firstName);
+    expect(screen.getByLabelText(/Password/)).toHaveValue(kind === "student" ? COMPETITOR.password : JUDGE.password);
+    await user.click(submit(label));
+    expect(await screen.findByRole("dialog", { name: kind === "student" ? "Registration complete" : "Sign-up complete" })).toBeVisible();
+    expect(mockCreateUser).toHaveBeenCalledTimes(2);
+  });
+
+  test("offers profile completion when account deletion also fails", async () => {
+    mockDbUpdate.mockRejectedValueOnce(new Error("offline"));
+    mockDeleteUser.mockRejectedValueOnce(new Error("offline"));
+    renderPage(Component);
+    await fill();
+    await user.click(submit(label));
+    expect(await screen.findByRole("button", { name: "Complete your profile" })).toBeVisible();
+    expect(screen.getByText(/Your account exists, but your profile/)).toBeVisible();
+  });
+
+  test("does not delete an account when auth creation fails", async () => {
+    mockCreateUser.mockRejectedValueOnce({ code: "auth/email-already-in-use" });
+    renderPage(Component);
+    await fill();
+    await user.click(submit(label));
+    await screen.findAllByText(/An account already uses/);
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  test("completes an existing account without creating or deleting auth credentials", async () => {
+    const onComplete = vi.fn();
+    renderPage(Component, { recoveryUser: { uid: "orphan", email: "existing@example.com" }, onComplete });
+    expect(screen.queryByLabelText(/Password/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Email address/)).toBeDisabled();
+    await fill(true);
+    await user.click(submit("Complete profile"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(mockDbUpdate.mock.calls[0][1][`/${role}/orphan`].email).toBe("existing@example.com");
+    expect(mockCreateUser).not.toHaveBeenCalled();
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+  });
+
+  test("keeps recovery answers for retry and never deletes the existing account", async () => {
+    mockDbUpdate.mockRejectedValueOnce(new Error("offline"));
+    const onComplete = vi.fn();
+    renderPage(Component, { recoveryUser: { uid: "orphan", email: "existing@example.com" }, onComplete });
+    await fill(true);
+    await user.click(submit("Complete profile"));
+    await screen.findAllByText(/Your profile could not be saved/);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(mockDeleteUser).not.toHaveBeenCalled();
+    await user.click(submit("Complete profile"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+  });
+
+  test("does not replace an existing profile", async () => {
+    mockGet.mockResolvedValue({ exists: () => true });
+    const onComplete = vi.fn();
+    renderPage(Component, { recoveryUser: { uid: "existing", email: "existing@example.com" }, onComplete });
+    await fill(true);
+    await user.click(submit("Complete profile"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 });
