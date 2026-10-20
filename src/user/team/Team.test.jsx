@@ -410,5 +410,44 @@ describe("the pitch deck waiver", () => {
     });
     expect(store["teams/t1/submitted"]).toBe(true);
   });
+
+  test("starts ticked when the stored submission already has the waiver, and saving keeps it", async () => {
+    const submission = {
+      ideaName: "My Idea",
+      problemStatement: "A problem worth solving.",
+      targetIndustry: "Education",
+      pitchDeckName: "deck.pdf",
+      pitchDeckURL: "https://example.com/deck.pdf",
+      waiverAcknowledged: true,
+    };
+    store["teams/t1"] = { name: "Lumen", members: { me: true }, submission };
+    store["teams/t1/submission"] = submission;
+    renderTeam();
+    await waitFor(() => expect(teamSnapshotCallback).not.toBeNull());
+    await act(async () => {
+      await emitTeamSnapshot();
+    });
+
+    expect(screen.getByRole("checkbox", { name: /HooHacks internal use only/i })).toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
+    });
+
+    await waitFor(() => expect(store["teams/t1/submitted"]).toBe(true));
+    expect(store["teams/t1/submission"]).toMatchObject({ waiverAcknowledged: true });
+  });
+
+  test("ticking the box does not clear an unrelated error", async () => {
+    await openTeam();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save submission/i }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/Please fill in the idea name/i);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /HooHacks internal use only/i }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/Please fill in the idea name/i);
+  });
 });
 

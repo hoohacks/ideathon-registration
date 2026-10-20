@@ -54,6 +54,8 @@ function Team() {
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
     const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
+    // kept apart from uploadError so ticking the box clears only its own message
+    const [waiverError, setWaiverError] = useState("");
     // null until the flag arrives, so the form does not flash up and vanish
     const [submissionsOpen, setSubmissionsOpen] = useState(null);
 
@@ -133,6 +135,7 @@ function Team() {
 
     const handleSubmitProject = async () => {
         if (submitting) return;
+        setWaiverError("");
         if (!ideaName.trim() || !problemStatement.trim() || !targetIndustry.trim()) {
             setUploadError("Please fill in the idea name, problem statement and target industry.");
             return;
@@ -145,7 +148,7 @@ function Team() {
         }
 
         if (!waiverAcknowledged) {
-            setUploadError("Please acknowledge that your presentation will be used for HooHacks internal use only before submitting.");
+            setWaiverError("Please acknowledge that your presentation will be used for HooHacks internal use only before submitting.");
             return;
         }
 
@@ -312,7 +315,7 @@ function Team() {
                 setProblemStatement(seededProblem);
                 setTargetIndustry(seededIndustry);
                 setPitchDeckName(teamData.submission?.pitchDeckName || "");
-                if (teamData.submission?.waiverAcknowledged || teamData.submitted) {
+                if (teamData.submission?.waiverAcknowledged) {
                     setWaiverAcknowledged(true);
                 }
             }
@@ -488,13 +491,14 @@ function Team() {
                                                     checked={waiverAcknowledged}
                                                     onChange={(e) => {
                                                         setWaiverAcknowledged(e.target.checked);
-                                                        if (uploadError) setUploadError("");
+                                                        setWaiverError("");
                                                     }}
                                                 />
                                             }
                                             label="By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only and will not be distributed externally."
                                         />
 
+                                        {waiverError && <Alert severity="error">{waiverError}</Alert>}
                                         {uploadError && <Alert severity="error">{uploadError}</Alert>}
 
                                         <Button

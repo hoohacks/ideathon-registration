@@ -206,8 +206,24 @@ describe("what somebody joining a team can read", () => {
 describe("the submission", () => {
   test("a member can write it", async () => {
     await assertSucceeds(
-      set(ref(db("alice"), "teams/team1/submission"), { ideaName: "Revised" })
+      set(ref(db("alice"), "teams/team1/submission"), { ideaName: "Revised", waiverAcknowledged: true })
     );
+  });
+
+  test("but not without acknowledging the pitch deck waiver", async () => {
+    await assertFails(set(ref(db("alice"), "teams/team1/submission"), { ideaName: "Revised" }));
+    await assertFails(
+      set(ref(db("alice"), "teams/team1/submission"), { ideaName: "Revised", waiverAcknowledged: false })
+    );
+  });
+
+  test("one field can be edited once the waiver is on record, not before", async () => {
+    await assertSucceeds(set(ref(db("alice"), "teams/team1/submission/ideaName"), "Revised"));
+    await assertFails(set(ref(db("carol"), "teams/team2/submission/ideaName"), "Revised"));
+  });
+
+  test("the waiver cannot be withdrawn by a field write", async () => {
+    await assertFails(set(ref(db("alice"), "teams/team1/submission/waiverAcknowledged"), null));
   });
 
   test("a non-member cannot", async () => {
