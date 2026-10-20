@@ -44,6 +44,7 @@ test("a team can write and save its pitch, which then closes the team", async ({
   await page.locator('input[type="file"]').setInputFiles(DECK);
   await expect(page.getByText(/pitch\.pdf/)).toBeVisible({ timeout: 30_000 });
 
+  await page.getByRole("checkbox", { name: /By submitting your presentation/i }).check();
   await page.getByRole("button", { name: "Save submission" }).click();
 
   // saving confirms in a dialog before it hands the page back
@@ -77,6 +78,7 @@ test("a submitted team is closed to anyone else joining", async ({ page, request
   await page.getByLabel("Target industry").fill("Logistics");
   await page.locator('input[type="file"]').setInputFiles(DECK);
   await expect(page.getByText(/pitch\.pdf/)).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("checkbox", { name: /By submitting your presentation/i }).check();
   await page.getByRole("button", { name: "Save submission" }).click();
   await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByLabel("Idea name")).toHaveValue("Closed Idea", { timeout: 20_000 });

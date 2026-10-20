@@ -3,6 +3,7 @@ import { ref, onValue } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
 import { assignmentList } from "./assignmentList.js";
+import { compareSlots } from "./finalRoundPlan.js";
 
 function requireUser() {
   const user = getAuth().currentUser;
@@ -34,12 +35,16 @@ export function subscribeToPersonalSchedule(onTeams, onError) {
   );
 }
 
+// final entries have no batch, so assignmentList leaves them in team id order;
+// the running order is the slot
 function toFinalRoundList(raw) {
-  return assignmentList(raw).map((entry) => ({
-    ...entry,
-    id: entry.teamId ?? entry.id,
-    time: entry.timeslot ?? entry.time,
-  }));
+  return assignmentList(raw)
+    .map((entry) => ({
+      ...entry,
+      id: entry.teamId ?? entry.id,
+      time: entry.timeslot ?? entry.time,
+    }))
+    .sort((a, b) => compareSlots(a.time, b.time));
 }
 
 /**

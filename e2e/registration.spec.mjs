@@ -85,3 +85,56 @@ test("an email that is already registered is refused, and says so", async ({ pag
   await expect(page.getByLabel("Email address")).toBeFocused();
   await expect(page.getByRole("dialog", { name: "Registration complete" })).toHaveCount(0);
 });
+
+test("a rejected profile write rolls back auth and the same email can register immediately", async ({ page }) => {
+  // Inject one invalid check-in value into the development module. Auth and the
+  // database remain real emulators; the unchanged rules reject the first write.
+  await page.route("**/src/Registration.jsx*", async (route) => {
+    const response = await route.fetch();
+    const source = await response.text();
+    expect(source).toContain("checkedIn: false");
+    await route.fulfill({ response, body: source.replace(
+      "checkedIn: false",
+      "checkedIn: window.__rejectRegistrationOnce !== false ? (window.__rejectRegistrationOnce = false, true) : false"
+    ) });
+  });
+  const email = `e2e-rollback-${unique()}@virginia.edu`;
+  await goto(page, "/");
+  await fillRegistration(page, { email });
+  await page.getByRole("button", { name: "Register" }).first().click();
+  await expect(page.getByText(/try submitting again with the same email/).filter({ visible: true })).toBeVisible();
+  await expect(page.getByLabel("Email address")).toHaveValue(email);
+  await expect(page.getByLabel("First name")).toHaveValue("Rosa");
+  await expect(page.getByLabel("Password")).toHaveValue("testtest");
+  await page.getByRole("button", { name: "Register" }).first().click();
+  await expect(page.getByRole("dialog", { name: "Registration complete" })).toBeVisible();
+});
+
+test("an orphaned auth account signs in and completes its profile with the same uid", async ({ page, request }) => {
+  const email = `e2e-orphan-${unique()}@virginia.edu`;
+  const response = await request.post("http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key", {
+    data: { email, password: "testtest", returnSecureToken: true },
+  });
+  expect(response.ok()).toBeTruthy();
+  const { localId } = await response.json();
+  await goto(page, "/login");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password").fill("testtest");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Complete student registration" }).click();
+  await expect(page.getByLabel("Email address")).toHaveValue(email);
+  await expect(page.getByLabel("Email address")).toBeDisabled();
+  await expect(page.getByLabel("Password")).toHaveCount(0);
+  await page.getByLabel("First name").fill("Rosa");
+  await page.getByLabel("Last name").fill("Delgado");
+  await page.getByLabel("Major or intended major").fill("Systems Engineering");
+  await page.getByLabel("Gender").click();
+  await page.getByRole("option", { name: "Prefer not to say" }).click();
+  await page.getByLabel(/I confirm I am 18 years or older/).check();
+  await page.getByRole("button", { name: "Complete profile" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Profile" })).toBeVisible();
+  const profile = await request.get(`http://127.0.0.1:9000/competitors/${localId}.json?ns=demo-ideathon-default-rtdb`, {
+    headers: { Authorization: "Bearer owner" },
+  });
+  expect((await profile.json()).email).toBe(email);
+});

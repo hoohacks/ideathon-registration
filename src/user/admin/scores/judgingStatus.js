@@ -1,5 +1,6 @@
 import { assignmentList, rosterOf } from "../../judge/assignmentList";
 import { calculateAverageScore, countFundableVotes } from "../../judge/scoreRubric";
+import { compareSlots } from "../../judge/finalRoundPlan";
 
 /**
  * Turns the raw judging nodes into the two questions an organizer actually has
@@ -122,13 +123,17 @@ export function buildProgress({
       // the teams in trouble first: that is the entire point of the page
       const rank = { [TEAM_UNJUDGED]: 0, [TEAM_THIN]: 1, [TEAM_OK]: 2 };
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+      // a final slot has no batch; its running order is the slot
+      if (final) return compareSlots(a.time, b.time) || String(a.name).localeCompare(String(b.name));
       if ((a.batch ?? 0) !== (b.batch ?? 0)) return (a.batch ?? 0) - (b.batch ?? 0);
       return String(a.name).localeCompare(String(b.name));
     });
 
   const judgeRows = judgeEntries
     .map(([judgeId, judge]) => {
-      const assignments = assignmentList(final ? judge?.finalAssignments : judge?.teamAssignments);
+      const assignments = final
+        ? assignmentList(judge?.finalAssignments).sort((a, b) => compareSlots(a.timeslot, b.timeslot))
+        : assignmentList(judge?.teamAssignments);
       const submitted = assignments.filter((assignment) => {
         const teamId = assignment.id ?? assignment.teamId;
         return Boolean(scores?.[teamId]?.[judgeId]);

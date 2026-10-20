@@ -321,6 +321,29 @@ describe("the final round shows the final round", () => {
     expect(judgeRows.map((r) => r.name)).not.toContain("Cy Judge");
   });
 
+  test("fully scored finalists are listed in slot order, not by name", () => {
+    const data = finalFixture();
+    // Beta presents first, and both have every card in
+    data.teams.t1.finalSlot.timeslot = "Slot 2";
+    data.teams.t2.finalSlot.timeslot = "Slot 1";
+    data.judges.j2.finalAssignments.t1.timeslot = "Slot 2";
+    data.judges.j2.finalAssignments.t2.timeslot = "Slot 1";
+    data.scores = { t1: { j1: card(), j2: card() }, t2: { j2: card() } };
+
+    const { teamRows } = buildProgress({ ...data, minJudges: 1 });
+    expect(teamRows.map((r) => r.status)).toEqual([TEAM_OK, TEAM_OK]);
+    expect(teamRows.map((r) => r.name)).toEqual(["Beta", "Alpha"]);
+  });
+
+  test("a judge's outstanding finalists are listed in slot order", () => {
+    const data = finalFixture();
+    data.judges.j2.finalAssignments.t1.timeslot = "Slot 2";
+    data.judges.j2.finalAssignments.t2.timeslot = "Slot 1";
+    data.scores = {};
+    const bo = buildProgress(data).judgeRows.find((r) => r.name === "Bo Judge");
+    expect(bo.outstanding.map((a) => a.teamId)).toEqual(["t2", "t1"]);
+  });
+
   test("before activation there are no finalists, not every team", () => {
     const { teamRows, totals } = buildProgress({ ...finalFixture(), finalRoundTeams: null });
     expect(teamRows).toEqual([]);
