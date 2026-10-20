@@ -11,12 +11,12 @@
  * not a wrong one — for that see test/rules/, which executes the rules against
  * the emulator. This file is the half that runs in CI without a JVM.
  */
-import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { assignmentList } from "./user/judge/assignmentList";
 import { memberIds, isMember } from "./user/team/teamMembers";
 import { MAX_TEAM_SIZE } from "./user/team/teamMembership";
+import { REQUIRED_RULES_VERSION } from "./user/admin/eventReadiness";
 
 const RULES_PATH = path.join(process.cwd(), "database.rules.json");
 const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
@@ -171,6 +171,22 @@ describe("a judge can read the submissions they are assigned", () => {
     // a read granted at a child never confers the parent, so the team node,
     // its members and its schedule stay closed to a judge
     expect(RULES.rules.teams.$teamId[".read"]).not.toContain("judges");
+  });
+});
+
+describe("the rules version is the one this build expects", () => {
+  /**
+   * The deploy workflow records the `// rulesVersion:` marker at
+   * config/rulesVersion, and the dashboard compares that with
+   * REQUIRED_RULES_VERSION. If the two numbers here disagree, every deploy
+   * leaves the dashboard warning that the rules are out of date.
+   *
+   * When it fails: you bumped one and not the other. Bump both.
+   */
+  test("the marker matches REQUIRED_RULES_VERSION", () => {
+    const declared = RAW_RULES.match(/\/\/\s*rulesVersion:\s*(\d+)/);
+    expect(declared).not.toBeNull();
+    expect(Number(declared[1])).toBe(REQUIRED_RULES_VERSION);
   });
 });
 

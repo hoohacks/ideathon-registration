@@ -13,8 +13,9 @@ Actions tab.
 2. Publish a release.
 
 The deploy job runs the unit and rules tests again before building, so a red
-suite never ships. Its summary says whether registration is open, and reminds you
-which rules version the release expects.
+suite never ships. It then deploys the database and storage rules, publishes the
+site, and records the rules version. Its summary says whether registration is
+open and which rules version went out.
 
 ### Discord notices
 
@@ -26,26 +27,32 @@ from the Actions tab are not announced.
 
 ## Publishing the database rules
 
-`database.rules.json` is the only real authorization, and it is automatically tested in CI. The rules are deployed to Firebase by the deploy workflow on a release or on the `main` branch.
+`database.rules.json` is the only real authorization. Every deploy publishes it
+and `storage.rules` from the same ref as the site, before the site goes out, so a
+failed rules deploy ships nothing.
 
-The file starts with a `// rulesVersion:` number. After publishing, record the
-same number at `config/rulesVersion` (Control panel, Event setup, Advanced). The
-organizer dashboard compares the two and shows a red warning until they match,
-because the app cannot read the deployed rules itself. See
+The file starts with a `// rulesVersion:` number. After the site is published,
+the workflow records that number at `config/rulesVersion`. The organizer
+dashboard compares it with the version the app needs and shows a red warning
+until they match, because the app cannot read the deployed rules itself. See
 [security rules](security-rules.md#versioning).
+
+The workflow needs two repository settings: the `GCP_SA_KEY` secret, a service
+account key that can deploy rules and write the database, and the
+`FIREBASE_PROJECT` variable, the project id.
 
 ## First-time Firebase setup
 
 Only needed once per project.
 
 1. Enable **Email/Password** sign-in.
-2. Publish `database.rules.json`.
-3. Publish `storage.rules`. Without it, resume and pitch deck uploads fail.
-4. **Create the first admin by hand.** Register an account (use
+2. Set the `GCP_SA_KEY` secret and `FIREBASE_PROJECT` variable (above). The first
+   release then publishes `database.rules.json` and `storage.rules`.
+3. **Create the first admin by hand.** Register an account (use
    `#/judge-registration?staff` if registration is closed), copy its uid from the
    Authentication tab, then add `admins/<uid>: true` in the database.
 
-Step 4 cannot be done in the app: writing `/admins` requires already being an
+Step 3 cannot be done in the app: writing `/admins` requires already being an
 admin. Every later organizer is granted admin from the control panel.
 
 ## Opening registration
@@ -63,7 +70,7 @@ why it is not security.
 ## Deploying from a laptop
 
 `npm run deploy` builds and pushes `build/` to `gh-pages` from your machine,
-skipping the tests, the rules reminder and the Discord notice, so prefer the
+skipping the tests, the rules deploy and the Discord notice, so prefer the
 workflow. Registration is closed in that build unless you open it:
 
 ```

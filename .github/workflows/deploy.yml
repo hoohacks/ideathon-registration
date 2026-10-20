@@ -75,31 +75,24 @@ jobs:
             echo "Organizers can still sign in at \`#/login?staff\`." >> $GITHUB_STEP_SUMMARY
           fi
 
+      # The rules go out with every deploy, from the same ref as the site, so
+      # the live rules always match the live client. They go first: a rules
+      # deploy is the step most likely to fail (credentials, permissions), and
+      # failing here ships nothing rather than a site the old rules reject.
       - name: Authenticate to Google Cloud
-        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Deploy Realtime Database and Storage Rules
-        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+      - name: Deploy database and storage rules
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
         run: |
-          npx firebase-tools deploy --only database,storage --project ${{ vars.FIREBASE_PROJECT }}
-
-      - name: Update config/rulesVersion and write step summary
-        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
-        run: |
-          # Extract rule version identifier (git short SHA or release tag)
-          RULES_VERSION="${{ github.event.release.tag_name || github.sha }}"
-
-          # Write version to Firebase RTDB config to clear organizer dashboard warning
-          npx firebase-tools database:set /config/rulesVersion "\"$RULES_VERSION\"" \
-            --project ${{ vars.FIREBASE_PROJECT }} \
-            --confirm
-
-          echo "### Firebase Rules Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Rules Version:** \`$RULES_VERSION\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Target Project:** \`${{ vars.FIREBASE_PROJECT }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ -z "$PROJECT" ]; then
+            echo "::error::The FIREBASE_PROJECT repository variable is not set."
+            exit 1
+          fi
+          npx firebase deploy --only database,storage --project "$PROJECT" --non-interactive
 
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
@@ -107,6 +100,27 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
           commit_message: "Deploy ${{ github.event.release.tag_name || github.sha }}"
+
+      # The dashboard compares config/rulesVersion with REQUIRED_RULES_VERSION,
+      # as a number. Last, so if this fails the site and rules are already
+      # live and the only effect is the dashboard warning staying up.
+      - name: Record the rules version
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+          REF: ${{ github.event.release.tag_name || github.sha }}
+        run: |
+          VERSION=$(grep -oE 'rulesVersion: [0-9]+' database.rules.json | grep -oE '[0-9]+')
+          if [ -z "$VERSION" ]; then
+            echo "::error::No // rulesVersion: marker in database.rules.json."
+            exit 1
+          fi
+          npx firebase database:set /config/rulesVersion --data "$VERSION" --project "$PROJECT" --force
+
+          echo "### Rules deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Rules version: \`$VERSION\`, recorded at \`config/rulesVersion\`" >> $GITHUB_STEP_SUMMARY
+          echo "- From: \`$REF\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: \`$PROJECT\`" >> $GITHUB_STEP_SUMMARY
 
   # Tells the team's Discord what happened to a release: live, or failed and
   # why to look. A job of its own, after the deploy, so it can report either
