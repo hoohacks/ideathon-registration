@@ -1,5 +1,5 @@
 {
-  // rulesVersion: 11 -- bump this, and REQUIRED_RULES_VERSION in
+  // rulesVersion: 12 -- bump this, and REQUIRED_RULES_VERSION in
   // src/user/admin/eventReadiness.js, when the app needs a change below. The
   // deploy workflow publishes this file and records this number at
   // config/rulesVersion; `npm test` fails if the two numbers disagree. See
@@ -103,12 +103,18 @@
         },
         "checkedIn": {
           ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
-          ".write": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
           ".validate": "newData.isBoolean()"
         },
         "foodCheckIn": {
           ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
-          ".write": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
           ".validate": "newData.isBoolean()"
         },
 
@@ -160,12 +166,18 @@
         },
         "checkedIn": {
           ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
-          ".write": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
           ".validate": "newData.isBoolean()"
         },
         "foodCheckIn": {
           ".read": "auth != null && root.child('organizers').child(auth.uid).exists()",
-          ".write": "auth != null && root.child('organizers').child(auth.uid).exists()",
+          // an existing record only, never your own, and never deleted: a
+          // write to an unknown uid would create a record that blocks that
+          // person from registering, and .validate does not run on a delete
+          ".write": "auth != null && root.child('organizers').child(auth.uid).exists() && $uid !== auth.uid && data.parent().exists() && newData.exists()",
           ".validate": "newData.isBoolean()"
         }
       }

@@ -328,6 +328,32 @@ describe("organizer check-in and restrictions", () => {
     );
   });
 
+  test.each(["judges", "competitors"])(
+    "an organizer cannot create a %s record by checking in an unknown uid",
+    async (node) => {
+      // the placeholder would make that uid look registered, and block the
+      // real person's own sign-up, which requires the record not to exist
+      await assertFails(set(ref(db("organizer1"), `${node}/nobody/checkedIn`), true));
+      await assertFails(set(ref(db("organizer1"), `${node}/nobody/foodCheckIn`), true));
+    }
+  );
+
+  test.each(["judges", "competitors"])("an organizer cannot check themselves in as one of the %s", async (node) => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await set(ref(context.database(), `${node}/organizer1`), {
+        firstName: "Olive", lastName: "Organizer", checkedIn: false, foodCheckIn: false,
+      });
+    });
+    await assertFails(set(ref(db("organizer1"), `${node}/organizer1/checkedIn`), true));
+    await assertFails(set(ref(db("organizer1"), `${node}/organizer1/foodCheckIn`), true));
+  });
+
+  test("an organizer cannot delete a check-in flag, only set it", async () => {
+    await assertFails(set(ref(db("organizer1"), "competitors/alice/checkedIn"), null));
+    await assertFails(set(ref(db("organizer1"), "judges/judge1/foodCheckIn"), null));
+    await assertSucceeds(set(ref(db("organizer1"), "competitors/alice/checkedIn"), false));
+  });
+
   test.each([
     ["teams", "teams/team1/name", "New Name"],
     ["scores", "scores/first/team1/judge1/notes", "Hacked note"],
