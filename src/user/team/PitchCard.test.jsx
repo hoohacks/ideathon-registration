@@ -15,6 +15,8 @@ const competitor = {
 };
 
 describe("the pitch card", () => {
+  beforeEach(() => db.reset());
+
   test("nothing published is nothing on screen", () => {
     const { container } = renderPage(<PitchCard schedule={null} finalSlot={null} />);
     expect(container).toBeEmptyDOMElement();
@@ -33,6 +35,15 @@ describe("the pitch card", () => {
   test("a final round slot typed as a time keeps the time", () => {
     renderPage(<PitchCard finalSlot={{ timeslot: "6:10 PM", room: "Rice 011" }} />);
     expect(screen.getByText(/You pitch/)).toHaveTextContent("You pitch at 6:10 PM in Rice 011.");
+  });
+
+  test("a final round start time set by an organizer shows on the label, live", async () => {
+    db.reset({ config: { finalRoundTime: "7:00 PM" } });
+    renderPage(<PitchCard finalSlot={{ timeslot: "Slot 2", room: "Rice 011" }} />);
+    expect(await screen.findByText("Final round, starting at 7:00 PM")).toBeInTheDocument();
+
+    await act(async () => db.setData("config/finalRoundTime", "7:30 PM"));
+    expect(screen.getByText("Final round, starting at 7:30 PM")).toBeInTheDocument();
   });
 
   test("with both rounds, each line is labelled", () => {

@@ -464,6 +464,26 @@ export function subscribeToFinalRoundActive(callback) {
 }
 
 /**
+ * When the final round starts, as the organizer typed it ("7:00 PM"), or null
+ * if nobody has set one. Read live from config rather than stamped at publish,
+ * so moving the start after the finalists are out reaches every team and judge.
+ */
+export function subscribeToFinalRoundTime(callback) {
+  const unsubscribe = onValue(
+    ref(database, "config/finalRoundTime"),
+    (snapshot) => {
+      const time = String(snapshot.val() ?? "").trim();
+      callback(time || null);
+    },
+    (error) => {
+      console.error("Failed to subscribe to final round time:", error);
+      callback(null);
+    }
+  );
+  return () => unsubscribe();
+}
+
+/**
  * The standings, with the average scores. Admin only — mount this behind a role
  * check or every judge logs a permission error on each page load.
  */

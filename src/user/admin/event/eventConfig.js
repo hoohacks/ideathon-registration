@@ -168,3 +168,18 @@ export async function setFinalRoundRoom(room) {
     changes: [{ path: "config/finalRoundRoom", before, after: next }],
   });
 }
+
+/**
+ * When the final round starts, free text like the batch times. Blank clears
+ * it. Teams and judges read it live, so this moves what they see immediately.
+ */
+export async function setFinalRoundTime(time) {
+  const next = String(time ?? "").trim() || null;
+  const before = await readOne("config/finalRoundTime", null);
+  if (before === next) return { ok: true };
+  return applyAdminAction({
+    action: "config.finalRoundTime",
+    summary: next === null ? "Cleared the final round time" : `Final round time ${before ?? "unset"} to ${next}`,
+    changes: [{ path: "config/finalRoundTime", before, after: next }],
+  });
+}

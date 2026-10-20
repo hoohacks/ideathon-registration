@@ -28,7 +28,7 @@ import {
   FIRST_ROUND,
   FINAL_ROUND,
 } from "./getTeamInfo";
-import { deactivateFinalRound, subscribeToFinalRoundActive } from "./finalRoundService";
+import { deactivateFinalRound, subscribeToFinalRoundActive, subscribeToFinalRoundTime } from "./finalRoundService";
 import { useJudgingSync } from "./useJudgingSync";
 import { clearDraft } from "./scoreDraft";
 import { readDraft } from "./draftStore";
@@ -106,6 +106,7 @@ function Assignments() {
   const [finalRoundLoading, setFinalRoundLoading] = useState(true);
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
+  const [finalRoundTime, setFinalRoundTime] = useState(null);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
   const { userTypes, userCredential } = useAuth();
@@ -300,6 +301,14 @@ function Assignments() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!finalRoundActive) {
+      setFinalRoundTime(null);
+      return undefined;
+    }
+    return subscribeToFinalRoundTime(setFinalRoundTime);
+  }, [finalRoundActive]);
 
   // The judge's finalists come from their own record. Deriving them in the
   // browser from /finalRound only worked because every judge could read the
@@ -520,7 +529,7 @@ function Assignments() {
             {finalRoundActive && (
               <>
                 <Divider />
-                <Section title="Final round">
+                <Section title="Final round" caption={finalRoundTime ? `Starts at ${finalRoundTime}` : null}>
                   {finalAssignments.length === 0 ? (
                     <Card sx={{ p: 3 }}>
                       <Typography variant="body2" align="center">
