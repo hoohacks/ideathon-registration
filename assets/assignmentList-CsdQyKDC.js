@@ -1,0 +1,1 @@
+function e(e){return e?(Array.isArray(e)?e:Object.values(e)).filter(e=>e&&typeof e==`object`).sort((e,t)=>(e.batch??0)-(t.batch??0)):[]}function t(e){let t=e?.judges;return(Array.isArray(t)?t:Object.values(t??{})).filter(e=>e&&e.judgeId)}export{t as n,e as t};

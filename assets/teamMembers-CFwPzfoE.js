@@ -1,0 +1,1 @@
+function e(e){return e?Array.isArray(e)?e.filter(Boolean):typeof e==`object`?Object.entries(e).filter(([,e])=>e).map(([e,t])=>typeof t==`string`?t:e):[]:[]}function t(e,t){if(!t||!e||typeof e!=`object`)return null;for(let[n,r]of Object.entries(e)){if(r===!0&&n===t)return{key:n,before:!0};if(typeof r==`string`&&r===t)return{key:n,before:r}}return null}export{t as n,e as t};
