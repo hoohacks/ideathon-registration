@@ -1,6 +1,6 @@
 import Layout from "./Layout";
 import { useContext, useEffect, useState } from "react";
-import { Link as RouterLink } from "react-router";
+import { Navigate, Link as RouterLink } from "react-router";
 import { AuthContext } from "../App";
 import { hasRole } from "../roles";
 import AdminHome from "./admin/AdminHome";
@@ -215,6 +215,8 @@ function Home() {
             ),
         });
     }
+
+    if (!userData && !userTypes?.length) return <Navigate to="/user/profile" replace />;
 
     return (
         <Layout maxWidth="md">

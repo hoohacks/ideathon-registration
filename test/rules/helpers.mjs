@@ -156,6 +156,7 @@ export function baseWorld() {
           targetIndustry: "Health",
           pitchDeckName: "deck.pdf",
           pitchDeckURL: "https://example.com/deck.pdf",
+          waiverAcknowledged: true,
         },
         schedule: assignment("team1"),
       },

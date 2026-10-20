@@ -18,12 +18,14 @@ import {
     Button,
     Card,
     CardContent,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     Divider,
+    FormControlLabel,
     LinearProgress,
     Stack,
     TextField,
@@ -51,6 +53,9 @@ function Team() {
     const [problemStatement, setProblemStatement] = useState(userData ? userData.problemStatement : "");
     const [targetIndustry, setTargetIndustry] = useState(userData ? userData.targetIndustry : "");
     const [showModal, setShowModal] = useState(false);
+    const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
+    // kept apart from uploadError so ticking the box clears only its own message
+    const [waiverError, setWaiverError] = useState("");
     // null until the flag arrives, so the form does not flash up and vanish
     const [submissionsOpen, setSubmissionsOpen] = useState(null);
 
@@ -130,6 +135,7 @@ function Team() {
 
     const handleSubmitProject = async () => {
         if (submitting) return;
+        setWaiverError("");
         if (!ideaName.trim() || !problemStatement.trim() || !targetIndustry.trim()) {
             setUploadError("Please fill in the idea name, problem statement and target industry.");
             return;
@@ -138,6 +144,11 @@ function Team() {
         const existingURL = teamData?.submission?.pitchDeckURL ?? null;
         if (!uploadPitchDeck && !existingURL) {
             setUploadError("Please upload a pitch deck before submitting.");
+            return;
+        }
+
+        if (!waiverAcknowledged) {
+            setWaiverError("Please acknowledge that your presentation will be used for HooHacks internal use only before submitting.");
             return;
         }
 
@@ -195,6 +206,7 @@ function Team() {
                         targetIndustry,
                         pitchDeckName: deckName,
                         pitchDeckURL,
+                        waiverAcknowledged: true,
                     };
                 },
                 { applyLocally: false }
@@ -303,6 +315,9 @@ function Team() {
                 setProblemStatement(seededProblem);
                 setTargetIndustry(seededIndustry);
                 setPitchDeckName(teamData.submission?.pitchDeckName || "");
+                if (teamData.submission?.waiverAcknowledged) {
+                    setWaiverAcknowledged(true);
+                }
             }
 
             setTeamData(teamData);
@@ -470,6 +485,20 @@ function Team() {
                                             )}
                                         </Box>
 
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={waiverAcknowledged}
+                                                    onChange={(e) => {
+                                                        setWaiverAcknowledged(e.target.checked);
+                                                        setWaiverError("");
+                                                    }}
+                                                />
+                                            }
+                                            label="By submitting your presentation, you acknowledge that it will be used for HooHacks internal use only and will not be distributed externally."
+                                        />
+
+                                        {waiverError && <Alert severity="error">{waiverError}</Alert>}
                                         {uploadError && <Alert severity="error">{uploadError}</Alert>}
 
                                         <Button

@@ -4,16 +4,16 @@ import { describeSupply, BATCH_COUNT } from "../judge/schedulePlan.js";
  * The rules version this build of the app needs deployed.
  *
  * `database.rules.json` carries the same number in a comment, and `npm test`
- * fails if the rules change without it being bumped. What neither can do is
- * tell whether the file was ever pasted into the Firebase console -- rules are
- * not readable from a browser. So an admin records what they published in
- * `config/rulesVersion`, and this compares the two.
+ * fails if the two disagree. Rules are not readable from a browser, so the
+ * deploy workflow records the number it deployed in `config/rulesVersion`, and
+ * this compares the two.
  *
  * It matters more than a version mismatch usually does: before version 5,
- * restoring a restore point that contains scores fails and changes nothing, and
+ * restoring a restore point that contains scores fails and changes nothing,
  * before version 10 the database takes a team's submission whether or not
  * organizers have opened submissions or the deadline has passed -- only the
- * page hides the form -- and announcements cannot be posted at all.
+ * page hides the form -- and announcements cannot be posted at all, and before
+ * version 11 the presentation waiver is not enforced.
  */
 export const REQUIRED_RULES_VERSION = 11;
 
@@ -179,6 +179,29 @@ function checksFor({ rooms, judge, team, config, supply }) {
   ];
 }
 
+// What an older deployed version is missing, keyed by the version that fixed
+// it, so the warning names only what is actually broken on that database.
+const RULES_GAPS = [
+  [10, "the database does not enforce the submissions switch or deadline, and announcements cannot be posted"],
+  [11, "the presentation waiver is not enforced"],
+  [5, "restoring a restore point that contains scores fails and changes nothing"],
+];
+
+function joinGaps(gaps) {
+  return gaps.length < 2 ? gaps.join("") : `${gaps.slice(0, -1).join(", ")}, and ${gaps[gaps.length - 1]}`;
+}
+
+function rulesDetail(published) {
+  if (!Number.isFinite(published)) {
+    return `Nobody has recorded which version is deployed. Until ${REQUIRED_RULES_VERSION} is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, announcements cannot be posted, and the presentation waiver is not enforced.`;
+  }
+  const gaps = RULES_GAPS.filter(([fixedIn]) => published < fixedIn).map(([, gap]) => gap);
+  if (!gaps.length) {
+    return `Version ${published} is recorded as published, but this build expects ${REQUIRED_RULES_VERSION}.`;
+  }
+  return `Version ${published} is recorded as published. Until ${REQUIRED_RULES_VERSION} is, ${joinGaps(gaps)}.`;
+}
+
 /**
  * Things that must be done before the event and that nothing else will remind
  * anyone about, because both fail silently rather than loudly.
@@ -191,10 +214,8 @@ function blockersFor({ config, legacyScoreTeams }) {
     blockers.push({
       id: "rules",
       title: `Publish database rules version ${REQUIRED_RULES_VERSION}`,
-      detail: Number.isFinite(published)
-        ? `Version ${published} is recorded as published. Until ${REQUIRED_RULES_VERSION} is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted${published < 5 ? ", and restoring a restore point that contains scores fails and changes nothing" : ""}.`
-        : `Nobody has recorded which version is deployed. Until ${REQUIRED_RULES_VERSION} is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.`,
-      how: "Paste database.rules.json into Realtime Database → Rules, then set config/rulesVersion to match.",
+      detail: rulesDetail(published),
+      how: "Publish a release; the deploy workflow publishes the rules and records the version. To do it by hand, deploy database.rules.json and set config/rulesVersion to match.",
       to: "/user/admin/control?tab=setup",
     });
   }

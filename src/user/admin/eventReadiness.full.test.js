@@ -27,8 +27,8 @@ const RULES_UNRECORDED = {
   id: "rules",
   title: "Publish database rules version 11",
   detail:
-    "Nobody has recorded which version is deployed. Until 11 is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.",
-  how: "Paste database.rules.json into Realtime Database → Rules, then set config/rulesVersion to match.",
+    "Nobody has recorded which version is deployed. Until 11 is published, restoring a restore point that contains scores may fail, the database does not enforce the submissions switch or deadline, announcements cannot be posted, and the presentation waiver is not enforced.",
+  how: "Publish a release; the deploy workflow publishes the rules and records the version. To do it by hand, deploy database.rules.json and set config/rulesVersion to match.",
   to: "/user/admin/control?tab=setup",
 };
 const CHECK_IN = { label: "Check people in", to: "/user/admin/scan" };
@@ -267,21 +267,29 @@ describe("blockers", () => {
       {
         ...RULES_UNRECORDED,
         detail:
-          "Version 4 is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted, and restoring a restore point that contains scores fails and changes nothing.",
+          "Version 4 is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted, the presentation waiver is not enforced, and restoring a restore point that contains scores fails and changes nothing.",
       },
     ]);
   });
 
-  test("version 5 or later only warns about submissions and announcements", () => {
+  test("version 5 or later only warns about submissions, announcements and the waiver", () => {
     for (const version of [5, "9"]) {
       expect(blockers({ rulesVersion: version })[0].detail).toBe(
-        `Version ${version} is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted.`
+        `Version ${version} is recorded as published. Until 11 is, the database does not enforce the submissions switch or deadline, and announcements cannot be posted, and the presentation waiver is not enforced.`
       );
     }
   });
 
+  test("version 10 only warns about the waiver", () => {
+    expect(blockers({ rulesVersion: 10 })[0].detail).toBe(
+      "Version 10 is recorded as published. Until 11 is, the presentation waiver is not enforced."
+    );
+  });
+
   test("a newer version than this build knows is still flagged", () => {
-    expect(blockers({ rulesVersion: 12 })).toHaveLength(1);
+    expect(blockers({ rulesVersion: 12 })).toEqual([
+      { ...RULES_UNRECORDED, detail: "Version 12 is recorded as published, but this build expects 11." },
+    ]);
   });
 
   test("the version recorded as text still clears it", () => {

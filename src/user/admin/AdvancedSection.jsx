@@ -38,9 +38,9 @@ export const KNOWN_KEYS = {
   finalRoundRoom: "string",
   finalRoundSize: "number",
   eventStart: "string",
-  // What an admin confirms they pasted into the Firebase console. The app knows
-  // which version it needs; it cannot read what is actually deployed, so this is
-  // the only way it can warn that a restore point will fail silently.
+  // The rules version deployed, written by the deploy workflow or by an admin
+  // who deployed by hand. The app knows which version it needs; it cannot read
+  // what is actually deployed, so this is the only way it can warn.
   rulesVersion: "number",
 };
 

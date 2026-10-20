@@ -65,11 +65,12 @@ secret**: anyone holding it can open the file, whatever the rules say.
 
 ## Versioning
 
-The rules file starts with `// rulesVersion: N`. `npm test` fails if the rules
-change without that number being bumped, and prints the new fingerprint to paste
-into `src/schema.test.js`. That failure is the reminder to republish.
+The rules file starts with `// rulesVersion: N`. Bump it together with
+`REQUIRED_RULES_VERSION` in `src/user/admin/eventReadiness.js` when the app comes
+to depend on a rules change; `npm test` fails if the two disagree.
 
-The app cannot read the deployed rules, so after publishing, an admin records
-the number at `config/rulesVersion`. The dashboard compares it with the version
-this build needs (`REQUIRED_RULES_VERSION` in `src/user/admin/eventReadiness.js`)
-and shows a red warning until they match.
+The deploy workflow publishes the rules on every release and records the number
+at `config/rulesVersion`, because the app cannot read the deployed rules. The
+dashboard compares it with `REQUIRED_RULES_VERSION` and shows a red warning until
+they match. If you deploy the rules by hand, set `config/rulesVersion` yourself
+(Control panel, Event setup, Advanced).

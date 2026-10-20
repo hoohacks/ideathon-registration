@@ -66,6 +66,19 @@ describe("final round", () => {
     ]);
   });
 
+  test("gives this judge's finalists in slot order, not team id order", () => {
+    db.setData("judges/j1/finalAssignments", {
+      t1: { teamId: "t1", timeslot: "Slot 10" },
+      t2: { teamId: "t2", timeslot: "Slot 2" },
+      t3: { teamId: "t3", timeslot: "6:30 PM" },
+      t4: { teamId: "t4", timeslot: "Slot 1" },
+    });
+    const onTeams = vi.fn();
+    subscribeToFinalRoundSchedule(onTeams);
+    // a free-text time from a forced entry has no slot, so it goes last
+    expect(onTeams.mock.lastCall[0].map((t) => t.id)).toEqual(["t4", "t2", "t1", "t3"]);
+  });
+
   test("older entries that already carry id and time keep them", () => {
     db.setData("judges/j1/finalAssignments", { t8: { id: "t8", time: "15:30" } });
     const onTeams = vi.fn();

@@ -75,6 +75,25 @@ jobs:
             echo "Organizers can still sign in at \`#/login?staff\`." >> $GITHUB_STEP_SUMMARY
           fi
 
+      # The rules go out with every deploy, from the same ref as the site, so
+      # the live rules always match the live client. They go first: a rules
+      # deploy is the step most likely to fail (credentials, permissions), and
+      # failing here ships nothing rather than a site the old rules reject.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy database and storage rules
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+        run: |
+          if [ -z "$PROJECT" ]; then
+            echo "::error::The FIREBASE_PROJECT repository variable is not set."
+            exit 1
+          fi
+          npx firebase deploy --only database,storage --project "$PROJECT" --non-interactive
+
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
         with:
@@ -82,18 +101,32 @@ jobs:
           publish_dir: ./build
           commit_message: "Deploy ${{ github.event.release.tag_name || github.sha }}"
 
-      # database.rules.json and storage.rules are NOT deployed here -- they are
-      # published by hand in the Firebase console, by choice. src/schema.test.js
-      # fails when the rules change without the version marker being bumped, so
-      # this is the reminder that goes with that.
-      - name: Remind about the rules
+      # The dashboard compares config/rulesVersion with REQUIRED_RULES_VERSION,
+      # as a number. Last, so if this fails the site and rules are already
+      # live and the only effect is the dashboard warning staying up. It must
+      # not fail the job either: Discord would announce a live release as one
+      # that "did not deploy".
+      - name: Record the rules version
+        continue-on-error: true
+        env:
+          PROJECT: ${{ vars.FIREBASE_PROJECT }}
+          REF: ${{ github.event.release.tag_name || github.sha }}
         run: |
-          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
+          VERSION=$(grep -oE 'rulesVersion: [0-9]+' database.rules.json | grep -oE '[0-9]+')
+          if [ -z "$VERSION" ]; then
+            echo "::error::No // rulesVersion: marker in database.rules.json."
+            exit 1
+          fi
+          if ! npx firebase database:set /config/rulesVersion --data "$VERSION" --project "$PROJECT" --force; then
+            echo "::warning::Rules and site are live, but config/rulesVersion was not updated. Set it to $VERSION in Control panel, Event setup, Advanced."
+            exit 1
+          fi
+
+          echo "### Rules deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "If \`database.rules.json\` or \`storage.rules\` changed in this release," >> $GITHUB_STEP_SUMMARY
-          echo "publish them in the Firebase console now. Nothing here does it for you." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          grep -o 'rulesVersion: [0-9]*' database.rules.json >> $GITHUB_STEP_SUMMARY || true
+          echo "- Rules version: \`$VERSION\`, recorded at \`config/rulesVersion\`" >> $GITHUB_STEP_SUMMARY
+          echo "- From: \`$REF\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: \`$PROJECT\`" >> $GITHUB_STEP_SUMMARY
 
   # Tells the team's Discord what happened to a release: live, or failed and
   # why to look. A job of its own, after the deploy, so it can report either
