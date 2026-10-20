@@ -27,6 +27,24 @@ export function slotLabel(order) {
 }
 
 /**
+ * The inverse of slotLabel, for sorting what was published. Judges' and teams'
+ * copies carry only the label, not `order`, and "Slot 10" sorts before
+ * "Slot 2" as text. A free-text time from a forced entry has no slot and sorts
+ * after every slotted team.
+ */
+export function slotOrder(label) {
+  const match = /^Slot (\d+)$/.exec(String(label ?? "").trim());
+  return match ? Number(match[1]) - 1 : Infinity;
+}
+
+/** Comparator over slot labels; safe with two unslotted entries. */
+export function compareSlots(a, b) {
+  const x = slotOrder(a);
+  const y = slotOrder(b);
+  return x === y ? 0 : x < y ? -1 : 1;
+}
+
+/**
  * Build the plan an organizer starts from.
  *
  * The cut is the top `size` of `ranked`, in rank order, and every finalist's
