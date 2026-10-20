@@ -280,6 +280,22 @@ async function main() {
     };
   });
 
+  tree.judges[organizerUid] = {
+    firstName: "Organizer",
+    lastName: "Judge",
+    email: "organizer@example.com",
+    company: "Ideathon",
+    withCompany: true,
+    wantsToJudge: true,
+    wantsToMentor: false,
+    skills: ["Product", "Engineering"],
+    timeslots: [],
+    checkedIn: true,
+    foodCheckIn: false,
+    isRound1Judge: true,
+    registeredAt: now - (JUDGES + 1) * 60000,
+  };
+
   teams.forEach((team, teamIndex) => {
     const members = competitors.slice(
       teamIndex * MEMBERS_PER_TEAM,
@@ -385,6 +401,7 @@ async function main() {
   console.log("  database written\n");
   console.log("  Sign in with any of these (password: " + PASSWORD + ")");
   console.log("    admin@example.com          organizer, listed in /admins");
+  console.log("    organizer@example.com      organizer and judge, listed in /organizers and /judges");
   console.log(`    judge1@example.com  …  judge${JUDGES}@example.com  round one`);
   if (UNMARKED_JUDGES > 0) {
     console.log(
