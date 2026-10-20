@@ -238,6 +238,14 @@ const theme = createTheme({
       // Chrome autofilling a value before React sees a change event, which left
       // a floating label sitting on top of it.
       defaultProps: { size: "small", slotProps: { inputLabel: { shrink: true } } },
+      styleOverrides: {
+        root: {
+          "& textarea": {
+            paddingLeft: 0,
+            paddingRight: 0,
+          },
+        },
+      },
     },
     // displayEmpty so a filter whose "Any" option has the value "" shows that
     // label; without it MUI renders "" as a blank box that looks broken.
