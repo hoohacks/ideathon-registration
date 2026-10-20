@@ -82,7 +82,7 @@ export const TAB_BAR_HEIGHT = 64;
 
 const PRIMARY = [
     { to: "/user/home", label: "Home", icon: PiHouse, activeIcon: PiHouseFill },
-    { to: "/user/judging", label: "Judging", icon: PiClipboardText, activeIcon: PiClipboardTextFill, roles: ["judge", "admin"] },
+    { to: "/user/judging", label: "Judging", icon: PiClipboardText, activeIcon: PiClipboardTextFill, roles: ["judge", "admin", "organizer"] },
     { to: "/user/team", label: "Team", icon: PiUsersThree, activeIcon: PiUsersThreeFill, roles: ["competitor"] },
     { to: "/user/checkin", label: "Check in", icon: PiQrCode, activeIcon: PiQrCodeFill, roles: ["competitor", "judge"] },
 ];

@@ -132,6 +132,27 @@ test("an assignment pushed to the judge's node after the page is already open sh
   expect(await screen.findByText("Team Rocket")).toBeInTheDocument();
 });
 
+test("an organizer can view assignments and see assignments pushed to their judge node", async () => {
+  const result = render(
+    <ThemeProvider theme={theme}>
+      <AuthContext.Provider value={{ ...baseAuth, userTypes: ["organizer"] }}>
+        <MemoryRouter>
+          <Assignments />
+        </MemoryRouter>
+      </AuthContext.Provider>
+    </ThemeProvider>
+  );
+  currentUnmount = result.unmount;
+
+  await screen.findByText("No assignments yet. They appear once an admin generates the schedule.");
+
+  await pushValue("judges/judge-1/teamAssignments", {
+    t1: { id: "t1", teamName: "Organizer Stars", room: "Rice 200", time: "11:00", batch: 0 },
+  });
+
+  expect(await screen.findByText("Organizer Stars")).toBeInTheDocument();
+});
+
 test("a failed final-round read says so instead of quietly claiming there are no assignments", async () => {
   renderJudge();
   await screen.findByText("No assignments yet. They appear once an admin generates the schedule.");

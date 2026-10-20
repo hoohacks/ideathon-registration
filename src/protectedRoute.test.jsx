@@ -168,6 +168,14 @@ describe("signed in", () => {
   });
 
 
+  test("an organizer can reach the judging route", () => {
+    renderGuard({
+      auth: { userCredential: SIGNED_IN, userTypes: ["organizer"] },
+      requiredRoles: ["judge", "admin", "organizer"],
+    });
+    expect(screen.getByText("secret content")).toBeInTheDocument();
+  });
+
   test("an organizer can reach the scan check-in route", () => {
     renderGuard({
       auth: { userCredential: SIGNED_IN, userTypes: ["organizer"] },

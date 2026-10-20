@@ -276,7 +276,7 @@ function App() {
           <Route index element={<Navigate to="/user/home" replace />} />
           <Route path="home" element={<ProtectedRoute><UserHome /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin"]}><Assignments /></ProtectedRoute>} />
+          <Route path="judging" element={<ProtectedRoute requiredRoles={["judge", "admin", "organizer"]}><Assignments /></ProtectedRoute>} />
           <Route path="checkin" element={<ProtectedRoute requiredRoles={["competitor", "judge"]}><CheckIn /></ProtectedRoute>} />
           <Route path="team">
             <Route index element={<ProtectedRoute requiredRoles={["competitor"]}><Team /></ProtectedRoute>} />

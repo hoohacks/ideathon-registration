@@ -27,7 +27,7 @@ account holds exactly one of them**, picked from the role dropdown on each row.
 - `/admins/{uid}` is `true` and gives full admin access, with its own switch. It has to sit on top: an admin who also judges needs the
 judge record, because being scheduled, seeing cards and filing a score under your
 own name all key off it.
-- `/organizers/{uid}` is `true` and gives scan check-in access at `/user/admin/scan`. It also sits on top, with its own switch beside Admin. Both grant and revoke actions appear in the activity log (`organizer.grant`, `organizer.revoke`). Someone who is both admin and organizer keeps full admin access.
+- `/organizers/{uid}` is `true` and gives scan check-in access at `/user/admin/scan` as well as the ability to judge projects at `/user/judging`. It also sits on top, with its own switch beside Admin in People and an Organizer toggle on each judge row on the Judges admin screen. Both grant and revoke actions appear in the activity log (`organizer.grant`, `organizer.revoke`). Someone who is both admin and organizer keeps full admin access.
 
 Changing a role deletes the old record and creates the new one, carrying name,
 email and company across. The confirmation names what goes with it: their team,
