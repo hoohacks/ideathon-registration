@@ -18,7 +18,7 @@
  * showing its own stale placeholder text -- hits Save.
  */
 import React from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 
 vi.mock("../../firebase", () => ({
@@ -84,6 +84,16 @@ vi.mock("firebase/database", () => ({
   },
 }));
 
+// Leaving writes through teamMembership.js, which this file's database stand-in
+// does not cover; a plain recorder is enough to see whether it was called.
+const leaveCalls = vi.hoisted(() => []);
+vi.mock("./teamMembership.js", () => ({
+  leaveTeam: async (teamId) => {
+    leaveCalls.push(teamId);
+    return { ok: true };
+  },
+}));
+
 vi.mock("firebase/storage", () => ({
   ref: (_storage, path) => ({ path }),
   uploadBytesResumable: () => ({ on: () => {}, snapshot: { ref: {} } }),
@@ -105,6 +115,7 @@ beforeEach(() => {
   // every test but the closed-submissions ones is set on the day
   store["config/submissionsOpen"] = true;
   teamSnapshotCallback = null;
+  leaveCalls.length = 0;
 });
 
 function renderTeam() {
@@ -451,3 +462,61 @@ describe("the pitch deck waiver", () => {
   });
 });
 
+describe("leaving the team", () => {
+  const openTeam = async (team) => {
+    store["teams/t1"] = { name: "Lumen", ...team };
+    renderTeam();
+    await waitFor(() => expect(teamSnapshotCallback).not.toBeNull());
+    await act(async () => {
+      await emitTeamSnapshot();
+    });
+  };
+
+  test("asks first, and leaves nothing behind when cancelled", async () => {
+    await openTeam({ members: { me: true, ally: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave team" }));
+    const dialog = await screen.findByRole("dialog", { name: "Leave Lumen?" });
+    expect(leaveCalls).toEqual([]);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(leaveCalls).toEqual([]);
+  });
+
+  test("leaves once confirmed", async () => {
+    await openTeam({ members: { me: true, ally: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave team" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Leave team" }));
+
+    await waitFor(() => expect(leaveCalls).toEqual(["t1"]));
+  });
+
+  test("before submitting, says how to get back on", async () => {
+    await openTeam({ members: { me: true, ally: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave team" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("You can rejoin later with the Team ID: t1")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/last member/)).not.toBeInTheDocument();
+  });
+
+  test("after submitting, says only an organizer can put you back", async () => {
+    await openTeam({ members: { me: true, ally: true }, submitted: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave team" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/closed to new members. Only an organizer can add you back/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/rejoin later/)).not.toBeInTheDocument();
+  });
+
+  test("the last member is told the team will be empty", async () => {
+    await openTeam({ members: { me: true } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave team" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("You are the last member, so the team will have nobody on it.")).toBeInTheDocument();
+  });
+});
