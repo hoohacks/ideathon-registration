@@ -15,7 +15,7 @@ import { describeSupply, BATCH_COUNT } from "../judge/schedulePlan.js";
  * organizers have opened submissions or the deadline has passed -- only the
  * page hides the form -- and announcements cannot be posted at all.
  */
-export const REQUIRED_RULES_VERSION = 10;
+export const REQUIRED_RULES_VERSION = 11;
 
 /**
  * Where the event has got to, and what an organizer should do next.

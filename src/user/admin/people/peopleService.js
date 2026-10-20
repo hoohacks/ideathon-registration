@@ -10,7 +10,7 @@ import {
 import { database, auth, USING_EMULATOR } from "../../../firebase.js";
 import { firebaseConfig } from "../../../firebaseConfig.js";
 import { applyAdminAction } from "../adminAction.js";
-import { grantAdmin, revokeAdmin, revokeGuard } from "../organizers/adminsService.js";
+import { grantAdmin, revokeAdmin, revokeGuard, grantOrganizer, revokeOrganizer, listOrganizers } from "../organizers/adminsService.js";
 import { memberRemovalPath } from "../../team/teamMembers.js";
 
 /**
@@ -88,8 +88,9 @@ export function blankCompetitor({ firstName = "", lastName = "", email = "" } = 
  * most need to find -- the organizer you are about to revoke -- is invisible.
  */
 export async function listPeople() {
-  const [adminsSnap, judgesSnap, competitorsSnap, archiveSnap] = await Promise.all([
+  const [adminsSnap, organizersSnap, judgesSnap, competitorsSnap, archiveSnap] = await Promise.all([
     get(ref(database, "admins")),
+    get(ref(database, "organizers")),
     get(ref(database, "judges")),
     get(ref(database, "competitors")),
     get(ref(database, "archive/people")),
@@ -104,6 +105,7 @@ export async function listPeople() {
   };
 
   for (const uid of Object.keys(adminsSnap.val() ?? {})) touch(uid).roles.push("admin");
+  for (const uid of Object.keys(organizersSnap.val() ?? {})) touch(uid).roles.push("organizer");
 
   for (const [role, snap] of [["judge", judgesSnap], ["competitor", competitorsSnap]]) {
     for (const [uid, person] of Object.entries(snap.val() ?? {})) {
@@ -246,7 +248,7 @@ async function loadWorld() {
   };
 }
 
-export const ROLE_LABELS = { admin: "Admin", judge: "Judge", competitor: "Competitor" };
+export const ROLE_LABELS = { admin: "Admin", organizer: "Organizer", judge: "Judge", competitor: "Competitor" };
 
 /** The roles a person holds one of. Admin sits on top and is not one. */
 export const PERSON_ROLES = ["judge", "competitor"];
@@ -461,15 +463,25 @@ export async function restoreArchived({ uid, key }) {
 }
 
 /**
- * Turn organizer access on or off, independently of the person's role.
+ * Turn admin access on or off, independently of the person's role.
  *
  * Delegates rather than reimplements: `revokeAdmin` carries the lockout guard
  * that stops /admins being emptied, which cannot be undone from inside the app
  * because writing /admins requires already being an admin.
  */
-export async function setOrganizer({ uid, name, enabled }) {
+export async function setAdmin({ uid, name, enabled }) {
   if (!uid) return { ok: false, error: "Pick a person first." };
   return enabled ? grantAdmin({ uid, name }) : revokeAdmin(uid, { name });
+}
+
+/**
+ * Turn organizer access on or off, independently of the person's role.
+ *
+ * Grants or revokes scan check-in access under /organizers/{uid}.
+ */
+export async function setOrganizer({ uid, name, enabled }) {
+  if (!uid) return { ok: false, error: "Pick a person first." };
+  return enabled ? grantOrganizer({ uid, name }) : revokeOrganizer(uid, { name });
 }
 
 /**
@@ -485,8 +497,12 @@ export async function deletePerson({ uid, name, includeScores = false }) {
   }
 
   const world = await loadWorld();
-  const adminsSnap = await get(ref(database, "admins"));
+  const [adminsSnap, organizersSnap] = await Promise.all([
+    get(ref(database, "admins")),
+    get(ref(database, "organizers")),
+  ]);
   const adminUids = Object.keys(adminsSnap.val() ?? {});
+  const organizerUids = Object.keys(organizersSnap.val() ?? {});
 
   if (adminUids.includes(uid)) {
     const refusal = revokeGuard({ uid, currentUid: auth.currentUser?.uid ?? null, adminUids });
@@ -496,6 +512,9 @@ export async function deletePerson({ uid, name, includeScores = false }) {
   const changes = removalChanges({ uid, ...world, includeScores });
   if (adminUids.includes(uid)) {
     changes.push({ path: `admins/${uid}`, before: true, after: null });
+  }
+  if (organizerUids.includes(uid)) {
+    changes.push({ path: `organizers/${uid}`, before: true, after: null });
   }
 
   if (!changes.length) return { ok: false, error: "There is nothing recorded for that person." };

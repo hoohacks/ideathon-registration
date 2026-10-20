@@ -166,6 +166,32 @@ describe("signed in", () => {
     });
     expect(screen.getByText("home page")).toBeInTheDocument();
   });
+
+
+  test("an organizer can reach the scan check-in route", () => {
+    renderGuard({
+      auth: { userCredential: SIGNED_IN, userTypes: ["organizer"] },
+      requiredRoles: ["admin", "organizer"],
+    });
+    expect(screen.getByText("secret content")).toBeInTheDocument();
+  });
+
+  test("an organizer cannot reach an admin-only page and is redirected home", () => {
+    renderGuard({
+      auth: { userCredential: SIGNED_IN, userTypes: ["organizer"] },
+      requiredRoles: ["admin"],
+    });
+    expect(screen.getByText("home page")).toBeInTheDocument();
+    expect(screen.queryByText("secret content")).not.toBeInTheDocument();
+  });
+
+  test("someone who is both admin and organizer keeps admin access", () => {
+    renderGuard({
+      auth: { userCredential: SIGNED_IN, userTypes: ["admin", "organizer"] },
+      requiredRoles: ["admin"],
+    });
+    expect(screen.getByText("secret content")).toBeInTheDocument();
+  });
 });
 
 describe("every admin route is actually guarded", () => {
@@ -197,8 +223,13 @@ describe("every admin route is actually guarded", () => {
     expect(APP).toContain('<Route path="control"');
   });
 
-  test("every route naming an admin page requires the admin role", () => {
-    const unguarded = adminRoutes.filter(
+  test("scan check-in requires admin or organizer, while every other admin route requires admin", () => {
+    const scanRoute = adminRoutes.find((line) => line.includes('path="scan"'));
+    expect(scanRoute).toBeDefined();
+    expect(scanRoute).toMatch(/requiredRoles=\{\["admin",\s*"organizer"\]\}/);
+
+    const otherAdminRoutes = adminRoutes.filter((line) => !line.includes('path="scan"'));
+    const unguarded = otherAdminRoutes.filter(
       (line) => !/requiredRoles=\{\["admin"\]\}/.test(line)
     );
     expect(unguarded).toEqual([]);

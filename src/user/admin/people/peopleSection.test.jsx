@@ -18,6 +18,7 @@ vi.mock("firebase/database", async () => (await import("../../../testing/fakeDat
 const mockService = {
   listPeople: vi.fn(),
   setSoleRole: vi.fn(),
+  setAdmin: vi.fn(),
   setOrganizer: vi.fn(),
   deletePerson: vi.fn(),
   sendReset: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("./peopleService", async () => ({
   ...(await vi.importActual("./peopleService")),
   listPeople: (...a) => mockService.listPeople(...a),
   setSoleRole: (...a) => mockService.setSoleRole(...a),
+  setAdmin: (...a) => mockService.setAdmin(...a),
   setOrganizer: (...a) => mockService.setOrganizer(...a),
   deletePerson: (...a) => mockService.deletePerson(...a),
   sendReset: (...a) => mockService.sendReset(...a),
@@ -41,6 +43,7 @@ const PEOPLE = [
   { uid: "admin-1", name: "Olu Admin", email: "olu@example.com", roles: ["admin", "judge"], judge: {}, competitor: null },
   { uid: "c-1", name: "Maya Okafor", email: "maya@virginia.edu", roles: ["competitor"], judge: null, competitor: {} },
   { uid: "j-1", name: "Priya Raman", email: "priya@capone.com", roles: ["judge"], judge: {}, competitor: null },
+  { uid: "org-1", name: "Sam Organizer", email: "sam@example.com", roles: ["organizer"], judge: null, competitor: null },
   { uid: "x-1", name: "(no profile) x-1", email: "", roles: [], judge: null, competitor: null },
 ];
 
@@ -48,7 +51,7 @@ let onResult;
 beforeEach(() => {
   Object.values(mockService).forEach((fn) => fn.mockReset());
   mockService.listPeople.mockResolvedValue(PEOPLE);
-  for (const name of ["setSoleRole", "setOrganizer", "deletePerson", "sendReset", "restoreArchived", "bulkSet"]) {
+  for (const name of ["setSoleRole", "setAdmin", "setOrganizer", "deletePerson", "sendReset", "restoreArchived", "bulkSet"]) {
     mockService[name].mockResolvedValue({ ok: true });
   }
   mockService.listArchived.mockResolvedValue([]);
@@ -72,11 +75,12 @@ const row = (name) => within(rowElement(name));
 // found by what it shows.
 const rolePicker = (name) => rowElement(name).querySelector(".MuiSelect-select");
 
-test("each person shows their name and email, with admins counted separately", async () => {
+test("each person shows their name and email, with admins and organizers counted separately", async () => {
   await open();
   expect(screen.getByText("maya@virginia.edu")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Everyone 4" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Everyone 5" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Admins 1" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Organizers 1" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Judges 2" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Competitors 1" })).toBeInTheDocument();
 });
@@ -91,7 +95,15 @@ test("the role filter narrows the list", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Competitors 1" }));
   expect(screen.getByText("Maya Okafor")).toBeInTheDocument();
   expect(screen.queryByText("Priya Raman")).not.toBeInTheDocument();
-  expect(screen.getByText("Showing 1 of 4")).toBeInTheDocument();
+  expect(screen.getByText("Showing 1 of 5")).toBeInTheDocument();
+});
+
+test("the organizer filter narrows to organizers", async () => {
+  await open();
+  fireEvent.click(screen.getByRole("button", { name: "Organizers 1" }));
+  expect(screen.getByText("Sam Organizer")).toBeInTheDocument();
+  expect(screen.queryByText("Maya Okafor")).not.toBeInTheDocument();
+  expect(screen.getByText("Showing 1 of 5")).toBeInTheDocument();
 });
 
 test("search matches on email", async () => {
@@ -109,9 +121,23 @@ test("the admin switch sits beside the role and flips only admin access", async 
 
   fireEvent.click(admin);
   await waitFor(() =>
-    expect(mockService.setOrganizer).toHaveBeenCalledWith({ uid: "j-1", name: "Priya Raman", enabled: true })
+    expect(mockService.setAdmin).toHaveBeenCalledWith({ uid: "j-1", name: "Priya Raman", enabled: true })
   );
   await waitFor(() => expect(onResult).toHaveBeenCalledWith({ ok: true }, "Priya Raman is now an admin"));
+  expect(mockService.setSoleRole).not.toHaveBeenCalled();
+});
+
+test("the organizer switch sits beside the admin switch and flips organizer access", async () => {
+  await open();
+  const priya = row("Priya Raman");
+  const organizer = priya.getByRole("switch", { name: "Organizer" });
+  expect(organizer).not.toBeChecked();
+
+  fireEvent.click(organizer);
+  await waitFor(() =>
+    expect(mockService.setOrganizer).toHaveBeenCalledWith({ uid: "j-1", name: "Priya Raman", enabled: true })
+  );
+  await waitFor(() => expect(onResult).toHaveBeenCalledWith({ ok: true }, "Priya Raman is now an organizer"));
   expect(mockService.setSoleRole).not.toHaveBeenCalled();
 });
 
@@ -120,6 +146,13 @@ test("an admin's switch is on, and the role underneath it still shows", async ()
   const olu = row("Olu Admin");
   expect(olu.getByRole("switch", { name: "Admin" })).toBeChecked();
   expect(rolePicker("Olu Admin")).toHaveTextContent("Judge");
+});
+
+test("an organizer's switch is on, and role underneath it still shows", async () => {
+  await open();
+  const sam = row("Sam Organizer");
+  expect(sam.getByRole("switch", { name: "Organizer" })).toBeChecked();
+  expect(rolePicker("Sam Organizer")).toHaveTextContent("No role");
 });
 
 test("changing a role asks first, and cancelling changes nothing", async () => {

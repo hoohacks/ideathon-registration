@@ -11,14 +11,16 @@
  * allocation while the scanner told the organizer "Checked in".
  */
 vi.mock("../../firebase", () => ({ database: {} }));
+
+const mockGet = vi.fn();
 vi.mock("firebase/database", () => ({
   ref: (_db, path) => ({ path: path ?? "" }),
-  get: vi.fn(),
+  get: (...args) => mockGet(...args),
   update: vi.fn(),
 }));
 vi.mock("react-zxing", () => ({ useZxing: () => ({ ref: { current: null } }) }));
 
-const { resolveCheckIn } = await import("./Scan");
+const { resolveCheckIn, loadCheckInPerson } = await import("./Scan");
 
 describe("resolveCheckIn", () => {
   test("nobody holds that code", () => {
@@ -127,5 +129,35 @@ describe("resolveCheckIn", () => {
     });
     expect(decision.alreadyDone).toBe(false);
     expect(decision.pendingRoles).toEqual(["competitors"]);
+  });
+});
+
+describe("loadCheckInPerson", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  test("returns null when no fields exist", async () => {
+    mockGet.mockResolvedValue({ exists: () => false, val: () => null });
+    const person = await loadCheckInPerson("competitors", "ghost");
+    expect(person).toBeNull();
+  });
+
+  test("loads individual check-in fields in parallel", async () => {
+    mockGet.mockImplementation(async (r) => {
+      if (r.path === "competitors/c1/firstName") return { exists: () => true, val: () => "Grace" };
+      if (r.path === "competitors/c1/lastName") return { exists: () => true, val: () => "Hopper" };
+      if (r.path === "competitors/c1/checkedIn") return { exists: () => true, val: () => false };
+      if (r.path === "competitors/c1/foodCheckIn") return { exists: () => true, val: () => true };
+      return { exists: () => false, val: () => null };
+    });
+
+    const person = await loadCheckInPerson("competitors", "c1");
+    expect(person).toEqual({
+      firstName: "Grace",
+      lastName: "Hopper",
+      checkedIn: false,
+      foodCheckIn: true,
+    });
   });
 });
