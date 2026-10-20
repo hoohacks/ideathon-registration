@@ -1,5 +1,5 @@
 /**
- * /admins, /organizers, /judges, /competitors, /config.
+ * /admins, /judges, /competitors, /config.
  *
  * Two of these have caught real bugs before and are here so they cannot come
  * back: the teamless competitor comparison (two records with no teamId compared
@@ -52,45 +52,6 @@ describe("admin membership", () => {
   });
 });
 
-describe("organizer membership", () => {
-  test("you may check whether you yourself are an organizer", async () => {
-    await assertSucceeds(get(ref(db("organizer1"), "organizers/organizer1")));
-    await assertSucceeds(get(ref(db("alice"), "organizers/alice")));
-  });
-
-  test("but not whether anyone else is", async () => {
-    await assertFails(get(ref(db("alice"), "organizers/organizer1")));
-  });
-
-  test("nor list them", async () => {
-    await assertFails(get(ref(db("alice"), "organizers")));
-    await assertFails(get(ref(db("organizer1"), "organizers")));
-  });
-
-  test("and you cannot make yourself an organizer", async () => {
-    await assertFails(set(ref(db("alice"), "organizers/alice"), true));
-  });
-
-  test("an organizer cannot grant anyone the organizer role", async () => {
-    await assertFails(set(ref(db("organizer1"), "organizers/bob"), true));
-  });
-
-  test("an organizer cannot grant themselves or anyone admin", async () => {
-    await assertFails(set(ref(db("organizer1"), "admins/organizer1"), true));
-    await assertFails(set(ref(db("organizer1"), "admins/bob"), true));
-  });
-
-  test("an admin can list, grant, and revoke organizers", async () => {
-    await assertSucceeds(get(ref(db("admin"), "organizers")));
-    await assertSucceeds(set(ref(db("admin"), "organizers/bob"), true));
-    await assertSucceeds(set(ref(db("admin"), "organizers/organizer1"), null));
-  });
-
-  test("signed out sees nothing", async () => {
-    await assertFails(get(ref(db(null), "organizers/organizer1")));
-  });
-});
-
 describe("config", () => {
   test("any signed-in user may read it", async () => {
     await assertSucceeds(get(ref(db("alice"), "config")));
@@ -102,7 +63,6 @@ describe("config", () => {
 
   test("only an admin may change the room list", async () => {
     await assertFails(set(ref(db("alice"), "config/judgingRooms"), ["Anywhere"]));
-    await assertFails(set(ref(db("organizer1"), "config/judgingRooms"), ["Anywhere"]));
     await assertSucceeds(set(ref(db("admin"), "config/judgingRooms"), ["Rice 110"]));
   });
 });
@@ -158,28 +118,10 @@ describe("competitors", () => {
   test("nobody may enumerate the list", async () => {
     await assertFails(get(ref(db("alice"), "competitors")));
     await assertFails(get(ref(db("judge1"), "competitors")));
-    await assertFails(get(ref(db("organizer1"), "competitors")));
   });
 
   test("an admin may", async () => {
     await assertSucceeds(get(ref(db("admin"), "competitors")));
-  });
-
-  test("an organizer reads only name and check-in fields on competitors", async () => {
-    await assertSucceeds(get(ref(db("organizer1"), "competitors/alice/firstName")));
-    await assertSucceeds(get(ref(db("organizer1"), "competitors/alice/lastName")));
-    await assertSucceeds(get(ref(db("organizer1"), "competitors/alice/checkedIn")));
-    await assertSucceeds(get(ref(db("organizer1"), "competitors/alice/foodCheckIn")));
-
-    await assertFails(get(ref(db("organizer1"), "competitors/alice")));
-    await assertFails(get(ref(db("organizer1"), "competitors/alice/teamId")));
-  });
-
-  test("an organizer can write checkedIn and foodCheckIn but nothing else on competitors", async () => {
-    await assertSucceeds(set(ref(db("organizer1"), "competitors/alice/checkedIn"), true));
-    await assertSucceeds(set(ref(db("organizer1"), "competitors/alice/foodCheckIn"), true));
-    await assertFails(set(ref(db("organizer1"), "competitors/alice/firstName"), "Alicia"));
-    await assertFails(set(ref(db("organizer1"), "competitors/alice/teamId"), "team2"));
   });
 
   test("you cannot write someone else's record", async () => {
@@ -232,24 +174,6 @@ describe("judges", () => {
 
   test("a competitor cannot read a judge", async () => {
     await assertFails(get(ref(db("alice"), "judges/judge1")));
-  });
-
-  test("an organizer reads only name and check-in fields on judges", async () => {
-    await assertSucceeds(get(ref(db("organizer1"), "judges/judge1/firstName")));
-    await assertSucceeds(get(ref(db("organizer1"), "judges/judge1/lastName")));
-    await assertSucceeds(get(ref(db("organizer1"), "judges/judge1/checkedIn")));
-    await assertSucceeds(get(ref(db("organizer1"), "judges/judge1/foodCheckIn")));
-
-    await assertFails(get(ref(db("organizer1"), "judges/judge1")));
-    await assertFails(get(ref(db("organizer1"), "judges/judge1/email")));
-    await assertFails(get(ref(db("organizer1"), "judges/judge1/teamAssignments")));
-  });
-
-  test("an organizer can write checkedIn and foodCheckIn but nothing else on judges", async () => {
-    await assertSucceeds(set(ref(db("organizer1"), "judges/judge2/checkedIn"), true));
-    await assertSucceeds(set(ref(db("organizer1"), "judges/judge2/foodCheckIn"), true));
-    await assertFails(set(ref(db("organizer1"), "judges/judge2/isRound1Judge"), true));
-    await assertFails(set(ref(db("organizer1"), "judges/judge2/firstName"), "Bob"));
   });
 
   test.each([
@@ -318,30 +242,9 @@ describe("judges", () => {
   });
 });
 
-describe("organizer check-in and restrictions", () => {
-  test("the scanner multi-path check-in succeeds for an organizer", async () => {
-    await assertSucceeds(
-      update(ref(db("organizer1")), {
-        "competitors/alice/checkedIn": true,
-        "judges/judge1/checkedIn": true,
-      })
-    );
-  });
-
-  test.each([
-    ["teams", "teams/team1/name", "New Name"],
-    ["scores", "scores/first/team1/judge1/notes", "Hacked note"],
-    ["adminLog", "adminLog/entry1", { at: Date.now(), by: "organizer1", action: "x", summary: "y" }],
-    ["announcements", "announcements/a1", { text: "Hello", audience: "everyone", postedAt: Date.now(), active: true }],
-  ])("writes anywhere else like %s are denied to organizers", async (_label, path, value) => {
-    await assertFails(set(ref(db("organizer1"), path), value));
-  });
-});
-
 describe("signed out", () => {
   test.each([
     "admins",
-    "organizers",
     "config",
     "judges/judge1",
     "competitors/alice",
@@ -361,16 +264,6 @@ describe("signed out", () => {
 
 describe("an admin", () => {
   test("reads and writes the root", async () => {
-    await assertSucceeds(get(ref(db("admin"), "/")));
-    await assertSucceeds(set(ref(db("admin"), "config/eventStart"), "2026-03-01T09:00:00Z"));
-  });
-
-  test("someone who is both admin and organizer keeps full admin access", async () => {
-    const world = baseWorld();
-    world.organizers.admin = true;
-    await testEnv.clearDatabase();
-    await seed(testEnv, world);
-
     await assertSucceeds(get(ref(db("admin"), "/")));
     await assertSucceeds(set(ref(db("admin"), "config/eventStart"), "2026-03-01T09:00:00Z"));
   });

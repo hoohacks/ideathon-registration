@@ -6,7 +6,6 @@ import { expect } from "@playwright/test";
  */
 export const ACCOUNTS = {
   admin: { email: "admin@example.com", password: "testtest" },
-  organizer: { email: "organizer@example.com", password: "testtest" },
   judge: { email: "judge1@example.com", password: "testtest" },
   competitor: { email: "competitor1@example.com", password: "testtest" },
 };

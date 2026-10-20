@@ -4,7 +4,7 @@ import { database } from "../../../firebase.js";
 import { applyAdminAction } from "../adminAction.js";
 
 /**
- * Who is an admin and who is an organizer.
+ * Who is an organizer.
  *
  * The rules give root access only to uids under /admins, and writing to
  * /admins requires being an admin already. Nothing in the app can break that
@@ -14,9 +14,6 @@ import { applyAdminAction } from "../adminAction.js";
  * back except the console. revokeGuard is the whole reason this module exists,
  * and it is enforced here rather than in the dialog so a stale page cannot slip
  * past it.
- *
- * Organizers have scan check-in access under /organizers/{uid}, granted and
- * revoked by admins.
  */
 
 /** The reason this revoke must not happen, or null if it may. Pure. */
@@ -68,40 +65,5 @@ export async function revokeAdmin(uid, { name } = {}) {
     action: "admin.revoke",
     summary: `Removed admin access from ${name || uid}`,
     changes: [{ path: `admins/${uid}`, before: true, after: null }],
-  });
-}
-
-export async function listOrganizers() {
-  const snap = await get(ref(database, "organizers"));
-  return snap.exists() ? Object.keys(snap.val() ?? {}) : [];
-}
-
-export async function grantOrganizer({ uid, name }) {
-  if (!uid) return { ok: false, error: "Pick a person first." };
-
-  const organizerUids = await listOrganizers();
-  if (organizerUids.includes(uid)) {
-    return { ok: false, error: `${name || uid} is already an organizer.` };
-  }
-
-  return applyAdminAction({
-    action: "organizer.grant",
-    summary: `Made ${name || uid} an organizer`,
-    changes: [{ path: `organizers/${uid}`, before: null, after: true }],
-  });
-}
-
-export async function revokeOrganizer(uid, { name } = {}) {
-  if (!uid) return { ok: false, error: "Pick a person first." };
-
-  const organizerUids = await listOrganizers();
-  if (!organizerUids.includes(uid)) {
-    return { ok: false, error: "That person is not an organizer." };
-  }
-
-  return applyAdminAction({
-    action: "organizer.revoke",
-    summary: `Removed organizer access from ${name || uid}`,
-    changes: [{ path: `organizers/${uid}`, before: true, after: null }],
   });
 }

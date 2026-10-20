@@ -5,7 +5,7 @@
  * The merge is what turns them into the one `userData` the app renders, so it
  * is the place a blank field on one record can erase a real one on another.
  */
-import { personName, hasRole, roleList, isAdmin, isJudge, isOrganizer, mergeRoleProfiles, ROLES } from "./roles";
+import { personName, hasRole, roleList, isAdmin, isJudge, mergeRoleProfiles, ROLES } from "./roles";
 
 describe("role predicates", () => {
   test("a missing list is not a role", () => {
@@ -13,13 +13,11 @@ describe("role predicates", () => {
     expect(roleList(undefined)).toEqual([]);
     expect(isAdmin(null)).toBe(false);
     expect(isJudge("judge")).toBe(false);
-    expect(isOrganizer("organizer")).toBe(false);
   });
 
   test("membership is membership", () => {
     expect(hasRole(["judge", "admin"], "admin")).toBe(true);
     expect(isJudge(["judge"])).toBe(true);
-    expect(isOrganizer(["organizer"])).toBe(true);
   });
 });
 
@@ -64,7 +62,7 @@ describe("merging one person's role records", () => {
   });
 
   test("roles are merged in ROLES order", () => {
-    expect(ROLES).toEqual(["competitor", "judge", "organizer", "admin"]);
+    expect(ROLES).toEqual(["competitor", "judge", "admin"]);
   });
 });
 

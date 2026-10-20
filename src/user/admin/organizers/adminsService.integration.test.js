@@ -1,5 +1,5 @@
 /**
- * Granting and revoking admin and organizer access against an in-memory database with
+ * Granting and revoking organizer access against an in-memory database with
  * the real audit log and admin check: what is written, what the feed says, and
  * the two revokes that must never go through, word for word.
  */
@@ -9,8 +9,7 @@ const mockCurrentUser = { value: { uid: "a1" } };
 vi.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: mockCurrentUser.value }) }));
 
 const db = await import("../../../testing/fakeDatabase");
-const { listAdmins, grantAdmin, revokeAdmin, revokeGuard, listOrganizers, grantOrganizer, revokeOrganizer } =
-  await import("./adminsService");
+const { listAdmins, grantAdmin, revokeAdmin, revokeGuard } = await import("./adminsService");
 const { decodeChanges } = await import("../adminAction");
 
 beforeEach(() => {
@@ -24,20 +23,13 @@ const lastLog = () => {
   return { ...entry, changes: decodeChanges(entry.changes) };
 };
 
-test("lists the admins, or nobody", async () => {
+test("lists the organizers, or nobody", async () => {
   await expect(listAdmins()).resolves.toEqual(["a1", "a2"]);
   db.setData("admins", null);
   await expect(listAdmins()).resolves.toEqual([]);
 });
 
-test("lists the organizers, or nobody", async () => {
-  db.setData("organizers", { o1: true, o2: true });
-  await expect(listOrganizers()).resolves.toEqual(["o1", "o2"]);
-  db.setData("organizers", null);
-  await expect(listOrganizers()).resolves.toEqual([]);
-});
-
-describe("granting admin", () => {
+describe("granting", () => {
   test("sets the flag and logs it by name, or by uid", async () => {
     await expect(grantAdmin({ uid: "u3", name: "Grace" })).resolves.toMatchObject({ ok: true });
     expect(db.getData("admins/u3")).toBe(true);
@@ -57,7 +49,7 @@ describe("granting admin", () => {
   });
 });
 
-describe("revoking admin", () => {
+describe("revoking", () => {
   test("clears the flag and logs it by name, or by uid", async () => {
     db.setData("admins/a3", true);
     await expect(revokeAdmin("a2", { name: "Bo" })).resolves.toMatchObject({ ok: true });
@@ -71,7 +63,7 @@ describe("revoking admin", () => {
     expect(lastLog().summary).toBe("Removed admin access from a3");
   });
 
-  test("refuses the last admin, yourself, or somebody who is not one", async () => {
+  test("refuses the last organizer, yourself, or somebody who is not one", async () => {
     await expect(revokeAdmin("a1")).resolves.toEqual({
       ok: false,
       error: "You cannot remove your own admin access. Ask another admin to do it.",
@@ -85,7 +77,7 @@ describe("revoking admin", () => {
     });
   });
 
-  test("with nobody signed in, the guard still refuses the last admin", () => {
+  test("with nobody signed in, the guard still refuses the last organizer", () => {
     expect(revokeGuard({ uid: "a1", currentUid: null, adminUids: ["a1"] })).toMatch(/^That is the last admin/);
   });
 
@@ -93,45 +85,5 @@ describe("revoking admin", () => {
     mockCurrentUser.value = null;
     // the guard passes (a2 is not "you"), and the write is then refused by the admin check
     await expect(revokeAdmin("a2")).resolves.toEqual({ ok: false, error: "Must be signed in to admin.revoke" });
-  });
-});
-
-describe("granting organizer", () => {
-  test("sets the flag and logs it with organizer.grant", async () => {
-    await expect(grantOrganizer({ uid: "o1", name: "Sam" })).resolves.toMatchObject({ ok: true });
-    expect(db.getData("organizers/o1")).toBe(true);
-    expect(lastLog()).toMatchObject({
-      action: "organizer.grant",
-      summary: "Made Sam an organizer",
-      changes: [{ path: "organizers/o1", before: null, after: true }],
-    });
-  });
-
-  test("refuses when already an organizer", async () => {
-    db.setData("organizers/o1", true);
-    await expect(grantOrganizer({ uid: "o1", name: "Sam" })).resolves.toEqual({
-      ok: false,
-      error: "Sam is already an organizer.",
-    });
-  });
-});
-
-describe("revoking organizer", () => {
-  test("clears the flag and logs it with organizer.revoke", async () => {
-    db.setData("organizers/o1", true);
-    await expect(revokeOrganizer("o1", { name: "Sam" })).resolves.toMatchObject({ ok: true });
-    expect(db.getData("organizers/o1")).toBeNull();
-    expect(lastLog()).toMatchObject({
-      action: "organizer.revoke",
-      summary: "Removed organizer access from Sam",
-      changes: [{ path: "organizers/o1", before: true, after: null }],
-    });
-  });
-
-  test("refuses when not an organizer", async () => {
-    await expect(revokeOrganizer("o9")).resolves.toEqual({
-      ok: false,
-      error: "That person is not an organizer.",
-    });
   });
 });

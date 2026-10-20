@@ -1,5 +1,5 @@
 /**
- * Who is an admin and who is an organizer.
+ * Who is an organizer.
  *
  * /admins is only writable by an admin, so nothing in the app can create the
  * first one -- docs/deployment.md documents the bootstrap by hand in the Firebase
@@ -21,8 +21,7 @@ vi.mock("firebase/database", () => ({
 vi.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
 vi.mock("../../../roles.js", () => ({ requireAdmin: vi.fn(async () => ({ uid: "admin-1" })) }));
 
-const { revokeGuard, grantAdmin, revokeAdmin, grantOrganizer, revokeOrganizer, listOrganizers } =
-  await import("./adminsService");
+const { revokeGuard, grantAdmin, revokeAdmin } = await import("./adminsService");
 const { requireAdmin } = await import("../../../roles.js");
 
 /**
@@ -63,7 +62,7 @@ describe("the two revokes that must never go through", () => {
   });
 });
 
-describe("granting admin", () => {
+describe("granting", () => {
   test("writes true at the uid and logs it", async () => {
     const result = await grantAdmin({ uid: "u9", name: "Sam Lee" });
     expect(result.ok).toBe(true);
@@ -86,7 +85,7 @@ describe("granting admin", () => {
   });
 });
 
-describe("revoking admin", () => {
+describe("revoking", () => {
   test("removes the uid when the guards pass", async () => {
     mockGet.mockImplementation(async (r) =>
       r.path === "admins"
@@ -107,61 +106,5 @@ describe("revoking admin", () => {
     const result = await revokeAdmin("admin-1");
     expect(result.ok).toBe(false);
     expect(mockUpdate).not.toHaveBeenCalled();
-  });
-});
-
-describe("granting organizer", () => {
-  test("writes true at organizers/{uid} and logs it", async () => {
-    const result = await grantOrganizer({ uid: "u10", name: "Taylor" });
-    expect(result.ok).toBe(true);
-    expect(mockUpdate.mock.calls[0][1]["organizers/u10"]).toBe(true);
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("organizer.grant");
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].summary).toContain("Taylor");
-  });
-
-  test("granting someone who already has it is refused", async () => {
-    mockGet.mockImplementation(async (r) =>
-      r.path === "organizers" ? { exists: () => true, val: () => ({ u10: true }) }
-                              : { exists: () => false, val: () => null });
-
-    const result = await grantOrganizer({ uid: "u10", name: "Taylor" });
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("already an organizer");
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  test("granting with no uid is refused", async () => {
-    expect((await grantOrganizer({ uid: "", name: "x" })).ok).toBe(false);
-  });
-});
-
-describe("revoking organizer", () => {
-  test("removes the uid from organizers/{uid} and logs it", async () => {
-    mockGet.mockImplementation(async (r) =>
-      r.path === "organizers"
-        ? { exists: () => true, val: () => ({ u10: true }) }
-        : { exists: () => false, val: () => null });
-
-    const result = await revokeOrganizer("u10", { name: "Taylor" });
-    expect(result.ok).toBe(true);
-    expect(mockUpdate.mock.calls[0][1]["organizers/u10"]).toBeNull();
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("organizer.revoke");
-    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].summary).toContain("Taylor");
-  });
-
-  test("revoking someone who is not an organizer is refused", async () => {
-    mockGet.mockImplementation(async (r) =>
-      r.path === "organizers"
-        ? { exists: () => true, val: () => ({}) }
-        : { exists: () => false, val: () => null });
-
-    const result = await revokeOrganizer("u10");
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("not an organizer");
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  test("revoking with no uid is refused", async () => {
-    expect((await revokeOrganizer("")).ok).toBe(false);
   });
 });

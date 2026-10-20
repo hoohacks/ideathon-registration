@@ -7,7 +7,7 @@ import {
 import { PiDotsThreeBold } from "react-icons/pi";
 import { FilterChips, Section } from "../adminUi";
 import {
-  listPeople, matchesQuery, setSoleRole, setAdmin, setOrganizer, describeSwitch, deletePerson,
+  listPeople, matchesQuery, setSoleRole, setOrganizer, describeSwitch, deletePerson,
   createPerson, attachRecord, sendReset, bulkSet, ROLE_LABELS, listArchived, restoreArchived,
 } from "./peopleService";
 
@@ -38,7 +38,7 @@ import {
  * under their own name.
  */
 function roleValue(person) {
-  const roles = person.roles.filter((role) => role !== "admin" && role !== "organizer");
+  const roles = person.roles.filter((role) => role !== "admin");
   if (roles.length > 1) return "multiple";
   return roles[0] ?? "none";
 }
@@ -96,7 +96,6 @@ export default function PeopleSection({ onResult }) {
 
   const counts = useMemo(() => ({
     admin: people.filter((p) => p.roles.includes("admin")).length,
-    organizer: people.filter((p) => p.roles.includes("organizer")).length,
     judge: people.filter((p) => p.roles.includes("judge")).length,
     competitor: people.filter((p) => p.roles.includes("competitor")).length,
   }), [people]);
@@ -138,7 +137,6 @@ export default function PeopleSection({ onResult }) {
             options={[
               { value: "all", label: `Everyone ${people.length}` },
               { value: "admin", label: `Admins ${counts.admin}` },
-              { value: "organizer", label: `Organizers ${counts.organizer}` },
               { value: "judge", label: `Judges ${counts.judge}` },
               { value: "competitor", label: `Competitors ${counts.competitor}` },
             ]}
@@ -191,14 +189,8 @@ export default function PeopleSection({ onResult }) {
                 onRole={(role) => setConfirmSwitch({ person, role })}
                 onAdmin={(enabled) =>
                   run(
-                    () => setAdmin({ uid: person.uid, name: person.name, enabled }),
-                    enabled ? `${person.name} is now an admin` : `${person.name} is no longer an admin`
-                  )
-                }
-                onOrganizer={(enabled) =>
-                  run(
                     () => setOrganizer({ uid: person.uid, name: person.name, enabled }),
-                    enabled ? `${person.name} is now an organizer` : `${person.name} is no longer an organizer`
+                    enabled ? `${person.name} is now an admin` : `${person.name} is no longer an admin`
                   )
                 }
                 onReset={() => run(() => sendReset(person.email), `Reset link sent to ${person.email}`)}
@@ -387,10 +379,9 @@ function initials(name) {
  * of the line where there is room for them, and fold into one menu on a
  * narrower screen, with delete set apart in red at the end either way.
  */
-function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onOrganizer, onReset, onHistory, onDelete }) {
+function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onReset, onHistory, onDelete }) {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const isAdmin = person.roles.includes("admin");
-  const isOrganizer = person.roles.includes("organizer");
   const close = () => setMenuAnchor(null);
 
   return (
@@ -493,34 +484,6 @@ function PersonRow({ person, busy, selected, onToggle, onRole, onAdmin, onOrgani
                 // named directly: inside a tooltip the label's own text is not
                 // reliably what assistive technology announces
                 slotProps={{ input: { "aria-label": "Admin" } }}
-              />
-            }
-          />
-        </Tooltip>
-
-        <Tooltip describeChild title="Organizer access. Allows check-in scanning only.">
-          <FormControlLabel
-            label="Organizer"
-            disabled={busy}
-            sx={{
-              m: 0,
-              pl: 1.5,
-              pr: 0.5,
-              height: 40,
-              borderRadius: 999,
-              bgcolor: isOrganizer ? "secondary.main" : "background.paper",
-              color: isOrganizer ? "#fff" : "text.primary",
-              "& .MuiFormControlLabel-label": { fontWeight: 600, fontSize: "0.875rem", color: isOrganizer ? "#fff" : "text.primary" },
-              "& .MuiSwitch-thumb": { bgcolor: "#fff" },
-              "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#fff", opacity: 0.45 },
-            }}
-            labelPlacement="start"
-            control={
-              <Switch
-                size="small"
-                checked={isOrganizer}
-                onChange={(event) => onOrganizer(event.target.checked)}
-                slotProps={{ input: { "aria-label": "Organizer" } }}
               />
             }
           />

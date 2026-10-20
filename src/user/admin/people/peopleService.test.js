@@ -33,7 +33,7 @@ vi.mock("../../../roles.js", () => ({ requireAdmin: vi.fn(async () => ({ uid: "a
 
 const {
   removalChanges, listPeople, matchesQuery, blankJudge, blankCompetitor,
-  setSoleRole, setAdmin, setOrganizer, describeSwitch, deletePerson, bulkSet, deleteTeam,
+  setSoleRole, setOrganizer, describeSwitch, deletePerson, bulkSet, deleteTeam,
   listArchived, restoreArchived, attachRecord,
 } = await import("./peopleService");
 const { requireAdmin } = await import("../../../roles.js");
@@ -243,14 +243,6 @@ describe("listing people", () => {
     const people = await listPeople();
     expect(people.find((p) => p.uid === "j1").roles.sort()).toEqual(["admin", "judge"]);
   });
-
-  test("an organizer is listed with the organizer role", async () => {
-    mockGet.mockImplementation(world({ organizers: { o1: true } }));
-    const people = await listPeople();
-    const org = people.find((p) => p.uid === "o1");
-    expect(org).toBeTruthy();
-    expect(org.roles).toContain("organizer");
-  });
 });
 
 describe("searching", () => {
@@ -375,9 +367,9 @@ describe("giving somebody their one role", () => {
   });
 });
 
-describe("admin access, on top of the role", () => {
+describe("organizer access, on top of the role", () => {
   test("granting sets the flag and nothing else", async () => {
-    const result = await setAdmin({ uid: "c1", name: "Grace", enabled: true });
+    const result = await setOrganizer({ uid: "c1", name: "Grace", enabled: true });
     expect(result.ok).toBe(true);
     const p = payload();
     expect(p["admins/c1"]).toBe(true);
@@ -385,41 +377,23 @@ describe("admin access, on top of the role", () => {
   });
 
   test("revoking clears the flag and leaves their record", async () => {
-    await setAdmin({ uid: "admin-2", name: "Two", enabled: false });
+    await setOrganizer({ uid: "admin-2", name: "Two", enabled: false });
     const p = payload();
     expect(p["admins/admin-2"]).toBeNull();
     expect(p["judges/admin-2"]).toBeUndefined();
   });
 
-  test("the last admin cannot be revoked", async () => {
+  test("the last organizer cannot be revoked", async () => {
     mockGet.mockImplementation(world({ admins: { "admin-9": true } }));
-    const result = await setAdmin({ uid: "admin-9", name: "Nine", enabled: false });
+    const result = await setOrganizer({ uid: "admin-9", name: "Nine", enabled: false });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/last admin/);
   });
 
-  test("you cannot revoke your own admin access", async () => {
-    const result = await setAdmin({ uid: "admin-1", name: "Me", enabled: false });
+  test("you cannot revoke your own organizer access", async () => {
+    const result = await setOrganizer({ uid: "admin-1", name: "Me", enabled: false });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/your own/);
-  });
-});
-
-describe("organizer access, on top of the role", () => {
-  test("granting sets the flag and nothing else", async () => {
-    const result = await setOrganizer({ uid: "c1", name: "Grace", enabled: true });
-    expect(result.ok).toBe(true);
-    const p = payload();
-    expect(p["organizers/c1"]).toBe(true);
-    expect(p["competitors/c1"]).toBeUndefined();
-  });
-
-  test("revoking clears the flag and leaves their record", async () => {
-    mockGet.mockImplementation(world({ organizers: { "o1": true } }));
-    const result = await setOrganizer({ uid: "o1", name: "One", enabled: false });
-    expect(result.ok).toBe(true);
-    const p = payload();
-    expect(p["organizers/o1"]).toBeNull();
   });
 });
 
@@ -492,13 +466,6 @@ describe("deleting a person", () => {
     const result = await deletePerson({ uid: "ghost" });
     expect(result.ok).toBe(false);
     expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  test("removes organizer flag if present", async () => {
-    mockGet.mockImplementation(world({ organizers: { o1: true }, competitors: { o1: {} } }));
-    const result = await deletePerson({ uid: "o1", name: "Org" });
-    expect(result.ok).toBe(true);
-    expect(payload()["organizers/o1"]).toBeNull();
   });
 });
 

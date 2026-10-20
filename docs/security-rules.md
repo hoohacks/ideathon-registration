@@ -12,10 +12,8 @@ rules are what actually refuse ([ADR 0001](decisions/0001-rules-are-the-only-aut
 | Anyone signed in | Read their own record, `config`, `/announcements`, `finalRound/active`, and any team's `name` |
 | Competitor | Edit their own record except check-in; create a team; join or leave one that has **not** submitted; read their team; write their team's submission **while submissions are open and before the deadline** |
 | Judge | Read their own record and assignments; read the submissions of teams they are assigned; write and read back their own scores |
-| Organizer | Read `firstName`, `lastName`, `checkedIn`, `foodCheckIn` on `/competitors/{uid}` and `/judges/{uid}`; write `checkedIn` and `foodCheckIn` on `/competitors/{uid}` and `/judges/{uid}`; read `/organizers/{auth.uid}`. Denied access everywhere else |
 | Admin | Everything, through the root rule |
 
-- An organizer cannot read or write any other fields on competitors or judges, cannot read the rest of the database (scores, teams, config, logs), and cannot grant or revoke any role (including organizer or admin).
 - A judge cannot set their own `isRound1Judge`, `checkedIn` or assignments. The
   last one is load-bearing: the score rules treat an assignment as proof that the
   judge was assigned.
@@ -26,7 +24,7 @@ rules are what actually refuse ([ADR 0001](decisions/0001-rules-are-the-only-aut
   neither write the submission nor mark the team submitted. This is a `.validate`,
   not part of `.write`, because the team-creation rule applies to the whole team
   node and would otherwise let a team arrive with a submission already in it.
-  Admins are not bound by either.
+  Organizers are not bound by either.
 - **Announcements** are posted by admins only, and the shape (text up to 280
   characters, one of three audiences) is held even for them.
 - **There is no team size cap in the rules, and there cannot be.** `numChildren()`
@@ -69,7 +67,7 @@ The rules file starts with `// rulesVersion: N`. `npm test` fails if the rules
 change without that number being bumped, and prints the new fingerprint to paste
 into `src/schema.test.js`. That failure is the reminder to republish.
 
-The app cannot read the deployed rules, so after publishing, an admin records
+The app cannot read the deployed rules, so after publishing, an organizer records
 the number at `config/rulesVersion`. The dashboard compares it with the version
 this build needs (`REQUIRED_RULES_VERSION` in `src/user/admin/eventReadiness.js`)
 and shows a red warning until they match.

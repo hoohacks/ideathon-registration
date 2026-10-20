@@ -4,10 +4,10 @@ import { database } from "./firebase.js";
 
 /**
  * A role is membership of a top-level node named after it: /admins/{uid},
- * /organizers/{uid}, /judges/{uid}, /competitors/{uid}. Roles are additive — one account can be
- * all four — so this is always a list, never a single value.
+ * /judges/{uid}, /competitors/{uid}. Roles are additive — one account can be
+ * all three — so this is always a list, never a single value.
  */
-export const ROLES = ["competitor", "judge", "organizer", "admin"];
+export const ROLES = ["competitor", "judge", "admin"];
 
 /**
  * `userTypes` is an array that is empty while the session is still resolving
@@ -75,10 +75,6 @@ export function isAdmin(userTypes) {
 
 export function isJudge(userTypes) {
   return hasRole(userTypes, "judge");
-}
-
-export function isOrganizer(userTypes) {
-  return hasRole(userTypes, "organizer");
 }
 
 /**

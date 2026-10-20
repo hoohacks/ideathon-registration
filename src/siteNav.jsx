@@ -226,7 +226,6 @@ function Nav({ variant = "app", overlay = false }) {
     const setAccountOpen = hoisted ? hoisted.setAccountOpen : setLocalAccountOpen;
 
     const isAdmin = hasRole(userTypes, "admin");
-    const isOrganizer = hasRole(userTypes, "organizer");
     const primary = PRIMARY.filter(
         (link) => !link.roles || link.roles.some((role) => hasRole(userTypes, role))
     );
@@ -308,7 +307,7 @@ function Nav({ variant = "app", overlay = false }) {
     // On a phone the tab bar has room for four: the person's own pages, and
     // for an organizer the scanner they will be holding at the door. Everything
     // else, and the account, is one tap away under Menu.
-    const tabs = (isAdmin || isOrganizer)
+    const tabs = isAdmin
         ? [...primary, ADMIN_GROUPS[0].links[0]].slice(0, 3)
         : primary.slice(0, 3);
 
@@ -394,20 +393,6 @@ function Nav({ variant = "app", overlay = false }) {
                                 ))}
                             </Stack>
                         ))}
-
-                    {!isAdmin && isOrganizer && (
-                        <Stack
-                            role="group"
-                            aria-label="Organizer"
-                            sx={{ alignItems: "center", gap: 0.5 }}>
-                            <Box aria-hidden sx={{ width: 32, height: "1px", bgcolor: tokens.LINE, my: 0.75 }} />
-                            <NavItem
-                                {...ADMIN_GROUPS[0].links[0]}
-                                label={ADMIN_GROUPS[0].links[0].short}
-                                active={pathname.startsWith(ADMIN_GROUPS[0].links[0].to)}
-                            />
-                        </Stack>
-                    )}
                 </Stack>
 
                 {/* Named by hidden text rather than aria-label: the button
@@ -558,23 +543,6 @@ function Nav({ variant = "app", overlay = false }) {
                                 ))}
                             </Box>
                         ))}
-
-                    {!isAdmin && isOrganizer && (
-                        <Box sx={{ mb: 0.5 }}>
-                            <Typography
-                                variant="body2"
-                                sx={{ display: "block", px: 1, pt: 1.5, pb: 0.5, fontWeight: 600, fontSize: "0.8125rem" }}
-                            >
-                                Organizer
-                            </Typography>
-                            <SheetLink
-                                label={ADMIN_GROUPS[0].links[0].label}
-                                icon={pathname.startsWith(ADMIN_GROUPS[0].links[0].to) ? ADMIN_GROUPS[0].links[0].activeIcon : ADMIN_GROUPS[0].links[0].icon}
-                                active={pathname.startsWith(ADMIN_GROUPS[0].links[0].to)}
-                                onClick={() => go(ADMIN_GROUPS[0].links[0].to)}
-                            />
-                        </Box>
-                    )}
 
                     <Divider sx={{ my: 1 }} />
                     <SheetLink label="Profile" icon={PiUser} onClick={() => go("/user/profile")} />
