@@ -1,8 +1,9 @@
 import Layout from "./Layout";
+import Registration from "../Registration";
+import JudgeRegistration from "../JudgeRegistration";
 import { useContext, useState } from "react";
 import { AuthContext } from "../App";
 import { hasRole, roleList } from "../roles";
-import { EVENT } from "../eventInfo";
 import {
     Alert,
     Box,
@@ -47,7 +48,8 @@ function Row({ label, children }) {
 }
 
 function Profile() {
-    const { userData, userTypes, userCredential } = useContext(AuthContext);
+    const { userData, userTypes, userCredential, refreshUserData, profileLoadError, loadingUserData } = useContext(AuthContext);
+    const [recoveryRole, setRecoveryRole] = useState(null);
     const roles = roleList(userTypes);
     const navigate = useNavigate();
     const [sentReset, setSentReset] = useState(false);
@@ -91,6 +93,14 @@ function Profile() {
         }
     };
 
+    if (!userData && !profileLoadError && !loadingUserData && recoveryRole && userCredential?.user) {
+        const Form = recoveryRole === "competitor" ? Registration : JudgeRegistration;
+        return <Form recoveryUser={userCredential.user} onComplete={async () => {
+            await refreshUserData();
+            setRecoveryRole(null);
+        }} />;
+    }
+
     if (!userData) {
         return (
             <Layout maxWidth="sm">
@@ -98,9 +108,23 @@ function Profile() {
                     Profile
                 </Typography>
                 <Alert severity="warning">
-                    No profile found for this account. Please contact HooHacks at{" "}
-                    <a href={`mailto:${EVENT.contactEmail}`}>{EVENT.contactEmail}</a>.
+                    {profileLoadError
+                        ? "Your profile could not be loaded. Check your connection and try again."
+                        : "Your account is ready, but registration is incomplete. Complete your profile to continue."}
                 </Alert>
+                {profileLoadError ? (
+                    <Button onClick={refreshUserData} disabled={loadingUserData}>Try again</Button>
+                ) : (
+                    <Stack spacing={2} sx={{ mt: 2 }}>
+                        <Typography variant="h2">Complete your profile</Typography>
+                        <Button variant="contained" onClick={() => setRecoveryRole("competitor")}>
+                            Complete student registration
+                        </Button>
+                        <Button variant="outlined" onClick={() => setRecoveryRole("judge")}>
+                            Complete judge or mentor registration
+                        </Button>
+                    </Stack>
+                )}
                 <Button variant="outlined" onClick={handleLogout} sx={{ mt: 2 }}>
                     Log out
                 </Button>

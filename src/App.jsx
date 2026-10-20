@@ -166,6 +166,7 @@ function AuthProvider({ children }) {
   const [userTypes, setUserTypes] = useState([]);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -192,6 +193,7 @@ function AuthProvider({ children }) {
     }
 
     setLoadingUserData(true);
+    setProfileLoadError(false);
 
     try {
       const idToken = await userCredential.user.getIdToken();
@@ -199,6 +201,7 @@ function AuthProvider({ children }) {
 
       const foundRoles = [];
       const records = [];
+      let readFailed = false;
 
       for (const role of ROLES) {
         try {
@@ -210,14 +213,22 @@ function AuthProvider({ children }) {
           }
         } catch (error) {
           console.warn(`Could not read ${role} data:`, error);
+          readFailed = true;
         }
       }
 
       // merged rather than spread, so the record for a role granted later does
       // not blank the name and email on the one they registered with
       // replace rather than append, otherwise roles accumulate across logins
+      setProfileLoadError(readFailed);
       setUserData(mergeRoleProfiles(records));
       setUserTypes(foundRoles);
+    } catch (error) {
+      console.warn("Could not load profile:", error);
+      setUserData(null);
+      setUserTypes([]);
+      setToken(null);
+      setProfileLoadError(true);
     } finally {
       setLoadingUserData(false);
     }
@@ -250,7 +261,7 @@ function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ userCredential, handleLogin, refreshUserData, token, userData, userTypes, loadingAuth, loadingUserData }}>
+    <AuthContext.Provider value={{ userCredential, handleLogin, refreshUserData, token, userData, userTypes, loadingAuth, loadingUserData, profileLoadError }}>
       {children}
     </AuthContext.Provider>
   )

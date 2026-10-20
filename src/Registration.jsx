@@ -2,9 +2,9 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // firebase
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { database, storage, auth } from "./firebase";
-import { ref, update, serverTimestamp } from "firebase/database";
+import { ref, get, update, serverTimestamp } from "firebase/database";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { ref as storageRef } from "firebase/storage";
 
@@ -110,7 +110,7 @@ const SECTIONS = [
 
 const REQUIRED = SECTIONS.flatMap((section) => section.required);
 
-function problemsFor(values) {
+function problemsFor(values, recoveryUser) {
   const problems = {};
   const fail = (name, message, noun) => {
     problems[name] = { message, noun };
@@ -125,9 +125,9 @@ function problemsFor(values) {
     fail("email", "Enter a complete address, like you@virginia.edu", "a valid email address");
   }
 
-  if (!isFilled(values.password)) {
+  if (!recoveryUser && !isFilled(values.password)) {
     fail("password", "Choose a password", "a password");
-  } else if (values.password.length < MIN_PASSWORD) {
+  } else if (!recoveryUser && values.password.length < MIN_PASSWORD) {
     fail("password", `Use at least ${MIN_PASSWORD} characters`, "a longer password");
   }
 
@@ -149,16 +149,16 @@ function problemsFor(values) {
   return problems;
 }
 
-const Registration = () => {
+const Registration = ({ recoveryUser, onComplete } = {}) => {
   // the site is live weeks before sign-ups are; see registrationWindow.js
-  if (!REGISTRATION_OPEN) return <ClosedNotice />;
+  if (!recoveryUser && !REGISTRATION_OPEN) return <ClosedNotice />;
 
-  return <RegistrationForm />;
+  return <RegistrationForm recoveryUser={recoveryUser} onComplete={onComplete} />;
 };
 
-const RegistrationForm = () => {
+const RegistrationForm = ({ recoveryUser, onComplete }) => {
   const navigate = useNavigate();
-  const { formRef, values, handleChange, collect } = useSyncedForm(INITIAL);
+  const { formRef, values, handleChange, collect } = useSyncedForm({ ...INITIAL, email: recoveryUser?.email ?? "" });
 
   const [touched, setTouched] = useState({});
   const [showErrors, setShowErrors] = useState(false);
@@ -174,7 +174,8 @@ const RegistrationForm = () => {
   const [progress, setProgress] = useState(null);
   const [skipResume, setSkipResume] = useState(false);
 
-  const problems = useMemo(() => problemsFor(values), [values]);
+  const required = REQUIRED.filter((name) => !recoveryUser || name !== "password");
+  const problems = useMemo(() => problemsFor(values, recoveryUser), [values, recoveryUser]);
 
   usePageTitle("Register");
 
@@ -183,7 +184,7 @@ const RegistrationForm = () => {
     label: section.label,
     remaining: section.required.filter((name) => problems[name]).length,
   }));
-  const answered = REQUIRED.length - Object.keys(problems).length;
+  const answered = required.length - Object.keys(problems).length;
 
   const markTouched = (event) =>
     setTouched((prev) => ({ ...prev, [event.target.name]: true }));
@@ -252,8 +253,8 @@ const RegistrationForm = () => {
     // listening, `values` is still empty and everything below would refuse a
     // form the person can see is complete.
     const current = collect();
-    const found = problemsFor(current);
-    const outstanding = REQUIRED.filter((name) => found[name]);
+    const found = problemsFor(current, recoveryUser);
+    const outstanding = required.filter((name) => found[name]);
 
     if (outstanding.length) {
       setShowErrors(true);
@@ -286,29 +287,31 @@ const RegistrationForm = () => {
         }
       }
 
-      let user = null;
-      try {
-        const credential = await createUserWithEmailAndPassword(
-          auth,
-          current.email.trim(),
-          current.password
-        );
-        user = credential.user;
-      } catch (error) {
-        console.error("Could not create the account:", error);
-        setFormError(
-          error?.code === "auth/email-already-in-use"
-            ? "An account already uses that email address. Sign in instead, or reset the password."
-            : "That account could not be created. Check the email address and try again."
-        );
-        focusField(formRef, "email");
-        return;
+      let user = recoveryUser;
+      if (!user) {
+        try {
+          const credential = await createUserWithEmailAndPassword(
+            auth,
+            current.email.trim(),
+            current.password
+          );
+          user = credential.user;
+        } catch (error) {
+          console.error("Could not create the account:", error);
+          setFormError(
+            error?.code === "auth/email-already-in-use"
+              ? "An account already uses that email address. Sign in instead, or reset the password."
+              : "That account could not be created. Check the email address and try again."
+          );
+          focusField(formRef, "email");
+          return;
+        }
       }
 
       const applicant = {
         firstName: cleanName(current.firstName),
         lastName: cleanName(current.lastName),
-        email: current.email.trim(),
+        email: recoveryUser?.email ?? current.email.trim(),
         schoolYear: Number(current.schoolYear),
         uvaSchool: current.uvaSchool,
         resume: resumeUrl,
@@ -324,15 +327,32 @@ const RegistrationForm = () => {
       };
 
       try {
+        if (recoveryUser) {
+          // Recheck before saving: a profile may have been completed in another tab.
+          const profiles = await Promise.all(["competitors", "judges", "admins"].map(
+            (role) => get(ref(database, `/${role}/${user.uid}`))
+          ));
+          if (profiles.some((profile) => profile.exists())) {
+            await onComplete?.();
+            return;
+          }
+        }
         await update(ref(database), { ["/competitors/" + user.uid]: applicant });
-        setRegistered(true);
+        if (recoveryUser) await onComplete?.();
+        else setRegistered(true);
       } catch (error) {
-        // the account exists at this point, so failing quietly here left people
-        // able to sign in with no profile and no idea why
         console.error("Could not save registration:", error);
-        setFailure(
-          `Your account was created but your registration could not be saved. Email ${EVENT.contactEmail} before trying again.`
-        );
+        if (recoveryUser) {
+          setFormError("Your profile could not be saved. Your answers are still here. Check your connection and try again.");
+        } else {
+          try {
+            await deleteUser(user);
+            setFormError("Registration could not be saved. Your answers are still here. Please try submitting again with the same email address.");
+          } catch (rollbackError) {
+            console.error("Could not roll back account creation:", rollbackError);
+            setFailure("Your account exists, but your profile could not be saved. Reconnect, then open your profile to complete registration. If asked, sign in with the email and password you just entered.");
+          }
+        }
       }
     } finally {
       setSubmitting(false);
@@ -342,10 +362,10 @@ const RegistrationForm = () => {
   const rail = {
     sections,
     answered,
-    total: REQUIRED.length,
+    total: required.length,
     error: formError,
     busy: submitting,
-    submitLabel: "Register",
+    submitLabel: recoveryUser ? "Complete profile" : "Register",
     busyLabel: "Registering…",
   };
 
@@ -390,8 +410,8 @@ const RegistrationForm = () => {
         title="Registration not saved"
         onClose={() => setFailure("")}
         actions={
-          <Button variant="contained" onClick={() => setFailure("")}>
-            Close
+          <Button variant="contained" onClick={() => navigate("/user/profile")}>
+            Complete your profile
           </Button>
         }
       >
@@ -423,6 +443,7 @@ const RegistrationForm = () => {
                 <TextField
                   {...fieldProps("email")}
                   label="Email address"
+                  disabled={Boolean(recoveryUser)}
                   type="email"
                   autoComplete="email"
                   inputMode="email"
@@ -431,19 +452,21 @@ const RegistrationForm = () => {
                   helperText={errorFor("email") ?? "You will sign in with this address."}
                 />
 
-                <TextField
-                  {...fieldProps("password")}
-                  label="Password"
-                  type="password"
-                  // "new-password" is what tells a password manager to offer a
-                  // generated one and to save what you type. The old form said
-                  // "current-password", so managers filled an existing password
-                  // from another site instead.
-                  autoComplete="new-password"
-                  required
-                  fullWidth
-                  helperText={errorFor("password") ?? `At least ${MIN_PASSWORD} characters.`}
-                />
+                {!recoveryUser && (
+                  <TextField
+                    {...fieldProps("password")}
+                    label="Password"
+                    type="password"
+                    // "new-password" is what tells a password manager to offer a
+                    // generated one and to save what you type. The old form said
+                    // "current-password", so managers filled an existing password
+                    // from another site instead.
+                    autoComplete="new-password"
+                    required
+                    fullWidth
+                    helperText={errorFor("password") ?? `At least ${MIN_PASSWORD} characters.`}
+                  />
+                )}
               </Section>
 
               <Section id="studies" label="Studies">

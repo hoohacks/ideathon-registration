@@ -157,14 +157,11 @@ describe("pages render without crashing", () => {
     expect(screen.getByText("Alex Kim")).toBeInTheDocument();
   });
 
-  test("profile with no record shows a fallback rather than crashing", async () => {
+  test("profile with no record offers registration recovery", async () => {
     renderPage(Profile, { userData: null, userTypes: [] });
-    const notice = await screen.findByText(/No profile found/);
-    // the footer carries the same link, so look only inside the notice
-    expect(within(notice).getByRole("link", { name: "team@hoohacks.io" })).toHaveAttribute(
-      "href",
-      "mailto:team@hoohacks.io"
-    );
+    expect(await screen.findByText(/registration is incomplete/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Complete student registration" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Complete judge or mentor registration" })).toBeInTheDocument();
   });
 
   test("check in", async () => {

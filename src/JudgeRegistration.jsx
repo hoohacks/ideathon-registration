@@ -2,9 +2,9 @@ import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // firebase
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { database, auth } from "./firebase";
-import { ref, update, serverTimestamp } from "firebase/database";
+import { ref, get, update, serverTimestamp } from "firebase/database";
 
 import {
   Box,
@@ -189,7 +189,7 @@ function YesNo({ name, legend, hint, value, error, onChange }) {
  * yet is not counted -- the rail would otherwise ask for a company name from
  * someone who has just said they are not with one.
  */
-function problemsFor(values) {
+function problemsFor(values, recoveryUser) {
   const problems = {};
   const fail = (name, message, noun) => {
     problems[name] = { message, noun };
@@ -204,9 +204,9 @@ function problemsFor(values) {
     fail("email", "Enter a complete address, like you@company.com", "a valid email address");
   }
 
-  if (!isFilled(values.password)) {
+  if (!recoveryUser && !isFilled(values.password)) {
     fail("password", "Choose a password", "a password");
-  } else if (values.password.length < MIN_PASSWORD) {
+  } else if (!recoveryUser && values.password.length < MIN_PASSWORD) {
     fail("password", `Use at least ${MIN_PASSWORD} characters`, "a longer password");
   }
 
@@ -233,7 +233,7 @@ function problemsFor(values) {
   return problems;
 }
 
-const JudgeRegistration = () => {
+const JudgeRegistration = ({ recoveryUser, onComplete } = {}) => {
   // Organizers need accounts of their own before the doors open, and nothing
   // in the app can make one for them: creating a person from the control panel
   // requires an organizer already signed in, which is the very thing being
@@ -249,16 +249,16 @@ const JudgeRegistration = () => {
   // judge record and nothing else. They cannot score -- isRound1Judge is
   // admin-set -- and the rules show them no team they are not assigned to.
   const { search } = useLocation();
-  if (!REGISTRATION_OPEN && !isStaffEntrance(search)) {
+  if (!recoveryUser && !REGISTRATION_OPEN && !isStaffEntrance(search)) {
     return <ClosedNotice what="Judge and mentor sign-up" />;
   }
 
-  return <JudgeRegistrationForm />;
+  return <JudgeRegistrationForm recoveryUser={recoveryUser} onComplete={onComplete} />;
 };
 
-const JudgeRegistrationForm = () => {
+const JudgeRegistrationForm = ({ recoveryUser, onComplete }) => {
   const navigate = useNavigate();
-  const { formRef, values, setValue, handleChange, collect } = useSyncedForm(INITIAL);
+  const { formRef, values, setValue, handleChange, collect } = useSyncedForm({ ...INITIAL, email: recoveryUser?.email ?? "" });
 
   const [touched, setTouched] = useState({});
   const [showErrors, setShowErrors] = useState(false);
@@ -267,9 +267,9 @@ const JudgeRegistrationForm = () => {
   const [registered, setRegistered] = useState(false);
   const [failure, setFailure] = useState("");
 
-  const problems = useMemo(() => problemsFor(values), [values]);
+  const problems = useMemo(() => problemsFor(values, recoveryUser), [values, recoveryUser]);
 
-  const required = requiredFields(values);
+  const required = requiredFields(values).filter((name) => !recoveryUser || name !== "password");
   const sections = SECTIONS.map((section) => ({
     id: section.id,
     label: section.label,
@@ -314,7 +314,7 @@ const JudgeRegistrationForm = () => {
     // the DOM is the source of truth here: Chrome may have filled the name,
     // email and password before React attached a single listener
     const current = collect();
-    const found = problemsFor(current);
+    const found = problemsFor(current, recoveryUser);
     const outstanding = requiredFields(current).filter((name) => found[name]);
 
     if (outstanding.length) {
@@ -327,29 +327,31 @@ const JudgeRegistrationForm = () => {
     setFormError("");
     setSubmitting(true);
     try {
-      let user = null;
-      try {
-        const credential = await createUserWithEmailAndPassword(
-          auth,
-          current.email.trim(),
-          current.password
-        );
-        user = credential.user;
-      } catch (error) {
-        console.error("Could not create the account:", error);
-        setFormError(
-          error?.code === "auth/email-already-in-use"
-            ? "An account already uses that email address. Sign in instead, or reset the password."
-            : "That account could not be created. Check the email address and try again."
-        );
-        focusField(formRef, "email");
-        return;
+      let user = recoveryUser;
+      if (!user) {
+        try {
+          const credential = await createUserWithEmailAndPassword(
+            auth,
+            current.email.trim(),
+            current.password
+          );
+          user = credential.user;
+        } catch (error) {
+          console.error("Could not create the account:", error);
+          setFormError(
+            error?.code === "auth/email-already-in-use"
+              ? "An account already uses that email address. Sign in instead, or reset the password."
+              : "That account could not be created. Check the email address and try again."
+          );
+          focusField(formRef, "email");
+          return;
+        }
       }
 
       const judge = {
         firstName: cleanName(current.firstName),
         lastName: cleanName(current.lastName),
-        email: current.email.trim(),
+        email: recoveryUser?.email ?? current.email.trim(),
         withCompany: current.withCompany,
         company: current.withCompany ? current.company.trim() : "",
         wantsToMentor: current.wantsToMentor,
@@ -364,15 +366,32 @@ const JudgeRegistrationForm = () => {
       };
 
       try {
+        if (recoveryUser) {
+          // Recheck before saving: a profile may have been completed in another tab.
+          const profiles = await Promise.all(["competitors", "judges", "admins"].map(
+            (role) => get(ref(database, `/${role}/${user.uid}`))
+          ));
+          if (profiles.some((profile) => profile.exists())) {
+            await onComplete?.();
+            return;
+          }
+        }
         await update(ref(database), { ["/judges/" + user.uid]: judge });
-        setRegistered(true);
+        if (recoveryUser) await onComplete?.();
+        else setRegistered(true);
       } catch (error) {
-        // the account exists by now, so failing quietly here left judges able to
-        // sign in with no profile and no idea why
-        console.error("Could not save judge registration:", error);
-        setFailure(
-          `Your account was created but your registration could not be saved. Email ${EVENT.contactEmail} before trying again.`
-        );
+        console.error("Could not save registration:", error);
+        if (recoveryUser) {
+          setFormError("Your profile could not be saved. Your answers are still here. Check your connection and try again.");
+        } else {
+          try {
+            await deleteUser(user);
+            setFormError("Registration could not be saved. Your answers are still here. Please try submitting again with the same email address.");
+          } catch (rollbackError) {
+            console.error("Could not roll back account creation:", rollbackError);
+            setFailure("Your account exists, but your profile could not be saved. Reconnect, then open your profile to complete registration. If asked, sign in with the email and password you just entered.");
+          }
+        }
       }
     } finally {
       setSubmitting(false);
@@ -385,7 +404,7 @@ const JudgeRegistrationForm = () => {
     total: required.length,
     error: formError,
     busy: submitting,
-    submitLabel: "Create account",
+    submitLabel: recoveryUser ? "Complete profile" : "Create account",
     busyLabel: "Creating account…",
   };
 
@@ -440,8 +459,8 @@ const JudgeRegistrationForm = () => {
         title="Registration not saved"
         onClose={() => setFailure("")}
         actions={
-          <Button variant="contained" onClick={() => setFailure("")}>
-            Close
+          <Button variant="contained" onClick={() => navigate("/user/profile")}>
+            Complete your profile
           </Button>
         }
       >
@@ -473,6 +492,7 @@ const JudgeRegistrationForm = () => {
                 <TextField
                   {...fieldProps("email")}
                   label="Email address"
+                  disabled={Boolean(recoveryUser)}
                   type="email"
                   autoComplete="email"
                   inputMode="email"
@@ -481,15 +501,17 @@ const JudgeRegistrationForm = () => {
                   helperText={errorFor("email") ?? "You will sign in with this address."}
                 />
 
-                <TextField
-                  {...fieldProps("password")}
-                  label="Password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  fullWidth
-                  helperText={errorFor("password") ?? `At least ${MIN_PASSWORD} characters.`}
-                />
+                {!recoveryUser && (
+                  <TextField
+                    {...fieldProps("password")}
+                    label="Password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    fullWidth
+                    helperText={errorFor("password") ?? `At least ${MIN_PASSWORD} characters.`}
+                  />
+                )}
               </Section>
 
               <Section id="company" label="Affiliation">
