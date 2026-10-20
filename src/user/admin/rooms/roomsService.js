@@ -182,12 +182,22 @@ async function loadWorld() {
   };
 }
 
+/** The stored spelling of the room matching `name` ignoring case, if any. */
+function findRoomIgnoringCase(rooms, name) {
+  const wanted = name.toLowerCase();
+  return rooms.find((room) => room.toLowerCase() === wanted);
+}
+
 export async function addRoom(name) {
   const room = String(name ?? "").trim();
   if (!room) return { ok: false, error: "Give the room a name." };
 
   const rooms = await listRooms();
-  if (rooms.includes(room)) return { ok: false, error: `${room} is already on the list.` };
+  // Case-insensitive: "rice 340" next to "Rice 340" is two list entries for one
+  // physical room, and a schedule can then be split across them. Name the
+  // entry as stored so the organizer sees which one they collided with.
+  const existing = findRoomIgnoringCase(rooms, room);
+  if (existing) return { ok: false, error: `${existing} is already on the list.` };
 
   return applyAdminAction({
     action: "room.add",
@@ -202,7 +212,15 @@ export async function renameRoom(from, to) {
 
   const { rooms, teamsData, judgesData, finalRoundTeams } = await loadWorld();
   if (!rooms.includes(from)) return { ok: false, error: `${from} is not on the list.` };
-  if (rooms.includes(next)) return { ok: false, error: `${next} is already on the list.` };
+  // the clash check below lets a room's own name through, so the exact same
+  // name has to be stopped here or it saves a rename that changes nothing
+  if (next === from) return { ok: false, error: "That is already the name." };
+  // Only ANOTHER room blocks the name. Recasing a room's own name ("rice 340"
+  // -> "Rice 340") is how a bad capitalisation gets fixed, and it still goes
+  // through the normal remap below: `from` is the stored spelling, so the
+  // schedule copies matching it exactly are the ones that move.
+  const clash = findRoomIgnoringCase(rooms, next);
+  if (clash && clash !== from) return { ok: false, error: `${clash} is already on the list.` };
 
   const scheduled = remapChanges({ from, to: next, teamsData, judgesData, finalRoundTeams });
 

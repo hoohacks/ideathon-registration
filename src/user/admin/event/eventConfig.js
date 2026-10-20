@@ -8,6 +8,7 @@ import {
   MAX_JUDGES_PER_TEAM,
   panelLabel,
 } from "../../judge/schedulePlan.js";
+import { normalizeClockTime } from "../../judge/clockTime.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService.js";
 import { EVENT_START } from "../../../eventInfo.js";
 
@@ -71,11 +72,41 @@ export async function setBatchTimes(times) {
     return { ok: false, error: `Give every batch a time. Missing: ${missing.join(", ")}.` };
   }
 
+  // Each time is stored as the text the schedule shows, so it has to be a real
+  // clock time: "banana" would otherwise save and put a nonsense slot on every
+  // judge's and team's schedule at the next generation.
+  const canonical = {};
+  const invalid = [];
+  for (let batch = 1; batch <= count; batch++) {
+    const time = normalizeClockTime(times[batch]);
+    if (time === null) invalid.push(batch);
+    else canonical[batch] = time;
+  }
+  if (invalid.length) {
+    return {
+      ok: false,
+      error: invalid
+        .map((batch) => `Batch ${batch}'s time "${String(times[batch]).trim()}" is not a clock time like 5:00 PM.`)
+        .join(" "),
+    };
+  }
+
+  // Two batches at one time would put both waves of teams in the same slot, so
+  // the rooms and judges the batches exist to spread out would be double-booked.
+  const seen = new Map();
+  for (let batch = 1; batch <= count; batch++) {
+    const time = canonical[batch];
+    if (seen.has(time)) {
+      return { ok: false, error: `Batches ${seen.get(time)} and ${batch} both start at ${time}. Give each batch its own time.` };
+    }
+    seen.set(time, batch);
+  }
+
   const before = await readOne("config/batchTimes", BATCH_TIMES);
   return applyAdminAction({
     action: "config.batchTimes",
     summary: `Batch times set for ${count} batch(es)`,
-    changes: [{ path: "config/batchTimes", before, after: times }],
+    changes: [{ path: "config/batchTimes", before, after: canonical }],
   });
 }
 

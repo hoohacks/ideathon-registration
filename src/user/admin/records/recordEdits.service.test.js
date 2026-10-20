@@ -161,6 +161,26 @@ describe("renaming a team", () => {
   });
 });
 
+describe("renaming a team to a name another team has", () => {
+  test("is refused whatever the capitals or surrounding spaces", async () => {
+    await expect(renameTeam("t1", "  cIRCLES ")).resolves.toEqual({
+      ok: false,
+      error: "Another team is already called Circles.",
+    });
+    expect(db.writes).toEqual([]);
+    expect(db.getData("teams/t1/name")).toBe("Lantern");
+  });
+
+  test("allows a team to recapitalise its own name", async () => {
+    await expect(renameTeam("t1", "LANTERN")).resolves.toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/name")).toBe("LANTERN");
+  });
+
+  test("allows an unrelated name", async () => {
+    await expect(renameTeam("t1", "Beacon")).resolves.toMatchObject({ ok: true });
+  });
+});
+
 describe("the rename change builder", () => {
   test("tolerates a missing team record and judge records with nothing assigned", () => {
     expect(

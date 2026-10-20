@@ -425,16 +425,33 @@ describe("moving a team that is already scheduled", () => {
   });
 
   /**
-   * The check is on the room changing, not on every save. An event that already
-   * has a clash somewhere should not have its time edits blocked by it.
+   * The time decides the batch, so a time-only edit is still a move into
+   * another batch's room and is checked against it.
    */
-  test("editing only the time is not blocked", async () => {
-    const result = await move("Rice 344", "5:05 PM");
+  test("moving to another batch's time writes the batch and checks that batch's room", async () => {
+    const result = await move("Rice 344", "5:15 PM");
 
     expect(result.ok).toBe(true);
     const paths = Object.keys(mockUpdate.mock.calls[0][1]);
     expect(paths).toContain("teams/team-clearing/schedule/time");
+    expect(paths).toContain("teams/team-clearing/schedule/batch");
     expect(paths).not.toContain("teams/team-clearing/schedule/room");
+  });
+
+  test("refuses another batch's occupied room, naming the team in that batch", async () => {
+    const result = await move("Rice 341", "5:15 PM");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Almanac is already in Rice 341 in batch 2/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("refuses a time that is no batch's time", async () => {
+    const result = await move("Rice 344", "5:05 PM");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Valid times: 5:00 PM \(batch 1\), 5:15 PM \(batch 2\)/);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

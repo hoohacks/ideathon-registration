@@ -12,6 +12,8 @@ const db = await import("../../../testing/fakeDatabase");
 const {
   overrideSlotChanges,
   overrideTeamSlot,
+  batchTimesOf,
+  batchForTime,
   deleteScore,
   setTeamSubmitted,
   clearSchedule,
@@ -27,12 +29,12 @@ beforeEach(() => {
     teams: {
       t1: { name: "Lantern", submitted: true, schedule: slot("Rice 340") },
       t2: { name: "Circles", schedule: slot("Rice 342") },
-      t3: { name: "Tempo", schedule: slot("Olsson 005", 2) },
+      t3: { name: "Tempo", schedule: slot("Olsson 005", 2, "6:00 PM") },
       t4: { name: "Unscheduled" },
     },
     judges: {
       j1: { firstName: "Ada", teamAssignments: { t1: slot("Rice 340"), t2: slot("Rice 342") } },
-      j2: { firstName: "Grace", teamAssignments: { t3: slot("Olsson 005", 2) } },
+      j2: { firstName: "Grace", teamAssignments: { t3: slot("Olsson 005", 2, "6:00 PM") } },
       j3: { firstName: "Idle" },
     },
     scores: { first: { t1: { j1: { problem: 8, notes: "Good" } } } },
@@ -73,12 +75,141 @@ describe("the slot change builder", () => {
   });
 });
 
+describe("batch times", () => {
+  test("come from the teams' schedule entries, first team per batch, in batch order", () => {
+    expect(batchTimesOf({
+      a: { schedule: { batch: 2, time: "6:00 PM" } },
+      b: { schedule: { batch: 1, time: "5:00 PM" } },
+      c: { schedule: { batch: 1, time: "5:05 PM" } },
+      d: {},
+      e: null,
+    })).toEqual([{ batch: 1, time: "5:00 PM" }, { batch: 2, time: "6:00 PM" }]);
+    expect(batchTimesOf(undefined)).toEqual([]);
+  });
+
+  test("a typed time matches by clock time, or is no batch", () => {
+    const times = [{ batch: 1, time: "5:00 PM" }, { batch: 2, time: "6:00 PM" }];
+    expect(batchForTime("  6:00 PM ", times)).toBe(2);
+    expect(batchForTime("6:00pm", times)).toBe(2);
+    expect(batchForTime("5pm", times)).toBe(1);
+    expect(batchForTime("7:00 PM", times)).toBeNull();
+    expect(batchForTime("25:99 XM", times)).toBeNull();
+    expect(batchForTime("", times)).toBeNull();
+  });
+
+  test("the builder writes the batch on the team and each judge's copy", () => {
+    const changes = overrideSlotChanges({
+      teamId: "t1", batch: 2,
+      teamData: { schedule: slot("Rice 340") },
+      judgesData: { j1: { teamAssignments: { t1: {} } } },
+    });
+    expect(changes).toEqual([
+      { path: "teams/t1/schedule/batch", before: 1, after: 2 },
+      { path: "judges/j1/teamAssignments/t1/batch", before: 1, after: 2 },
+    ]);
+    expect(overrideSlotChanges({ teamId: "t1", batch: 1, teamData: { schedule: slot("Rice 340") } })).toEqual([]);
+  });
+});
+
 describe("moving a scheduled team", () => {
   test("moves the team and its judges' copies, and logs where to", async () => {
-    await expect(overrideTeamSlot({ teamId: "t1", teamName: "Lantern", room: "Thornton", time: "5:05 PM" })).resolves.toMatchObject({ ok: true });
-    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Thornton", time: "5:05 PM" });
-    expect(db.getData("judges/j1/teamAssignments/t1")).toMatchObject({ room: "Thornton", time: "5:05 PM" });
-    expect(lastLog()).toMatchObject({ action: "team.slot", summary: "Moved Lantern to Thornton at 5:05 PM" });
+    await expect(overrideTeamSlot({ teamId: "t1", teamName: "Lantern", room: "Thornton", time: "5:00 PM" })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Thornton", time: "5:00 PM", batch: 1 });
+    expect(db.getData("judges/j1/teamAssignments/t1")).toMatchObject({ room: "Thornton", time: "5:00 PM", batch: 1 });
+    expect(lastLog()).toMatchObject({ action: "team.slot", summary: "Moved Lantern to Thornton at 5:00 PM" });
+  });
+
+  test("a time that belongs to another batch moves the team there, on every copy", async () => {
+    const result = await overrideTeamSlot({ teamId: "t1", teamName: "Lantern", room: "Thornton", time: " 6:00 PM " });
+    expect(result).toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Thornton", time: "6:00 PM", batch: 2 });
+    expect(db.getData("judges/j1/teamAssignments/t1")).toMatchObject({ room: "Thornton", time: "6:00 PM", batch: 2 });
+    expect(lastLog().summary).toBe("Moved Lantern to Thornton at 6:00 PM (batch 2)");
+  });
+
+  test("refuses a room held in the batch being moved INTO, naming that team, not the old batch's", async () => {
+    // t2 (Circles) holds Rice 342 in batch 1; t3 (Tempo) holds Olsson 005 in batch 2
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Olsson 005", time: "6:00 PM" })).resolves.toEqual({
+      ok: false,
+      error: "Tempo is already in Olsson 005 in batch 2.",
+    });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Rice 340", batch: 1 });
+    expect(db.getData("adminLog")).toBeNull();
+  });
+
+  test("a time-only move into a batch where the room is taken is refused", async () => {
+    db.setData("teams/t3/schedule/room", "Rice 340");
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Rice 340", time: "6:00 PM" })).resolves.toEqual({
+      ok: false,
+      error: "Tempo is already in Rice 340 in batch 2.",
+    });
+    // and with the room left blank it means "keep my room"
+    await expect(overrideTeamSlot({ teamId: "t1", time: "6:00 PM" })).resolves.toMatchObject({ ok: false });
+  });
+
+  test("a time that is no batch's time is refused, listing the valid ones", async () => {
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "5:05 PM" })).resolves.toEqual({
+      ok: false,
+      error: "5:05 PM is not a batch time. Valid times: 5:00 PM (batch 1), 6:00 PM (batch 2).",
+    });
+    expect(db.getData("teams/t1/schedule/time")).toBe("5:00 PM");
+  });
+
+  test("text that is not a clock time is refused as such, and nothing is written", async () => {
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "25:99 XM" })).resolves.toEqual({
+      ok: false,
+      error: '"25:99 XM" is not a clock time like 5:00 PM.',
+    });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Rice 340", time: "5:00 PM", batch: 1 });
+    expect(db.getData("judges/j1/teamAssignments/t1/time")).toBe("5:00 PM");
+    expect(db.getData("adminLog")).toBeNull();
+  });
+
+  test("a loosely typed time finds its batch and writes the batch's own label", async () => {
+    await expect(overrideTeamSlot({ teamId: "t1", teamName: "Lantern", room: "Thornton", time: "6pm" })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ time: "6:00 PM", batch: 2 });
+    expect(db.getData("judges/j1/teamAssignments/t1")).toMatchObject({ time: "6:00 PM", batch: 2 });
+    expect(lastLog().summary).toBe("Moved Lantern to Thornton at 6:00 PM (batch 2)");
+  });
+
+  test("retyping the time it already has, spelled differently, is not a move", async () => {
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Rice 340", time: "5:00pm" })).resolves.toEqual({
+      ok: false,
+      error: "Nothing changed. Generate a schedule first if there is none.",
+    });
+    // with a room change alongside, the stored label is kept
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "5pm" })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Thornton", time: "5:00 PM", batch: 1 });
+  });
+
+  test("refuses a batch move that double-books one of the team's judges, naming both", async () => {
+    // Ada (j1) holds t1 in batch 1; put her on Tempo (t3) in batch 2 as well
+    db.setData("judges/j1/teamAssignments/t3", { ...slot("Olsson 005", 2, "6:00 PM"), id: "t3", teamName: "Beacon" });
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "6:00 PM" })).resolves.toEqual({
+      ok: false,
+      error: "Ada is already judging Beacon in batch 2.",
+    });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ batch: 1, time: "5:00 PM" });
+    expect(db.getData("adminLog")).toBeNull();
+  });
+
+  test("a batch move with no judge conflict still goes through", async () => {
+    // Grace (j2) is on Tempo in batch 2, but she is not one of t1's judges
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "6:00 PM" })).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a judge already double-booked in the team's own batch does not block a move within it", async () => {
+    // Ada (j1) is on Lantern and Circles, both batch 1: the same booking that
+    // refuses a move INTO batch 1 must not refuse a room change that stays there
+    db.setData("judges/j1/teamAssignments/t2", { ...slot("Rice 342"), id: "t2", teamName: "Circles" });
+    db.setData("teams/t5", { name: "Beacon", schedule: slot("Olsson 005", 2, "6:00 PM") });
+    db.setData("judges/j1/teamAssignments/t5", { ...slot("Olsson 005", 2, "6:00 PM"), id: "t5", teamName: "Beacon" });
+    await expect(overrideTeamSlot({ teamId: "t5", room: "Thornton", time: "5:00 PM" })).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/^Ada is already judging .+ in batch 1\.$/),
+    });
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Thornton", time: "5:00 PM" })).resolves.toMatchObject({ ok: true });
+    expect(db.getData("teams/t1/schedule")).toMatchObject({ room: "Thornton", batch: 1 });
   });
 
   test("is named by id when no name is given", async () => {
@@ -104,8 +235,17 @@ describe("moving a scheduled team", () => {
   });
 
   test("keeping the same room is not checked for a clash", async () => {
+    // a clash that already exists in the team's own slot does not follow it to a clear one
     db.setData("teams/t2/schedule/room", "Rice 340");
     await expect(overrideTeamSlot({ teamId: "t1", room: "Rice 340", time: "6:00 PM" })).resolves.toMatchObject({ ok: true });
+  });
+
+  test("re-saving the slot a team already holds is a no-op, not a clash", async () => {
+    db.setData("teams/t2/schedule/room", "Rice 340");
+    await expect(overrideTeamSlot({ teamId: "t1", room: "Rice 340", time: "5:00 PM" })).resolves.toEqual({
+      ok: false,
+      error: "Nothing changed. Generate a schedule first if there is none.",
+    });
   });
 
   test("a team with no batch is not checked for a clash", async () => {

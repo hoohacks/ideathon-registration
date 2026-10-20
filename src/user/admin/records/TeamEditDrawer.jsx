@@ -3,8 +3,9 @@ import { LinesSkeleton } from "../../../loadingUi";
 import { Alert, Button, Divider, MenuItem, TextField, Typography } from "@mui/material";
 import EditDrawer from "./EditDrawer";
 import { renameTeam } from "./recordEdits";
-import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound } from "../danger/dangerZone";
+import { overrideTeamSlot, setTeamSubmitted, forceIntoFinalRound, batchForTime } from "../danger/dangerZone";
 import { listRooms } from "../rooms/roomsService";
+import { parseClockTime, sameClockTime } from "../../judge/clockTime";
 import { findOpenSlots, scheduleTeamIntoBatch } from "../../judge/assignmentEdits";
 import { judgePickerOptions } from "../../judge/judgeRoles";
 import { deleteTeam } from "../people/peopleService";
@@ -25,15 +26,59 @@ export default function TeamEditDrawer({ team, teamId, onClose, onResult }) {
   const [room, setRoom] = useState(team.schedule?.room ?? "");
   const [time, setTime] = useState(team.schedule?.time ?? "");
   const [rooms, setRooms] = useState([]);
+  // null until loaded, so the hint does not call a real batch time invalid
+  const [batchTimes, setBatchTimes] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => { listRooms().then(setRooms).catch(() => setRooms([])); }, []);
 
+  // the same listing the "slot into an existing batch" control uses: a batch is
+  // a time, and the time typed below decides which batch the team lands in
+  useEffect(() => {
+    let live = true;
+    findOpenSlots()
+      .then((slots) => { if (live) setBatchTimes(slots); })
+      .catch(() => { if (live) setBatchTimes([]); });
+    return () => { live = false; };
+  }, []);
+
   const nameDirty = name.trim() !== (team.name ?? "");
+
+  // What the typed time means. Blank or unchanged (by clock time, so "5:00pm"
+  // is the same as "5:00 PM") keeps the team's own batch; anything else has to
+  // be a clock time that is one of the batches' times, which is also what the
+  // save enforces (overrideTeamSlot).
+  const typedTime = time.trim();
+  const keepsTime =
+    !typedTime ||
+    typedTime === (team.schedule?.time ?? "") ||
+    sameClockTime(typedTime, team.schedule?.time);
+  const notClockTime = !keepsTime && parseClockTime(typedTime) == null;
+  const movesToBatch = keepsTime ? null : batchForTime(typedTime, batchTimes);
+  // judged the way the save judges it: "5pm" over "5:00 PM", or a blank time,
+  // changes nothing, and counting it would send a save the override refuses
+  // with "Nothing changed" -- after a rename in the same save has already landed
   const slotDirty =
-    Boolean(team.schedule) &&
-    (room !== (team.schedule?.room ?? "") || time !== (team.schedule?.time ?? ""));
+    Boolean(team.schedule) && (room !== (team.schedule?.room ?? "") || !keepsTime);
+  // the save stores the batch's own label, not the typed spelling, so the toast
+  // names that one too
+  const movedTime = keepsTime
+    ? team.schedule?.time
+    : batchTimes?.find((slot) => slot.batch === movesToBatch)?.time ?? typedTime;
+  let batchHint;
+  if (keepsTime) {
+    batchHint = `Batch ${team.schedule?.batch ?? "?"}`;
+  } else if (movesToBatch != null) {
+    batchHint = `Moves to batch ${movesToBatch}`;
+  } else if (notClockTime) {
+    batchHint = "Not a clock time (like 5:00 PM)";
+  } else if (batchTimes === null) {
+    batchHint = "Checking batch times…";
+  } else {
+    const valid = batchTimes.map((slot) => slot.time).join(", ");
+    batchHint = `Not a batch time${valid ? ` (${valid})` : ""}`;
+  }
 
   const run = async (work, message) => {
     setSaving(true);
@@ -52,7 +97,8 @@ export default function TeamEditDrawer({ team, teamId, onClose, onResult }) {
     if (nameDirty && !(await run(() => renameTeam(teamId, name), `Renamed to ${name.trim()}`))) return;
     if (slotDirty && !(await run(
       () => overrideTeamSlot({ teamId, teamName: name, room, time }),
-      `Moved to ${room} at ${time}`
+      `Moved to ${room} at ${movedTime}` +
+        (movesToBatch != null && movesToBatch !== team.schedule?.batch ? ` (batch ${movesToBatch})` : "")
     ))) return;
     onClose();
   };
@@ -94,7 +140,8 @@ export default function TeamEditDrawer({ team, teamId, onClose, onResult }) {
             value={time}
             onChange={(event) => setTime(event.target.value)}
             placeholder="5:00 PM"
-            helperText={`Batch ${team.schedule.batch ?? "?"} · moves every assigned judge too`}
+            error={batchHint.startsWith("Not a")}
+            helperText={`${batchHint} · moves every assigned judge too`}
           />
         </>
       ) : (

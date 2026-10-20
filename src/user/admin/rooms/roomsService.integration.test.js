@@ -130,6 +130,12 @@ describe("adding a room", () => {
     await expect(addRoom(undefined)).resolves.toEqual({ ok: false, error: "Give the room a name." });
     await expect(addRoom(" Spare ")).resolves.toEqual({ ok: false, error: "Spare is already on the list." });
   });
+
+  test("refuses a name that differs only by case, naming the room as stored", async () => {
+    await expect(addRoom("rice 340")).resolves.toEqual({ ok: false, error: "Rice 340 is already on the list." });
+    await expect(addRoom(" OLSSON 005 ")).resolves.toEqual({ ok: false, error: "Olsson 005 is already on the list." });
+    expect(db.getData("config/judgingRooms")).toEqual(["Rice 340", "Rice 342", "Olsson 005", "Spare"]);
+  });
 });
 
 describe("renaming a room", () => {
@@ -157,6 +163,27 @@ describe("renaming a room", () => {
     await expect(renameRoom("Spare", undefined)).resolves.toEqual({ ok: false, error: "Give the room a name." });
     await expect(renameRoom("Nowhere", "X")).resolves.toEqual({ ok: false, error: "Nowhere is not on the list." });
     await expect(renameRoom("Spare", "Rice 342")).resolves.toEqual({ ok: false, error: "Rice 342 is already on the list." });
+  });
+
+  test("refuses a name that matches another room ignoring case", async () => {
+    await expect(renameRoom("Spare", "RICE 342")).resolves.toEqual({ ok: false, error: "Rice 342 is already on the list." });
+    expect(db.getData("config/judgingRooms")).toEqual(["Rice 340", "Rice 342", "Olsson 005", "Spare"]);
+  });
+
+  test("refuses renaming a room to exactly the name it has, and logs nothing", async () => {
+    await expect(renameRoom("Rice 340", " Rice 340 ")).resolves.toEqual({ ok: false, error: "That is already the name." });
+    expect(db.getData("adminLog")).toBeNull();
+  });
+
+  test("allows recasing a room's own name and still moves every scheduled copy", async () => {
+    await expect(renameRoom("Rice 340", "RICE 340")).resolves.toMatchObject({ ok: true });
+    expect(db.getData("config/judgingRooms")).toEqual(["RICE 340", "Rice 342", "Olsson 005", "Spare"]);
+    expect(db.getData("teams/t1/schedule/room")).toBe("RICE 340");
+    expect(db.getData("teams/t4/finalSlot/room")).toBe("RICE 340");
+    expect(db.getData("judges/j1/teamAssignments/t1/room")).toBe("RICE 340");
+    expect(db.getData("judges/j1/finalAssignments/t4/room")).toBe("RICE 340");
+    expect(db.getData("finalRound/teams/t4/room")).toBe("RICE 340");
+    expect(db.getData("teams/t3/schedule/room")).toBe("Rice 342");
   });
 
   test("works with no teams, judges or final round at all", async () => {
