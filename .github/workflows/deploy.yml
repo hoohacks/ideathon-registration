@@ -103,8 +103,11 @@ jobs:
 
       # The dashboard compares config/rulesVersion with REQUIRED_RULES_VERSION,
       # as a number. Last, so if this fails the site and rules are already
-      # live and the only effect is the dashboard warning staying up.
+      # live and the only effect is the dashboard warning staying up. It must
+      # not fail the job either: Discord would announce a live release as one
+      # that "did not deploy".
       - name: Record the rules version
+        continue-on-error: true
         env:
           PROJECT: ${{ vars.FIREBASE_PROJECT }}
           REF: ${{ github.event.release.tag_name || github.sha }}
@@ -114,7 +117,10 @@ jobs:
             echo "::error::No // rulesVersion: marker in database.rules.json."
             exit 1
           fi
-          npx firebase database:set /config/rulesVersion --data "$VERSION" --project "$PROJECT" --force
+          if ! npx firebase database:set /config/rulesVersion --data "$VERSION" --project "$PROJECT" --force; then
+            echo "::warning::Rules and site are live, but config/rulesVersion was not updated. Set it to $VERSION in Control panel, Event setup, Advanced."
+            exit 1
+          fi
 
           echo "### Rules deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

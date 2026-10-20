@@ -37,9 +37,11 @@ dashboard compares it with the version the app needs and shows a red warning
 until they match, because the app cannot read the deployed rules itself. See
 [security rules](security-rules.md#versioning).
 
-The workflow needs two repository settings: the `GCP_SA_KEY` secret, a service
-account key that can deploy rules and write the database, and the
-`FIREBASE_PROJECT` variable, the project id.
+The workflow needs two repository settings: the `GCP_SA_KEY` secret, the JSON key
+of a service account that can deploy rules and write the database (the Firebase
+Admin role covers both), and the `FIREBASE_PROJECT` variable, the project id. If
+recording the version fails, the release still goes out and the run shows a
+warning saying what to set by hand.
 
 ## First-time Firebase setup
 
