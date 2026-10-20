@@ -75,18 +75,38 @@ jobs:
             echo "Organizers can still sign in at \`#/login?staff\`." >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Authenticate to Google Cloud
+        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy Realtime Database and Storage Rules
+        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+        run: |
+          npx firebase-tools deploy --only database,storage --project ${{ vars.FIREBASE_PROJECT }}
+
+      - name: Update config/rulesVersion and write step summary
+        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+        run: |
+          # Extract rule version identifier (git short SHA or release tag)
+          RULES_VERSION="${{ github.event.release.tag_name || github.sha }}"
+
+          # Write version to Firebase RTDB config to clear organizer dashboard warning
+          npx firebase-tools database:set /config/rulesVersion "\"$RULES_VERSION\"" \
+            --project ${{ vars.FIREBASE_PROJECT }} \
+            --confirm
+
+          echo "### Firebase Rules Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rules Version:** \`$RULES_VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Project:** \`${{ vars.FIREBASE_PROJECT }}\`" >> $GITHUB_STEP_SUMMARY
+
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
           commit_message: "Deploy ${{ github.event.release.tag_name || github.sha }}"
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
-      - name: Deploy Realtime Database and Storage Rules
-        run: firebase deploy --only database,storage --token "${{ secrets.FIREBASE_TOKEN }}" --project ${{ vars.FIREBASE_PROJECT }}
 
   # Tells the team's Discord what happened to a release: live, or failed and
   # why to look. A job of its own, after the deploy, so it can report either
