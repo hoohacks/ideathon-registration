@@ -19,6 +19,7 @@ const DOC = "application/msword";
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PPT = "application/vnd.ms-powerpoint";
 const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 let testEnv;
 
@@ -55,6 +56,17 @@ describe("uploading a resume", () => {
     await assertSucceeds(upload(null, "ideathon-resumes/2027/2028/a.pdf", PDF));
     await assertSucceeds(upload(null, "ideathon-resumes/2027/2028/a.doc", DOC));
     await assertSucceeds(upload(null, "ideathon-resumes/2027/2028/a.docx", DOCX));
+  });
+
+  test("an anonymous resume upload with an .xlsx or .pptx content type is refused", async () => {
+    await assertFails(upload(null, "ideathon-resumes/2027/2028/a.xlsx", XLSX));
+    await assertFails(upload(null, "ideathon-resumes/2027/2028/a.pptx", PPTX));
+  });
+
+  test("an anonymous write to a resume path that already holds a file is refused", async () => {
+    const existingPath = "ideathon-resumes/2027/2028/existing.pdf";
+    await seedFile(existingPath, PDF);
+    await assertFails(upload(null, existingPath, PDF));
   });
 
   test("the event year is not hardcoded", async () => {
