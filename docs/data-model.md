@@ -42,7 +42,7 @@ admin-only root grant, and `src/schema.test.js` asserts they stay that way.
 | `eventName` | The phrase typed to confirm publishing over an existing schedule |
 | `minJudgesPerTeam`, `maxJudgesPerTeam` | First-round panel size: min (default 3) is warned about, not enforced; max absent means no cap, so every judge is seated |
 | `finalRoundSize` | Finalists (default 4) |
-| `rulesVersion` | The rules version an organizer says is published; see [security rules](security-rules.md#versioning) |
+| `rulesVersion` | The rules version deployed, recorded by the deploy workflow; see [security rules](security-rules.md#versioning) |
 
 Keys without a screen of their own are set from Control panel, Event setup,
 Advanced, which checks the type of the known ones.

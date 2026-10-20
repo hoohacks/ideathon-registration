@@ -11,12 +11,12 @@
  * not a wrong one — for that see test/rules/, which executes the rules against
  * the emulator. This file is the half that runs in CI without a JVM.
  */
-import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { assignmentList } from "./user/judge/assignmentList";
 import { memberIds, isMember } from "./user/team/teamMembers";
 import { MAX_TEAM_SIZE } from "./user/team/teamMembership";
+import { REQUIRED_RULES_VERSION } from "./user/admin/eventReadiness";
 
 const RULES_PATH = path.join(process.cwd(), "database.rules.json");
 const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
@@ -174,48 +174,19 @@ describe("a judge can read the submissions they are assigned", () => {
   });
 });
 
-describe("the deployed rules cannot drift from these ones unnoticed", () => {
+describe("the rules version is the one this build expects", () => {
   /**
-   * Nothing in this project deploys the rules — they are pasted into the
-   * Firebase console by hand. So the one failure this cannot catch is the rules
-   * file changing in git and never being republished. This test makes that
-   * change loud: edit the rules and it fails until you bump the version and
-   * paste the new digest, which is the moment you are reminded to republish.
+   * The deploy workflow records the `// rulesVersion:` marker at
+   * config/rulesVersion, and the dashboard compares that with
+   * REQUIRED_RULES_VERSION. If the two numbers here disagree, every deploy
+   * leaves the dashboard warning that the rules are out of date.
    *
-   * When it fails: republish database.rules.json in the console, bump
-   * `// rulesVersion:` at the top of that file, and put the printed digest here.
+   * When it fails: you bumped one and not the other. Bump both.
    */
-  const EXPECTED_VERSION = 11;
-  const EXPECTED_DIGEST = "6de139375e5e2849e63e5e65e04a56cde7676be14875f899f5f2a0cc4236cc95";
-
-  // sorted so a pure reordering of the file is not treated as a rules change
-  function sortDeep(value) {
-    if (Array.isArray(value)) return value.map(sortDeep);
-    if (value === null || typeof value !== "object") return value;
-    return Object.fromEntries(
-      Object.keys(value).sort().map((key) => [key, sortDeep(value[key])])
-    );
-  }
-
-  test("the version marker matches the rules", () => {
+  test("the marker matches REQUIRED_RULES_VERSION", () => {
     const declared = RAW_RULES.match(/\/\/\s*rulesVersion:\s*(\d+)/);
     expect(declared).not.toBeNull();
-    expect(Number(declared[1])).toBe(EXPECTED_VERSION);
-
-    const digest = crypto
-      .createHash("sha256")
-      .update(JSON.stringify(sortDeep(RULES.rules)))
-      .digest("hex");
-
-    if (digest !== EXPECTED_DIGEST) {
-      throw new Error(
-        `database.rules.json changed.\n\n` +
-          `  1. Republish it in the Firebase console (Realtime Database -> Rules).\n` +
-          `  2. Bump "// rulesVersion:" to ${EXPECTED_VERSION + 1} in that file.\n` +
-          `  3. Set EXPECTED_VERSION = ${EXPECTED_VERSION + 1} and\n` +
-          `     EXPECTED_DIGEST = "${digest}" in src/schema.test.js\n`
-      );
-    }
+    expect(Number(declared[1])).toBe(REQUIRED_RULES_VERSION);
   });
 });
 
