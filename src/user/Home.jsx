@@ -1,6 +1,6 @@
 import Layout from "./Layout";
 import { useContext, useEffect, useState } from "react";
-import { Navigate, Link as RouterLink } from "react-router-dom";
+import { Navigate, Link as RouterLink } from "react-router";
 import { AuthContext } from "../App";
 import { hasRole } from "../roles";
 import AdminHome from "./admin/AdminHome";
@@ -277,8 +277,8 @@ function Home() {
                             What to do next
                         </Typography>
                         <Card>
-                            {steps.map((step, index) => (
-                                <Box key={step.key}>
+                            {steps.map(({ key, ...step }, index) => (
+                                <Box key={key}>
                                     {index > 0 && <Divider sx={{ mx: 2.5 }} />}
                                     <NextStep {...step} />
                                 </Box>

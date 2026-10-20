@@ -10,7 +10,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import { CardGridSkeleton } from "../../loadingUi";

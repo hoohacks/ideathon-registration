@@ -52,7 +52,7 @@ Two things that will confuse you:
 
 ## Stack
 
-- React 18 built with Vite (`vite.config.mjs`), and React Router in hash mode.
+- React 19 built with Vite (`vite.config.mjs`), and React Router in hash mode.
   Files containing JSX must be `.jsx`; Vite will not parse JSX in a `.js` file.
 - Build-time settings are `VITE_*` environment variables, read as
   `import.meta.env.VITE_*` and compiled into the bundle: `VITE_USE_EMULATOR`,

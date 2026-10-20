@@ -3,7 +3,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../../App";
 import { ref, get, set, onValue, runTransaction } from "firebase/database";
 import { auth, database, storage } from "../../firebase";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { memberIds } from "./teamMembers";
 import { personName } from "../../roles.js";
 import { leaveTeam } from "./teamMembership.js";
@@ -29,7 +29,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "react-router";
 import { PiArrowSquareOut } from "react-icons/pi";
 import PitchCard from "./PitchCard";
 

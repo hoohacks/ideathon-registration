@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { Tab, Tabs } from "@mui/material";
 import Layout from "../../Layout.jsx";
 import { PageHeader } from "../adminUi";

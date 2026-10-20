@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import { auth, database } from "../firebase";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { ref, update } from "firebase/database";
 
 // page title
