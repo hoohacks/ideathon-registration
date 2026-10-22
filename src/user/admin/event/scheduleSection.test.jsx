@@ -70,12 +70,22 @@ describe("final round times", () => {
 
   test("a typed start and slot length are saved, the length as a number", async () => {
     render(<ScheduleSection config={{}} onResult={vi.fn()} />);
-    fireEvent.change(start(), { target: { value: "5:30 PM" } });
+    fireEvent.change(start(), { target: { value: "17:30" } });
     fireEvent.change(minutes(), { target: { value: "10" } });
     fireEvent.click(saveTiming());
     await waitFor(() =>
-      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "5:30 PM", slotMinutes: 10 })
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "17:30", slotMinutes: 10 })
     );
+  });
+
+  test("a stored start is shown in the time picker", () => {
+    render(
+      <ScheduleSection config={{ finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />
+    );
+    expect(start()).toHaveAttribute("type", "time");
+    expect(start()).toHaveValue("17:30");
+    expect(minutes()).toHaveValue(10);
+    expect(saveTiming()).toBeDisabled();
   });
 
   test("clearing both saves blanks as no timing", async () => {

@@ -12,6 +12,17 @@ import {
   panelLabel,
 } from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService";
+import { formatClock, parseClock } from "../../judge/finalRoundPlan.js";
+
+/**
+ * "5:30 PM", as stored, to the "17:30" a time input takes; blank if unset.
+ * Stored in the batch-time format because that is what goes on the cards.
+ */
+function toTimeInput(stored) {
+  const minutes = parseClock(stored);
+  if (minutes === null) return "";
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
 
 /**
  * The shape of judging day.
@@ -28,7 +39,7 @@ export default function ScheduleSection({ config, onResult }) {
   const storedMin = config.minJudgesPerTeam ?? MIN_JUDGES_PER_TEAM;
   const storedMax = config.maxJudgesPerTeam ?? MAX_JUDGES_PER_TEAM;
   // no fallback: unset means the final round shows "Slot 1", "Slot 2"
-  const storedFinalStart = config.finalRoundStart ?? "";
+  const storedFinalStart = toTimeInput(config.finalRoundStart);
   const storedSlotMinutes = config.finalRoundSlotMinutes == null ? "" : String(config.finalRoundSlotMinutes);
 
   const [count, setCount] = useState(String(storedCount));
@@ -191,8 +202,8 @@ export default function ScheduleSection({ config, onResult }) {
             hint="Finalists present one after another from the start time, so their cards show a time instead of a slot number. Read when you publish the final round; cards already published keep their times. Leave both blank to show slot numbers."
           >
             <TextField
+              type="time"
               label="Start"
-              placeholder="5:30 PM"
               value={finalStart}
               onChange={(event) => setFinalStart(event.target.value)}
               sx={{ width: FIELD.time }}
@@ -214,7 +225,7 @@ export default function ScheduleSection({ config, onResult }) {
               onClick={() => run(
                 () => setFinalRoundTiming({ start: finalStart, slotMinutes: nextSlotMinutes }),
                 finalStart.trim()
-                  ? `Final round starts at ${finalStart.trim()}, ${nextSlotMinutes} min per team`
+                  ? `Final round starts at ${formatClock(parseClock(finalStart))}, ${nextSlotMinutes} min per team`
                   : "Final round times cleared"
               )}
             >
