@@ -20,7 +20,7 @@ vi.mock("firebase/database", () => ({
 vi.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
 vi.mock("../../../roles.js", () => ({ requireAdmin: vi.fn(async () => ({ uid: "admin-1" })) }));
 
-const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom, setSubmissionsOpen, setSubmissionsCloseAt } =
+const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom, setFinalRoundTime, setSubmissionsOpen, setSubmissionsCloseAt } =
   await import("./eventConfig");
 const { BATCH_COUNT, BATCH_TIMES } = await import("../../judge/schedulePlan");
 const { requireAdmin } = await import("../../../roles.js");
@@ -101,6 +101,23 @@ describe("writing config", () => {
 
   test("an empty final round room is refused", async () => {
     expect((await setFinalRoundRoom("   ")).ok).toBe(false);
+  });
+
+  test("the final round time is saved trimmed and logged", async () => {
+    expect((await setFinalRoundTime("  7:00 PM ")).ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["config/finalRoundTime"]).toBe("7:00 PM");
+    expect(mockUpdate.mock.calls[0][1]["adminLog/entry-1"].action).toBe("config.finalRoundTime");
+  });
+
+  test("a blank final round time clears it", async () => {
+    mockGet.mockResolvedValue({ exists: () => true, val: () => "7:00 PM" });
+    expect((await setFinalRoundTime("  ")).ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["config/finalRoundTime"]).toBeNull();
+  });
+
+  test("clearing a time that was never set writes nothing", async () => {
+    expect((await setFinalRoundTime("")).ok).toBe(true);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

@@ -29,6 +29,26 @@ export function useTeamPitch(teamId) {
     return { schedule, finalSlot };
 }
 
+/**
+ * When the final round starts (config/finalRoundTime), read live. Only
+ * subscribed once the team is a finalist, so the card costs nothing before.
+ */
+function useFinalRoundTime(enabled) {
+    const [time, setTime] = useState(null);
+
+    useEffect(() => {
+        setTime(null);
+        if (!enabled) return undefined;
+        return onValue(
+            ref(database, "config/finalRoundTime"),
+            (snapshot) => setTime(String(snapshot.val() ?? "").trim() || null),
+            () => setTime(null)
+        );
+    }, [enabled]);
+
+    return time;
+}
+
 const ORDINALS = ["1st", "2nd", "3rd"];
 const ordinal = (n) => ORDINALS[n - 1] ?? `${n}th`;
 
@@ -72,6 +92,7 @@ function PitchLine({ label, time, room }) {
  * published, so it never takes space from a page that has no answer yet.
  */
 export default function PitchCard({ schedule, finalSlot }) {
+    const finalTime = useFinalRoundTime(Boolean(finalSlot));
     if (!schedule && !finalSlot) return null;
     return (
         <Card component="section" aria-label="When you pitch" sx={{ borderRadius: 4, border: 2, borderColor: "primary.main" }}>
@@ -81,7 +102,11 @@ export default function PitchCard({ schedule, finalSlot }) {
                         <PitchLine label={finalSlot ? "First round" : null} time={schedule.time} room={schedule.room} />
                     )}
                     {finalSlot && (
-                        <PitchLine label="Final round" time={finalSlot.timeslot} room={finalSlot.room} />
+                        <PitchLine
+                            label={finalTime ? `Final round, starting at ${finalTime}` : "Final round"}
+                            time={finalSlot.timeslot}
+                            room={finalSlot.room}
+                        />
                     )}
                 </Stack>
             </CardContent>

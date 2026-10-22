@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, TextField } from "@mui/material";
 import { FIELD, Section, SettingList, SettingRow } from "../adminUi";
-import { setBatchCount, setBatchTimes, setFinalRoundRoom, setJudgesPerTeam } from "./eventConfig";
+import { setBatchCount, setBatchTimes, setFinalRoundRoom, setFinalRoundTime, setJudgesPerTeam } from "./eventConfig";
 import {
   BATCH_COUNT,
   BATCH_TIMES,
@@ -23,12 +23,15 @@ export default function ScheduleSection({ config, onResult }) {
   const storedCount = config.batchCount ?? BATCH_COUNT;
   const storedTimes = config.batchTimes ?? BATCH_TIMES;
   const storedRoom = config.finalRoundRoom ?? FINAL_ROUND_ROOM;
+  // no built-in default: an unset time shows nothing rather than a guess
+  const storedFinalTime = config.finalRoundTime ?? "";
   const storedMin = config.minJudgesPerTeam ?? MIN_JUDGES_PER_TEAM;
   const storedMax = config.maxJudgesPerTeam ?? MAX_JUDGES_PER_TEAM;
 
   const [count, setCount] = useState(String(storedCount));
   const [times, setTimes] = useState(storedTimes);
   const [room, setRoom] = useState(storedRoom);
+  const [finalTime, setFinalTime] = useState(storedFinalTime);
   const [minJudges, setMinJudges] = useState(String(storedMin));
   // blank is "no cap", which is how a null max reads back
   const [maxJudges, setMaxJudges] = useState(storedMax == null ? "" : String(storedMax));
@@ -39,6 +42,7 @@ export default function ScheduleSection({ config, onResult }) {
   useEffect(() => { setCount(String(storedCount)); }, [storedCount]);
   useEffect(() => { setTimes(storedTimes); }, [storedTimes]);
   useEffect(() => { setRoom(storedRoom); }, [storedRoom]);
+  useEffect(() => { setFinalTime(storedFinalTime); }, [storedFinalTime]);
   useEffect(() => { setMinJudges(String(storedMin)); }, [storedMin]);
   useEffect(() => { setMaxJudges(storedMax == null ? "" : String(storedMax)); }, [storedMax]);
 
@@ -169,6 +173,29 @@ export default function ScheduleSection({ config, onResult }) {
               variant="outlined"
               disabled={busy || room === storedRoom}
               onClick={() => run(() => setFinalRoundRoom(room), `Final round room set to ${room}`)}
+            >
+              Save
+            </Button>
+          </SettingRow>
+
+          <SettingRow
+            label="Final round time"
+            hint="When the final round starts. Unlike the batch times, teams and judges see this live, so a change reaches them straight away. Leave blank to show no time."
+          >
+            <TextField
+              value={finalTime}
+              onChange={(event) => setFinalTime(event.target.value)}
+              placeholder="7:00 PM"
+              sx={{ width: FIELD.time }}
+              slotProps={{ htmlInput: { "aria-label": "Final round time" } }}
+            />
+            <Button
+              variant="outlined"
+              disabled={busy || finalTime.trim() === storedFinalTime}
+              onClick={() => run(
+                () => setFinalRoundTime(finalTime),
+                finalTime.trim() ? `Final round time set to ${finalTime.trim()}` : "Final round time cleared"
+              )}
             >
               Save
             </Button>
