@@ -5,7 +5,7 @@ Everything lives in one Firebase Realtime Database tree.
 ```
 /admins/{uid}              true
 /config                    judgingRooms[] batchCount batchTimes eventStart eventName
-                           finalRoundRoom finalRoundSize finalRoundStart finalRoundSlotMinutes
+                           finalRoundRoom finalRoundSize finalRoundTime finalRoundSlotMinutes
                            minJudgesPerTeam maxJudgesPerTeam
                            submissionsOpen submissionsCloseAt rulesVersion scheduleMeta
 /competitors/{uid}         name, email, major, school, dietary, resume,
@@ -43,7 +43,7 @@ admin-only root grant, and `src/schema.test.js` asserts they stay that way.
 | `eventName` | The phrase typed to confirm publishing over an existing schedule |
 | `minJudgesPerTeam`, `maxJudgesPerTeam` | First-round panel size: min (default 3) is warned about, not enforced; max absent means no cap, so every judge is seated |
 | `finalRoundSize` | Finalists (default 4) |
-| `finalRoundStart`, `finalRoundSlotMinutes` | When the final round starts ("5:30 PM") and minutes per finalist. With both set, published final round cards read a clock time; otherwise "Slot 1", "Slot 2" |
+| `finalRoundTime`, `finalRoundSlotMinutes` | When the final round starts ("7:00 PM") and minutes per finalist. Read live: with both set, every "Slot N" is shown as a clock time |
 | `rulesVersion` | The rules version deployed, recorded by the deploy workflow; see [security rules](security-rules.md#versioning) |
 
 Keys without a screen of their own are set from Control panel, Event setup,

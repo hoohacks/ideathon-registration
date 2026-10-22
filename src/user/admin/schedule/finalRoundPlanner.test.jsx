@@ -220,7 +220,7 @@ test("a refused save is shown and the plan is left as it was", async () => {
 });
 
 test("with final round times set, the running order shows each finalist's time", async () => {
-  db.setData("config", { finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 15 });
+  db.setData("config", { finalRoundTime: "5:30 PM", finalRoundSlotMinutes: 15 });
   openWith(plan());
   expect(await screen.findByText("5:30 PM")).toBeInTheDocument();
   expect(screen.getByText("5:45 PM")).toBeInTheDocument();

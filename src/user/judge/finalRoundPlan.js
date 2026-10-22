@@ -27,68 +27,14 @@ export function slotLabel(order) {
 }
 
 /**
- * A clock time as minutes past midnight, or null if it is not one.
- *
- * Takes what an organizer types into the batch-time fields -- "5:30 PM",
- * "5:30pm", "5 PM" -- and the 24-hour "17:30" a time input produces.
- */
-export function parseClock(text) {
-  const match = /^(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?$/i.exec(String(text ?? "").trim());
-  if (!match) return null;
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] ?? 0);
-  const meridiem = match[3]?.[0].toLowerCase();
-  if (minutes > 59) return null;
-  if (meridiem) {
-    if (hours < 1 || hours > 12) return null;
-    hours = (hours % 12) + (meridiem === "p" ? 12 : 0);
-  } else if (match[2] === undefined || hours > 23) {
-    // a bare "5" is not a time anybody meant
-    return null;
-  }
-  return hours * 60 + minutes;
-}
-
-/** Minutes past midnight as "5:30 PM", the way the batch times are written. */
-export function formatClock(total) {
-  const wrapped = ((total % 1440) + 1440) % 1440;
-  const hours = Math.floor(wrapped / 60);
-  const minutes = String(wrapped % 60).padStart(2, "0");
-  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? "AM" : "PM"}`;
-}
-
-/**
- * config/finalRoundStart and config/finalRoundSlotMinutes as one value, or
- * null unless both are usable. Half a setting is no setting: slots fall back
- * to their labels rather than inventing a start or a length.
- */
-export function finalTiming(start, slotMinutes) {
-  const startMinutes = parseClock(start);
-  const length = Number(slotMinutes);
-  if (startMinutes === null || !Number.isInteger(length) || length < 1) return null;
-  return { startMinutes, slotMinutes: length };
-}
-
-/**
- * What a finalist's card says for when it presents: a clock time when the
- * final round has a start and a slot length, its slot label otherwise.
- */
-export function slotTime(order, timing) {
-  return timing ? formatClock(timing.startMinutes + order * timing.slotMinutes) : slotLabel(order);
-}
-
-/**
- * The inverse of slotLabel and slotTime, for sorting what was published.
- * Judges' and teams' copies carry only the label, not `order`, and "Slot 10"
- * sorts before "Slot 2" as text, as "10:00 AM" does before "9:30 AM". Anything
- * else -- a free-text time from a forced entry -- sorts after every slotted
- * team. A round that runs past midnight is not handled.
+ * The inverse of slotLabel, for sorting what was published. Judges' and teams'
+ * copies carry only the label, not `order`, and "Slot 10" sorts before
+ * "Slot 2" as text. A free-text time from a forced entry has no slot and sorts
+ * after every slotted team.
  */
 export function slotOrder(label) {
-  const text = String(label ?? "").trim();
-  const match = /^Slot (\d+)$/.exec(text);
-  if (match) return Number(match[1]) - 1;
-  return parseClock(text) ?? Infinity;
+  const match = /^Slot (\d+)$/.exec(String(label ?? "").trim());
+  return match ? Number(match[1]) - 1 : Infinity;
 }
 
 /** Comparator over slot labels; safe with two unslotted entries. */

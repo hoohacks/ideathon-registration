@@ -4,7 +4,7 @@ import { requireAdmin } from "../../roles.js";
 import { FIRST_ROUND } from "./getTeamInfo.js";
 import { compareForRanking, rankingEntry, scoredJudgeCount } from "./scoreRubric.js";
 import { guardWith } from "../admin/snapshots.js";
-import { buildFinalPlan, slotsOf, slotTime, finalTiming } from "./finalRoundPlan.js";
+import { buildFinalPlan, slotsOf, slotLabel } from "./finalRoundPlan.js";
 import { checkFinalDrift, blockingOnly, BLOCKING } from "./checkFinalDrift.js";
 import { clearFinalDraft } from "./finalDraftStore.js";
 import { judgesRoundOne } from "./judgeRoles.js";
@@ -91,13 +91,11 @@ function eligibleJudgePool(judgesData) {
  * from how it looked.
  */
 async function readFinalWorld() {
-  const [teamsSnap, judgesSnap, sizeSnap, roomSnap, startSnap, slotMinutesSnap] = await Promise.all([
+  const [teamsSnap, judgesSnap, sizeSnap, roomSnap] = await Promise.all([
     get(ref(database, "teams")),
     get(ref(database, "judges")),
     get(ref(database, "config/finalRoundSize")),
     get(ref(database, "config/finalRoundRoom")),
-    get(ref(database, "config/finalRoundStart")),
-    get(ref(database, "config/finalRoundSlotMinutes")),
   ]);
 
   const teamsData = teamsSnap.exists() ? teamsSnap.val() ?? {} : {};
@@ -114,9 +112,6 @@ async function readFinalWorld() {
     // ignored it and used the constant, so changing the room in the control
     // panel changed the display and nothing else.
     room: roomSnap.exists() ? String(roomSnap.val()) : FINAL_ROUND_ROOM,
-    // read live rather than frozen into the plan, like the planner's view of
-    // it, so retiming the round needs no rebuild and cannot drift
-    timing: finalTiming(startSnap.val(), slotMinutesSnap.val()),
   };
 }
 
@@ -291,7 +286,6 @@ export async function readLiveFinalBasis() {
     ),
     room: world.room,
     size: world.size,
-    timing: world.timing,
     teamsData: world.teamsData,
     judgesData: world.judgesData,
   };
@@ -313,9 +307,6 @@ export async function readLiveFinalBasis() {
  * The last two exist because Realtime Database needs read permission at the
  * location being queried, and the standings must not be readable. Denormalising
  * is the same answer the first-round schedule already uses.
- *
- * The time is a clock time when config/finalRoundStart and
- * config/finalRoundSlotMinutes are both set, and "Slot N" otherwise.
  *
  * Returns { ok, error?, drift?, warnings, snapshotId }. Never throws.
  */
@@ -339,7 +330,7 @@ export async function publishFinalRound(plan) {
 
     for (const slot of finalists) {
       const ranked = (plan.ranked ?? []).find((team) => team.teamId === slot.teamId);
-      const timeslot = slotTime(slot.order, live.timing);
+      const timeslot = slotLabel(slot.order);
 
       teamsPayload[slot.teamId] = {
         name: slot.teamName,
@@ -369,7 +360,7 @@ export async function publishFinalRound(plan) {
           teamId: slot.teamId,
           teamName: slot.teamName,
           room: plan.room,
-          timeslot: slotTime(slot.order, live.timing),
+          timeslot: slotLabel(slot.order),
         };
       }
     }

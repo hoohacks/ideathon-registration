@@ -8,13 +8,13 @@ import {
   MAX_JUDGES_PER_TEAM,
   panelLabel,
 } from "../../judge/schedulePlan.js";
+import { normalizeClockTime } from "../../judge/clockTime.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService.js";
-import { formatClock, parseClock } from "../../judge/finalRoundPlan.js";
 import { EVENT_START } from "../../../eventInfo.js";
 
 /**
- * Batch count, batch times, judges per team, event start, and the final round
- * room and timing.
+ * Batch count, batch times, judges per team, event start and the final round
+ * room.
  *
  * All of these were module constants and remain so as fallbacks. Unlike the room
  * list, these are structural rather than venue facts: an event always has some
@@ -37,23 +37,16 @@ async function readOne(path, fallback) {
 }
 
 export async function readEventConfig() {
-  const [
-    batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom,
-    finalRoundStart, finalRoundSlotMinutes,
-  ] = await Promise.all([
-    readOne("config/batchCount", BATCH_COUNT),
-    readOne("config/batchTimes", BATCH_TIMES),
-    readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
-    readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
-    readOne("config/eventStart", EVENT_START),
-    readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
-    readOne("config/finalRoundStart", null),
-    readOne("config/finalRoundSlotMinutes", null),
-  ]);
-  return {
-    batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom,
-    finalRoundStart, finalRoundSlotMinutes,
-  };
+  const [batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom] =
+    await Promise.all([
+      readOne("config/batchCount", BATCH_COUNT),
+      readOne("config/batchTimes", BATCH_TIMES),
+      readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
+      readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
+      readOne("config/eventStart", EVENT_START),
+      readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
+    ]);
+  return { batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom };
 }
 
 export async function setBatchCount(count) {
@@ -79,11 +72,41 @@ export async function setBatchTimes(times) {
     return { ok: false, error: `Give every batch a time. Missing: ${missing.join(", ")}.` };
   }
 
+  // Each time is stored as the text the schedule shows, so it has to be a real
+  // clock time: "banana" would otherwise save and put a nonsense slot on every
+  // judge's and team's schedule at the next generation.
+  const canonical = {};
+  const invalid = [];
+  for (let batch = 1; batch <= count; batch++) {
+    const time = normalizeClockTime(times[batch]);
+    if (time === null) invalid.push(batch);
+    else canonical[batch] = time;
+  }
+  if (invalid.length) {
+    return {
+      ok: false,
+      error: invalid
+        .map((batch) => `Batch ${batch}'s time "${String(times[batch]).trim()}" is not a clock time like 5:00 PM.`)
+        .join(" "),
+    };
+  }
+
+  // Two batches at one time would put both waves of teams in the same slot, so
+  // the rooms and judges the batches exist to spread out would be double-booked.
+  const seen = new Map();
+  for (let batch = 1; batch <= count; batch++) {
+    const time = canonical[batch];
+    if (seen.has(time)) {
+      return { ok: false, error: `Batches ${seen.get(time)} and ${batch} both start at ${time}. Give each batch its own time.` };
+    }
+    seen.set(time, batch);
+  }
+
   const before = await readOne("config/batchTimes", BATCH_TIMES);
   return applyAdminAction({
     action: "config.batchTimes",
     summary: `Batch times set for ${count} batch(es)`,
-    changes: [{ path: "config/batchTimes", before, after: times }],
+    changes: [{ path: "config/batchTimes", before, after: canonical }],
   });
 }
 
@@ -178,44 +201,39 @@ export async function setFinalRoundRoom(room) {
 }
 
 /**
- * When the final round starts and how long each finalist gets, so the cards
- * read "5:40 PM" rather than "Slot 2". Both blank clears it, and slots go back
- * to their labels; that is the fallback because there is no sensible default
- * for when a final round starts.
- *
- * Read when the final round is published. A round already published keeps the
- * times it went out with.
+ * When the final round starts, and how many minutes each finalist gets. With
+ * both, each finalist's slot reads as a clock time ("Slot 2" becomes 5:40 PM);
+ * with only the start, teams and judges see when the round starts. Blank clears
+ * either. Teams and judges read both live, so this moves what they see
+ * immediately, published or not.
  */
-export async function setFinalRoundTiming({ start, slotMinutes }) {
-  const text = String(start ?? "").trim();
-  const cleared = !text && (slotMinutes === null || slotMinutes === undefined);
-
-  let after = { start: null, slotMinutes: null };
-  if (!cleared) {
-    const startMinutes = parseClock(text);
-    if (startMinutes === null) {
-      return { ok: false, error: "Give the final round a start time, like 5:30 PM." };
-    }
-    if (!Number.isInteger(slotMinutes) || slotMinutes < 1 || slotMinutes > 120) {
-      return { ok: false, error: "Minutes per team must be a whole number between 1 and 120." };
-    }
-    after = { start: formatClock(startMinutes), slotMinutes };
+export async function setFinalRoundTiming({ time, slotMinutes }) {
+  const text = String(time ?? "").trim();
+  const nextTime = text ? normalizeClockTime(text) : null;
+  if (text && nextTime === null) {
+    return { ok: false, error: `"${text}" is not a clock time like 7:00 PM.` };
+  }
+  const nextMinutes = slotMinutes ?? null;
+  if (nextMinutes !== null && (!Number.isInteger(nextMinutes) || nextMinutes < 1 || nextMinutes > 120)) {
+    return { ok: false, error: "Minutes per finalist must be a whole number between 1 and 120, or blank." };
   }
 
-  const [beforeStart, beforeMinutes] = await Promise.all([
-    readOne("config/finalRoundStart", null),
+  const [beforeTime, beforeMinutes] = await Promise.all([
+    readOne("config/finalRoundTime", null),
     readOne("config/finalRoundSlotMinutes", null),
   ]);
-  if (beforeStart === after.start && beforeMinutes === after.slotMinutes) return { ok: true };
+  if (beforeTime === nextTime && beforeMinutes === nextMinutes) return { ok: true };
 
+  const parts = [
+    nextTime === null ? "no start time" : `starts ${nextTime}`,
+    nextMinutes === null ? "no slot length" : `${nextMinutes} min per finalist`,
+  ];
   return applyAdminAction({
     action: "config.finalRoundTiming",
-    summary: cleared
-      ? "Cleared the final round times"
-      : `Final round starts ${after.start}, ${after.slotMinutes} min per team`,
+    summary: `Final round ${parts.join(", ")}`,
     changes: [
-      { path: "config/finalRoundStart", before: beforeStart, after: after.start },
-      { path: "config/finalRoundSlotMinutes", before: beforeMinutes, after: after.slotMinutes },
+      { path: "config/finalRoundTime", before: beforeTime, after: nextTime },
+      { path: "config/finalRoundSlotMinutes", before: beforeMinutes, after: nextMinutes },
     ],
   });
 }

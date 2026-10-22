@@ -89,6 +89,42 @@ describe("writing config", () => {
     expect((await setBatchTimes({ 1: "5:00 PM", 2: "5:15 PM" })).ok).toBe(false);
   });
 
+  describe("batch times must be clock times", () => {
+    beforeEach(() => {
+      mockGet.mockImplementation(async (r) => {
+        const stored = { "config/batchCount": 3 }[r.path];
+        return { exists: () => stored !== undefined, val: () => stored };
+      });
+    });
+
+    test("a time that is not a clock time is refused, naming the batch", async () => {
+      const result = await setBatchTimes({ 1: "4:30 PM", 2: "4:45 PM", 3: "banana" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain(`Batch 3's time "banana" is not a clock time like 5:00 PM.`);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    test("every bad batch is named", async () => {
+      const result = await setBatchTimes({ 1: "25:99 XM", 2: "4:45 PM", 3: "13:00 PM" });
+      expect(result.error).toContain("Batch 1's");
+      expect(result.error).toContain("Batch 3's");
+      expect(result.error).not.toContain("Batch 2's");
+    });
+
+    test("two batches at the same time are refused, even spelled differently", async () => {
+      const result = await setBatchTimes({ 1: "5:00 PM", 2: "4:45 PM", 3: "5pm" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("Batches 1 and 3");
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    test("valid times are saved in canonical form", async () => {
+      const result = await setBatchTimes({ 1: " 4:30pm ", 2: "04:45 PM", 3: "5 pm" });
+      expect(result.ok).toBe(true);
+      expect(mockUpdate.mock.calls[0][1]["config/batchTimes"]).toEqual({ 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" });
+    });
+  });
+
   test("an unparseable event start is refused", async () => {
     expect((await setEventStart("not a date")).ok).toBe(false);
   });
@@ -101,6 +137,44 @@ describe("writing config", () => {
 
   test("an empty final round room is refused", async () => {
     expect((await setFinalRoundRoom("   ")).ok).toBe(false);
+  });
+
+  test("the final round time and slot length are saved together and logged", async () => {
+    expect((await setFinalRoundTiming({ time: " 7:00pm ", slotMinutes: 10 })).ok).toBe(true);
+    const written = mockUpdate.mock.calls[0][1];
+    expect(written["config/finalRoundTime"]).toBe("7:00 PM");
+    expect(written["config/finalRoundSlotMinutes"]).toBe(10);
+    expect(written["adminLog/entry-1"].action).toBe("config.finalRoundTiming");
+  });
+
+  test("a start on its own is fine", async () => {
+    expect((await setFinalRoundTiming({ time: "7:00 PM", slotMinutes: null })).ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["config/finalRoundSlotMinutes"]).toBeNull();
+  });
+
+  test("blanks clear them", async () => {
+    mockGet.mockImplementation(async (r) => {
+      const stored = { "config/finalRoundTime": "7:00 PM", "config/finalRoundSlotMinutes": 10 }[r.path];
+      return { exists: () => stored !== undefined, val: () => stored };
+    });
+    expect((await setFinalRoundTiming({ time: "  ", slotMinutes: null })).ok).toBe(true);
+    expect(mockUpdate.mock.calls[0][1]["config/finalRoundTime"]).toBeNull();
+    expect(mockUpdate.mock.calls[0][1]["config/finalRoundSlotMinutes"]).toBeNull();
+  });
+
+  test("clearing what was never set writes nothing", async () => {
+    expect((await setFinalRoundTiming({ time: "", slotMinutes: null })).ok).toBe(true);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("a start that is not a clock time is refused", async () => {
+    expect((await setFinalRoundTiming({ time: "after dinner", slotMinutes: 10 })).ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test.each([0, 121, 7.5])("a slot length of %p is refused", async (slotMinutes) => {
+    expect((await setFinalRoundTiming({ time: "7:00 PM", slotMinutes })).ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -139,48 +213,6 @@ describe("the submission deadline", () => {
 
   test("a time that is not a time is refused before anything is written", async () => {
     expect((await setSubmissionsCloseAt(NaN)).ok).toBe(false);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-});
-
-describe("final round times", () => {
-  test("are written together, with the start in the batch-time format", async () => {
-    expect((await setFinalRoundTiming({ start: "5:30pm", slotMinutes: 10 })).ok).toBe(true);
-    const written = mockUpdate.mock.calls[0][1];
-    expect(written["config/finalRoundStart"]).toBe("5:30 PM");
-    expect(written["config/finalRoundSlotMinutes"]).toBe(10);
-    expect(written["adminLog/entry-1"].action).toBe("config.finalRoundTiming");
-  });
-
-  test("both blank clears them, so slots go back to their labels", async () => {
-    mockGet.mockImplementation(async (r) => {
-      const stored = { "config/finalRoundStart": "5:30 PM", "config/finalRoundSlotMinutes": 10 }[r.path];
-      return { exists: () => stored !== undefined, val: () => stored };
-    });
-    expect((await setFinalRoundTiming({ start: " ", slotMinutes: null })).ok).toBe(true);
-    const written = mockUpdate.mock.calls[0][1];
-    expect(written["config/finalRoundStart"]).toBeNull();
-    expect(written["config/finalRoundSlotMinutes"]).toBeNull();
-  });
-
-  test("a start that is not a time is refused before anything is written", async () => {
-    expect((await setFinalRoundTiming({ start: "after dinner", slotMinutes: 10 })).ok).toBe(false);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  test("a start without a slot length is refused", async () => {
-    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: null })).ok).toBe(false);
-    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 0 })).ok).toBe(false);
-    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 7.5 })).ok).toBe(false);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  test("saving what is already stored writes nothing", async () => {
-    mockGet.mockImplementation(async (r) => {
-      const stored = { "config/finalRoundStart": "5:30 PM", "config/finalRoundSlotMinutes": 10 }[r.path];
-      return { exists: () => stored !== undefined, val: () => stored };
-    });
-    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 10 })).ok).toBe(true);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

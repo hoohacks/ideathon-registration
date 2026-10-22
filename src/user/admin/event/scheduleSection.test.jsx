@@ -23,7 +23,10 @@ const max = () => screen.getByLabelText("Max judges per team");
 // Batches, then this row, then the final round room; "Save times" is its own name
 const save = () => screen.getAllByRole("button", { name: "Save" })[1];
 
-beforeEach(() => Object.values(mock).forEach((fn) => fn.mockClear()));
+beforeEach(() => {
+  mock.setJudgesPerTeam.mockClear();
+  mock.setFinalRoundTiming.mockClear();
+});
 
 test("an empty config shows the built-in min of 3 and a blank max, with nothing to save", () => {
   render(<ScheduleSection config={{}} onResult={vi.fn()} />);
@@ -55,48 +58,47 @@ test("a typed min and max are saved as numbers", async () => {
   await waitFor(() => expect(mock.setJudgesPerTeam).toHaveBeenCalledWith({ min: 2, max: 5 }));
 });
 
-describe("final round times", () => {
-  const start = () => screen.getByLabelText("Final round start");
+describe("the final round time", () => {
+  const time = () => screen.getByLabelText("Final round time");
   const minutes = () => screen.getByLabelText("Minutes per finalist");
-  // Batches, judges per team, final round room, then this row
-  const saveTiming = () => screen.getAllByRole("button", { name: "Save" })[3];
+  const saveTime = () => screen.getAllByRole("button", { name: "Save" })[3];
 
-  test("unset shows blanks, with nothing to save", () => {
+  test("unset is blank with nothing to save", () => {
     render(<ScheduleSection config={{}} onResult={vi.fn()} />);
-    expect(start()).toHaveValue("");
-    expect(minutes()).toHaveValue(null);
-    expect(saveTiming()).toBeDisabled();
+    expect(time()).toHaveAttribute("type", "time");
+    expect(time().value).toBe("");
+    expect(minutes().value).toBe("");
+    expect(saveTime()).toBeDisabled();
   });
 
-  test("a typed start and slot length are saved, the length as a number", async () => {
-    render(<ScheduleSection config={{}} onResult={vi.fn()} />);
-    fireEvent.change(start(), { target: { value: "17:30" } });
+  test("a picked time is saved the way teams are shown it, with the slot length", async () => {
+    const onResult = vi.fn();
+    render(<ScheduleSection config={{}} onResult={onResult} />);
+    fireEvent.change(time(), { target: { value: "19:00" } });
     fireEvent.change(minutes(), { target: { value: "10" } });
-    fireEvent.click(saveTiming());
+    fireEvent.click(saveTime());
     await waitFor(() =>
-      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "17:30", slotMinutes: 10 })
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ time: "7:00 PM", slotMinutes: 10 })
     );
+    expect(onResult).toHaveBeenCalledWith({ ok: true }, "Final round time set to 7:00 PM");
   });
 
-  test("a stored start is shown in the time picker", () => {
-    render(
-      <ScheduleSection config={{ finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />
-    );
-    expect(start()).toHaveAttribute("type", "time");
-    expect(start()).toHaveValue("17:30");
-    expect(minutes()).toHaveValue(10);
-    expect(saveTiming()).toBeDisabled();
+  test("a stored time and slot length show in the fields", () => {
+    render(<ScheduleSection config={{ finalRoundTime: "7:00 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />);
+    expect(time().value).toBe("19:00");
+    expect(minutes().value).toBe("10");
+    expect(saveTime()).toBeDisabled();
   });
 
-  test("clearing both saves blanks as no timing", async () => {
-    render(
-      <ScheduleSection config={{ finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />
-    );
-    fireEvent.change(start(), { target: { value: "" } });
+  test("emptying both saves them as cleared", async () => {
+    const onResult = vi.fn();
+    render(<ScheduleSection config={{ finalRoundTime: "7:00 PM", finalRoundSlotMinutes: 10 }} onResult={onResult} />);
+    fireEvent.change(time(), { target: { value: "" } });
     fireEvent.change(minutes(), { target: { value: "" } });
-    fireEvent.click(saveTiming());
+    fireEvent.click(saveTime());
     await waitFor(() =>
-      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "", slotMinutes: null })
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ time: "", slotMinutes: null })
     );
+    expect(onResult).toHaveBeenCalledWith({ ok: true }, "Final round time cleared");
   });
 });

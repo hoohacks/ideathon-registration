@@ -1,45 +1,14 @@
 /**
- * Final round times: config/finalRoundStart and config/finalRoundSlotMinutes
- * turn "Slot 2" into "5:40 PM", and the readers that sort published slots have
- * to put "10:00 AM" after "9:30 AM".
+ * Finalists' clock times. Publishing writes "Slot 1", "Slot 2"; with
+ * config/finalRoundTime and config/finalRoundSlotMinutes set, every reader shows
+ * "5:30 PM", "5:40 PM" instead, live.
  */
-import {
-  parseClock, formatClock, finalTiming, slotTime, slotOrder, compareSlots,
-} from "./finalRoundPlan.js";
+vi.mock("../../firebase.js", () => ({ database: {} }));
+vi.mock("firebase/database", async () => (await import("../../testing/fakeDatabase")).module);
+const db = await import("../../testing/fakeDatabase");
+const { finalTiming, finalSlotTime, subscribeToFinalRoundTiming } = await import("./finalRoundTiming.js");
 
-describe("parseClock", () => {
-  test.each([
-    ["5:30 PM", 17 * 60 + 30],
-    ["5:30pm", 17 * 60 + 30],
-    ["5 PM", 17 * 60],
-    ["12:00 AM", 0],
-    ["12:15 PM", 12 * 60 + 15],
-    ["9:05 a.m.", 9 * 60 + 5],
-    ["17:30", 17 * 60 + 30],
-    ["  4:45 PM ", 16 * 60 + 45],
-  ])("%s", (text, minutes) => {
-    expect(parseClock(text)).toBe(minutes);
-  });
-
-  test.each(["", null, "5", "13:00 PM", "0:30 AM", "5:60 PM", "24:00", "soon", "Slot 1"])(
-    "%s is not a time",
-    (text) => {
-      expect(parseClock(text)).toBeNull();
-    }
-  );
-});
-
-describe("formatClock", () => {
-  test("writes times the way the batch times are written", () => {
-    expect(formatClock(17 * 60 + 5)).toBe("5:05 PM");
-    expect(formatClock(0)).toBe("12:00 AM");
-    expect(formatClock(12 * 60)).toBe("12:00 PM");
-  });
-
-  test("wraps past midnight rather than printing 25:00", () => {
-    expect(formatClock(24 * 60 + 10)).toBe("12:10 AM");
-  });
-});
+beforeEach(() => db.reset());
 
 describe("finalTiming", () => {
   test("needs both a start and a slot length", () => {
@@ -48,36 +17,44 @@ describe("finalTiming", () => {
     expect(finalTiming(null, 10)).toBeNull();
     expect(finalTiming("5:30 PM", 0)).toBeNull();
     expect(finalTiming("5:30 PM", 7.5)).toBeNull();
-    expect(finalTiming("whenever", 10)).toBeNull();
+    expect(finalTiming("after dinner", 10)).toBeNull();
   });
 });
 
-describe("slotTime", () => {
+describe("finalSlotTime", () => {
+  const timing = finalTiming("5:30 PM", 10);
+
   test("counts on from the start, one slot length per finalist", () => {
-    const timing = finalTiming("5:30 PM", 10);
-    expect([0, 1, 2, 3].map((order) => slotTime(order, timing))).toEqual([
-      "5:30 PM", "5:40 PM", "5:50 PM", "6:00 PM",
+    expect(["Slot 1", "Slot 2", "Slot 4"].map((label) => finalSlotTime(label, timing))).toEqual([
+      "5:30 PM", "5:40 PM", "6:00 PM",
     ]);
   });
 
-  test("falls back to the slot label with no timing", () => {
-    expect(slotTime(1, null)).toBe("Slot 2");
+  test("without timing, the label is unchanged", () => {
+    expect(finalSlotTime("Slot 2", null)).toBe("Slot 2");
+  });
+
+  test("a time typed onto a forced entry is left alone", () => {
+    expect(finalSlotTime("6:10 PM", timing)).toBe("6:10 PM");
+  });
+
+  test("past midnight wraps rather than printing hour 24", () => {
+    expect(finalSlotTime("Slot 2", finalTiming("11:55 PM", 10))).toBe("12:05 AM");
   });
 });
 
-describe("sorting published slots", () => {
-  test("clock times sort by time, not as text", () => {
-    expect(["10:00 AM", "9:30 AM", "1:00 PM"].sort(compareSlots)).toEqual([
-      "9:30 AM", "10:00 AM", "1:00 PM",
-    ]);
-  });
+describe("subscribeToFinalRoundTiming", () => {
+  test("reports the start as typed and the timing, and follows changes", () => {
+    db.reset({ config: { finalRoundTime: "5:30 PM" } });
+    const seen = [];
+    const off = subscribeToFinalRoundTiming((value) => seen.push(value));
+    expect(seen.at(-1)).toEqual({ start: "5:30 PM", timing: null });
 
-  test("slot labels still sort by number", () => {
-    expect(["Slot 10", "Slot 2"].sort(compareSlots)).toEqual(["Slot 2", "Slot 10"]);
-  });
+    db.setData("config/finalRoundSlotMinutes", 12);
+    expect(seen.at(-1)).toEqual({ start: "5:30 PM", timing: { startMinutes: 17 * 60 + 30, slotMinutes: 12 } });
 
-  test("free text still sorts last", () => {
-    expect(slotOrder("after lunch")).toBe(Infinity);
-    expect(["after lunch", "5:30 PM"].sort(compareSlots)).toEqual(["5:30 PM", "after lunch"]);
+    off();
+    db.setData("config/finalRoundTime", "6:00 PM");
+    expect(seen.at(-1).start).toBe("5:30 PM");
   });
 });

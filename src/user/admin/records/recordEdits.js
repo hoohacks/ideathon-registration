@@ -148,8 +148,9 @@ export async function renameTeam(teamId, name) {
   const to = String(name ?? "").trim();
   if (!to) return { ok: false, error: "Give the team a name." };
 
-  const [teamSnap, judgesSnap, finalSnap] = await Promise.all([
+  const [teamSnap, teamsSnap, judgesSnap, finalSnap] = await Promise.all([
     get(ref(database, `teams/${teamId}`)),
+    get(ref(database, "teams")),
     get(ref(database, "judges")),
     get(ref(database, "finalRound/teams")),
   ]);
@@ -157,7 +158,20 @@ export async function renameTeam(teamId, name) {
 
   const teamData = teamSnap.val();
   const from = teamData?.name ?? null;
+  // exact match only: "beacon" -> "Beacon" is a real change (a recapitalisation)
+  // and falls through to the clash check, which skips this team itself
   if (from === to) return { ok: false, error: "That is already the name." };
+
+  // Judges find a team by its name (findTeamIdByName) and treat two matches as
+  // a problem, so a name must stay unique. Case and surrounding spaces are
+  // ignored because "beacon " and "Beacon" are the same team to a person
+  // reading a list aloud. This team is skipped so it can change its own
+  // capitalisation.
+  const wanted = to.toLowerCase();
+  const clash = Object.entries(teamsSnap.exists() ? teamsSnap.val() : {}).find(
+    ([id, team]) => id !== teamId && String(team?.name ?? "").trim().toLowerCase() === wanted
+  );
+  if (clash) return { ok: false, error: `Another team is already called ${clash[1].name.trim()}.` };
 
   const changes = renameTeamChanges({
     teamId, from, to, teamData,

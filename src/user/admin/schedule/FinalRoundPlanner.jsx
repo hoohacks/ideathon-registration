@@ -15,7 +15,8 @@ import {
   subscribeFinalDraft, saveFinalDraft, clearFinalDraft,
 } from "../../judge/finalDraftStore.js";
 import { applyFinalEdit, undoFinalEdit } from "../../judge/applyFinalEdit.js";
-import { slotsOf, slotTime, finalTiming, finalStats } from "../../judge/finalRoundPlan.js";
+import { slotsOf, slotLabel, finalStats } from "../../judge/finalRoundPlan.js";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../../judge/finalRoundTiming.js";
 import RoomField from "./RoomField.jsx";
 
 /**
@@ -65,19 +66,9 @@ export default function FinalRoundPlanner() {
     return () => unsubscribe();
   }, []);
 
-  // Live for the same reason, and because publishing reads the times from
-  // config rather than from the plan: what this page shows is what goes out.
-  useEffect(() => {
-    const unsubscribe = onValue(
-      ref(database, "config"),
-      (snapshot) => {
-        const config = snapshot.val() ?? {};
-        setTiming(finalTiming(config.finalRoundStart, config.finalRoundSlotMinutes));
-      },
-      (error) => console.error("Could not read the final round times:", error)
-    );
-    return () => unsubscribe();
-  }, []);
+  // the same live times teams and judges are shown, so the running order here
+  // reads the way their cards will
+  useEffect(() => subscribeToFinalRoundTiming((next) => setTiming(next.timing)), []);
 
   const stats = plan ? finalStats(plan) : null;
   const warnings = plan ? warningsFor(plan) : [];
@@ -349,7 +340,7 @@ export default function FinalRoundPlanner() {
                   alignItems: { md: "center" },
                   py: 1
                 }}>
-                <Chip size="small" label={slotTime(slot.order, timing)} sx={{ flexShrink: 0 }} />
+                <Chip size="small" label={finalSlotTime(slotLabel(slot.order), timing)} sx={{ flexShrink: 0 }} />
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{slot.teamName}</Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -501,7 +492,7 @@ function PanelDrawer({ plan, slot, timing = null, allJudges = [], onClose, onEdi
       <DialogTitle>
         <Typography variant="h3" component="div">Panel for {slot.teamName}</Typography>
         <Typography variant="body2">
-          {slotTime(slot.order, timing)} · {plan.room}
+          {finalSlotTime(slotLabel(slot.order), timing)} · {plan.room}
         </Typography>
       </DialogTitle>
       <DialogContent dividers>

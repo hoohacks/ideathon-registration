@@ -269,6 +269,11 @@ const theme = createTheme({
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: INK, borderWidth: 2 },
           "&.Mui-focused": { boxShadow: `0 0 0 3px ${SURFACE}, 0 0 0 5px ${FOCUS}` },
           "&.Mui-error .MuiOutlinedInput-notchedOutline": { borderColor: DANGER },
+          // MUI pads a multiline root as well as its textarea, and the input
+          // padding below lands on the textarea too, so a multiline field's
+          // text sat 14px further in than a single-line field's beside it.
+          // The textarea's own padding is the only padding.
+          variants: [{ props: { multiline: true }, style: { padding: 0 } }],
         },
         input: {
           paddingBlock: 11,

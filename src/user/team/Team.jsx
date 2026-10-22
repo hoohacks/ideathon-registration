@@ -7,6 +7,7 @@ import { useNavigate } from "react-router";
 import { memberIds } from "./teamMembers";
 import { personName } from "../../roles.js";
 import { leaveTeam } from "./teamMembership.js";
+import { ConfirmDialog } from "../admin/adminUi";
 import { PageSkeleton } from "../../loadingUi";
 import { EVENT, describeRemaining, formatEventTime } from "../../eventInfo";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -243,7 +244,13 @@ function Team() {
         }
     }
 
+    // Leaving used to happen on the first click. On a submitted team that is
+    // hard to undo: it is closed to new members, so getting back on takes an
+    // organizer, and on the day that team is already on the judging schedule.
+    const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+
     const handleLeaveTeam = async () => {
+        setLeaveConfirmOpen(false);
         // Both halves of the membership go in one update. As two writes, a
         // failure between them left the person still in members but with no
         // teamId -- looking teamless while still counting toward the team.
@@ -553,15 +560,38 @@ function Team() {
                         <Divider />
 
                         <Box>
-                            <Button variant="outlined" onClick={handleLeaveTeam}>
+                            <Button variant="outlined" onClick={() => setLeaveConfirmOpen(true)}>
                                 Leave team
                             </Button>
                         </Box>
+
+                        <ConfirmDialog
+                            open={leaveConfirmOpen}
+                            title={`Leave ${teamData.name || "this team"}?`}
+                            consequences={leaveConsequences(teamData, teamId)}
+                            confirmLabel="Leave team"
+                            onConfirm={handleLeaveTeam}
+                            onCancel={() => setLeaveConfirmOpen(false)}
+                        />
                     </Stack>
                 )}
             </Layout>
         </>
     );
+}
+
+/**
+ * What leaving costs, in the words the confirmation shows. Whether you can come
+ * back on your own is the thing people need to know before they click.
+ */
+function leaveConsequences(teamData, teamId) {
+    const consequences = teamData.submitted
+        ? ["Your team has already submitted, so it is closed to new members. Only an organizer can add you back."]
+        : [`You can rejoin later with the Team ID: ${teamId}`];
+    if ((teamData.memberUids?.length ?? 0) <= 1) {
+        consequences.push("You are the last member, so the team will have nobody on it.");
+    }
+    return consequences;
 }
 
 /**

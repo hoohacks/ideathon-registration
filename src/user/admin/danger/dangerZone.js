@@ -3,6 +3,9 @@ import { database } from "../../../firebase.js";
 import { applyAdminAction, captureBefore } from "../adminAction.js";
 import { guardWith } from "../snapshots.js";
 import { FIRST_ROUND, FINAL_ROUND } from "../../judge/getTeamInfo.js";
+import { assignmentList } from "../../judge/assignmentList.js";
+import { parseClockTime, sameClockTime } from "../../judge/clockTime.js";
+import { personName } from "../../../roles.js";
 
 /**
  * Break-glass tooling: the things you reach for when something has already
@@ -19,14 +22,52 @@ import { FIRST_ROUND, FINAL_ROUND } from "../../judge/getTeamInfo.js";
  * through the paper score dialog.
  */
 
-/** Every path holding this team's room and time. Pure. */
-export function overrideSlotChanges({ teamId, room, time, teamData, judgesData }) {
+/**
+ * Which batch presents at which time, for a schedule that already exists.
+ *
+ * Read off the teams' own schedule entries, the same source findOpenSlots uses
+ * for "slot an unscheduled team into an existing batch" (assignmentEdits.js),
+ * and for the same reason: once a schedule is generated, the entries ARE the
+ * schedule. config/batchTimes is only the input to generation and can drift
+ * from what was published (an organizer edits it afterwards, or an earlier
+ * override relabelled a team), so trusting it here could send a team into a
+ * batch whose label no other team in that batch shows. Like findOpenSlots, the
+ * first team seen in a batch supplies its time. Pure.
+ */
+export function batchTimesOf(teamsData) {
+  const byBatch = new Map();
+  for (const team of Object.values(teamsData ?? {})) {
+    const schedule = team?.schedule;
+    if (!schedule?.batch || byBatch.has(schedule.batch)) continue;
+    byBatch.set(schedule.batch, { batch: schedule.batch, time: schedule.time });
+  }
+  return [...byBatch.values()].sort((a, b) => a.batch - b.batch);
+}
+
+/**
+ * The batch a typed time belongs to, or null if it is not a batch's time.
+ *
+ * Deliberately the only place that decides whether two time strings are "the
+ * same time", so the comparison lives in one edit. It compares clock times, not
+ * text, so "5pm" finds the "5:00 PM" batch. TeamEditDrawer calls it too, so its
+ * hint and the save can never disagree.
+ */
+export function batchForTime(time, batchTimes) {
+  if (parseClockTime(time) == null) return null;
+  return (batchTimes ?? []).find((slot) => sameClockTime(time, slot.time))?.batch ?? null;
+}
+
+/** Every path holding this team's room, time and batch. Pure. */
+export function overrideSlotChanges({ teamId, room, time, batch, teamData, judgesData }) {
   const schedule = teamData?.schedule;
   if (!schedule) return [];
 
   const fields = [];
   if (room && room !== schedule.room) fields.push(["room", schedule.room, room]);
   if (time && time !== schedule.time) fields.push(["time", schedule.time, time]);
+  // the batch follows the time: a judge's copy carries it too, and findConflict
+  // reads it to decide whether a judge is double-booked
+  if (batch != null && batch !== schedule.batch) fields.push(["batch", schedule.batch, batch]);
   if (!fields.length) return [];
 
   const changes = fields.map(([field, before, after]) => ({
@@ -58,37 +99,115 @@ export async function overrideTeamSlot({ teamId, teamName, room, time }) {
   if (!teamSnap.exists()) return { ok: false, error: "That team no longer exists." };
 
   const teamData = teamSnap.val();
-  const batch = teamData?.schedule?.batch;
+  const current = teamData?.schedule;
+  let typedTime = typeof time === "string" ? time.trim() : time;
+
+  /*
+   * The time decides the batch.
+   *
+   * A batch is a time: every team in it presents then. So typing another
+   * batch's time IS a move to that batch, and the batch has to be written with
+   * it. This used to change only the room and the label and leave the batch
+   * alone, which broke two things: the clash check below compared against the
+   * OLD batch (so a team could be dropped into an occupied room in another
+   * batch, and a refusal named whoever sat in that room in the old one), and
+   * the record kept claiming the old batch for judges' double-booking checks.
+   *
+   * Text that is not a clock time at all ("25:99 XM") is refused first, with
+   * its own message: it used to be saved and copied onto every assigned judge's
+   * card. A real time that is not a batch's time cannot be placed anywhere, so
+   * it is refused with the times that would work.
+   *
+   * Leaving the time as it already is never needs a lookup, so a room-only edit
+   * still works on a schedule whose label is odd. "As it already is" is judged
+   * by clock time, so retyping "5:00pm" over "5:00 PM" is not a move.
+   */
+  let targetBatch = current?.batch;
+  const unchangedTime =
+    !typedTime || typedTime === current?.time || sameClockTime(typedTime, current?.time);
+  if (current && !unchangedTime) {
+    if (parseClockTime(typedTime) == null) {
+      return { ok: false, error: `"${typedTime}" is not a clock time like 5:00 PM.` };
+    }
+    const batchTimes = batchTimesOf(teamsSnap.val());
+    const found = batchForTime(typedTime, batchTimes);
+    if (found == null) {
+      const valid = batchTimes.map((slot) => `${slot.time} (batch ${slot.batch})`).join(", ");
+      return {
+        ok: false,
+        error: valid
+          ? `${typedTime} is not a batch time. Valid times: ${valid}.`
+          : `${typedTime} is not a batch time, and no batches are scheduled.`,
+      };
+    }
+    targetBatch = found;
+    // write the batch's own label, not the admin's spelling, so every card for
+    // the batch reads the same ("5pm" is stored as "5:00 PM")
+    typedTime = batchTimes.find((slot) => slot.batch === found).time;
+  } else if (current && typedTime) {
+    // same time in another spelling: keep what is stored so nothing is rewritten
+    typedTime = current.time;
+  }
+  const batchChanged = targetBatch != null && targetBatch !== current?.batch;
 
   /*
    * Two teams cannot present in one room at one time.
    *
-   * A move changes the room and the label, never the batch, so this is the only
-   * thing it can break -- and it is the one check this path did not have. Both
-   * other ways into a slot refuse it: the planner's moveTeam, and
+   * Both other ways into a slot refuse it: the planner's moveTeam, and
    * scheduleTeamIntoBatch. This is the one an organizer uses during the event,
    * off a team's record, which makes it the worst of the three to leave open.
    *
-   * Only when the room actually changes. Editing just the time on an event that
-   * already has a clash somewhere should not be blocked by that clash.
+   * It checks the slot the team is moving INTO -- the new batch and the new
+   * room -- so it runs when either one changes, including a move that only
+   * changes the time. It does not run when neither does: re-saving a team in
+   * the slot it already holds should not be blocked by a clash somewhere else
+   * on an event that already has one.
    */
-  if (room && batch && room !== teamData?.schedule?.room) {
+  const targetRoom = room || current?.room;
+  if (targetBatch && targetRoom && (batchChanged || targetRoom !== current?.room)) {
     const clash = Object.entries(teamsSnap.val() ?? {}).find(
       ([id, other]) =>
-        id !== teamId && other?.schedule?.batch === batch && other?.schedule?.room === room
+        id !== teamId && other?.schedule?.batch === targetBatch && other?.schedule?.room === targetRoom
     );
     if (clash) {
       return {
         ok: false,
-        error: `${clash[1]?.name ?? "Another team"} is already in ${room} in batch ${batch}.`,
+        error: `${clash[1]?.name ?? "Another team"} is already in ${targetRoom} in batch ${targetBatch}.`,
       };
     }
   }
 
+  /*
+   * Judges travel with the team, so a batch move can double-book one of them.
+   *
+   * Same rule as findConflict (assignmentEdits.js): a judge already on another
+   * team in the batch is refused. findConflict reads one judge at a time, and
+   * the judges snapshot is already in hand, so this applies the same test to it
+   * instead of one more read per judge.
+   */
+  const judgesData = judgesSnap.exists() ? judgesSnap.val() : {};
+  if (batchChanged) {
+    for (const [judgeUid, judge] of Object.entries(judgesData ?? {})) {
+      if (!judge?.teamAssignments?.[teamId]) continue;
+      const other = assignmentList(judge.teamAssignments).find(
+        (existing) => existing.batch === targetBatch && existing.id !== teamId
+      );
+      if (other) {
+        return {
+          ok: false,
+          error:
+            `${personName(judge, "A judge")} is already judging ${other.teamName ?? "another team"} ` +
+            `in batch ${targetBatch}.`,
+        };
+      }
+    }
+  }
+
   const changes = overrideSlotChanges({
-    teamId, room, time,
+    teamId, room, time: typedTime,
+    batch: batchChanged ? targetBatch : undefined,
     teamData,
-    judgesData: judgesSnap.exists() ? judgesSnap.val() : {},
+    judgesData,
   });
 
   if (!changes.length) {
@@ -97,7 +216,9 @@ export async function overrideTeamSlot({ teamId, teamName, room, time }) {
 
   return applyAdminAction({
     action: "team.slot",
-    summary: `Moved ${teamName || teamId} to ${room} at ${time}`,
+    summary:
+      `Moved ${teamName || teamId} to ${targetRoom} at ${typedTime || current?.time}` +
+      (batchChanged ? ` (batch ${targetBatch})` : ""),
     changes,
   });
 }

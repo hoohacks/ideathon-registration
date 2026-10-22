@@ -25,7 +25,9 @@ const mock = {
   deleteTeam: vi.fn(),
 };
 vi.mock("./recordEdits", () => ({ renameTeam: (...a) => mock.renameTeam(...a) }));
-vi.mock("../danger/dangerZone", () => ({
+vi.mock("../danger/dangerZone", async () => ({
+  // the pure time -> batch lookup is the real one, so the hint and the save agree
+  batchForTime: (await vi.importActual("../danger/dangerZone")).batchForTime,
   overrideTeamSlot: (...a) => mock.overrideTeamSlot(...a),
   setTeamSubmitted: (...a) => mock.setTeamSubmitted(...a),
   forceIntoFinalRound: (...a) => mock.forceIntoFinalRound(...a),
@@ -81,6 +83,56 @@ test("it opens on the team, with the idea underneath", async () => {
   // the rooms to move to load after it opens
   fireEvent.mouseDown(screen.getByLabelText("Room"));
   expect(await screen.findByRole("option", { name: "Rice 342" })).toBeInTheDocument();
+});
+
+const batchSlots = [
+  { batch: 1, time: "5:00 PM", freeRooms: [] },
+  { batch: 2, time: "5:15 PM", freeRooms: [] },
+];
+
+test("the batch hint follows the time being typed", async () => {
+  mock.findOpenSlots.mockResolvedValue(batchSlots);
+  open();
+  const hint = (text) => screen.findByText(`${text} · moves every assigned judge too`);
+
+  expect(await hint("Batch 1")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: " 5:15 PM " } });
+  expect(await hint("Moves to batch 2")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5:05 PM" } });
+  expect(await hint("Not a batch time (5:00 PM, 5:15 PM)")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "25:99 XM" } });
+  expect(await hint("Not a clock time (like 5:00 PM)")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5:15pm" } });
+  expect(await hint("Moves to batch 2")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5:00 PM" } });
+  expect(await hint("Batch 1")).toBeInTheDocument();
+  // the same time in another spelling is still the team's own batch
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5pm" } });
+  expect(await hint("Batch 1")).toBeInTheDocument();
+});
+
+test("retyping the slot's own time in another spelling is not a change to save", async () => {
+  open();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5pm" } });
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+  // so a rename saved alongside it does not run into "Nothing changed" afterwards
+  fireEvent.change(screen.getByLabelText("Team name"), { target: { value: "Lighthouse" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(mock.overrideTeamSlot).not.toHaveBeenCalled();
+});
+
+test("a move's toast names the batch's own label, not the typed spelling", async () => {
+  mock.findOpenSlots.mockResolvedValue(batchSlots);
+  open();
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "5:15pm" } });
+  expect(await screen.findByText("Moves to batch 2 · moves every assigned judge too")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  await waitFor(() =>
+    expect(onResult).toHaveBeenCalledWith({ ok: true }, "Moved to Rice 340 at 5:15 PM (batch 2)")
+  );
 });
 
 test("nothing changed means nothing to save", () => {

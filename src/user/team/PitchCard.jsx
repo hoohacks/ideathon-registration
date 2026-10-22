@@ -3,6 +3,7 @@ import { ref, onValue } from "firebase/database";
 import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 import { PiPresentationChart } from "react-icons/pi";
 import { database } from "../../firebase";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../judge/finalRoundTiming";
 
 /**
  * A team's published pitch times, read live.
@@ -27,6 +28,24 @@ export function useTeamPitch(teamId) {
     }, [teamId]);
 
     return { schedule, finalSlot };
+}
+
+const NO_TIMING = { start: null, timing: null };
+
+/**
+ * When the final round starts and how long each finalist gets, read live. Only
+ * subscribed once the team is a finalist, so the card costs nothing before.
+ */
+function useFinalRoundTiming(enabled) {
+    const [timing, setTiming] = useState(NO_TIMING);
+
+    useEffect(() => {
+        setTiming(NO_TIMING);
+        if (!enabled) return undefined;
+        return subscribeToFinalRoundTiming(setTiming);
+    }, [enabled]);
+
+    return timing;
 }
 
 const ORDINALS = ["1st", "2nd", "3rd"];
@@ -72,6 +91,7 @@ function PitchLine({ label, time, room }) {
  * published, so it never takes space from a page that has no answer yet.
  */
 export default function PitchCard({ schedule, finalSlot }) {
+    const { start: finalStart, timing } = useFinalRoundTiming(Boolean(finalSlot));
     if (!schedule && !finalSlot) return null;
     return (
         <Card component="section" aria-label="When you pitch" sx={{ borderRadius: 4, border: 2, borderColor: "primary.main" }}>
@@ -81,7 +101,11 @@ export default function PitchCard({ schedule, finalSlot }) {
                         <PitchLine label={finalSlot ? "First round" : null} time={schedule.time} room={schedule.room} />
                     )}
                     {finalSlot && (
-                        <PitchLine label="Final round" time={finalSlot.timeslot} room={finalSlot.room} />
+                        <PitchLine
+                            label={finalStart ? `Final round, starting at ${finalStart}` : "Final round"}
+                            time={finalSlotTime(finalSlot.timeslot, timing)}
+                            room={finalSlot.room}
+                        />
                     )}
                 </Stack>
             </CardContent>
