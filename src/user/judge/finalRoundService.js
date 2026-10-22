@@ -2,7 +2,7 @@ import { ref, get, update, onValue, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
 import { FIRST_ROUND } from "./getTeamInfo.js";
-import { compareForRanking, rankingEntry, scoredJudgeCount } from "./scoreRubric.js";
+import { compareForRanking, rankingEntry, sameAverage, scoredJudgeCount } from "./scoreRubric.js";
 import { guardWith } from "../admin/snapshots.js";
 import { buildFinalPlan, slotsOf, slotLabel } from "./finalRoundPlan.js";
 import { checkFinalDrift, blockingOnly, BLOCKING } from "./checkFinalDrift.js";
@@ -180,14 +180,23 @@ export function warningsFor(plan) {
     );
   }
 
-  // a tie straddling the cut line is the one an organizer has to know about
+  // A tie straddling the cut line is the one an organizer has to decide. The
+  // ranking still put somebody in -- on fundable votes, judges, then name --
+  // but the name is not a reason to reach the final, so this says who is level
+  // and leaves the call to whoever is planning.
   const inCut = new Set(finalists.map((slot) => slot.teamId));
   const lastIn = [...ranked].reverse().find((team) => inCut.has(team.teamId));
-  const firstOut = ranked.find((team) => !inCut.has(team.teamId));
-  if (lastIn && firstOut && lastIn.averageScore === firstOut.averageScore) {
-    warnings.push(
-      `${lastIn.name} and ${firstOut.name} tied on average; the tiebreak put ${lastIn.name} through.`
-    );
+  if (lastIn) {
+    const level = ranked.filter((team) => sameAverage(team.averageScore, lastIn.averageScore));
+    const levelIn = level.filter((team) => inCut.has(team.teamId)).map((team) => team.name);
+    const levelOut = level.filter((team) => !inCut.has(team.teamId)).map((team) => team.name);
+    if (levelOut.length) {
+      warnings.push(
+        `${andList([...levelIn, ...levelOut])} are tied on average (${lastIn.averageScore.toFixed(2)}) ` +
+          `at the cut. ${andList(levelIn)} ${levelIn.length === 1 ? "is" : "are"} in for now; ` +
+          "decide which goes through with Add and Drop, or take them all."
+      );
+    }
   }
 
   if (!(plan?.pool ?? []).length) {
@@ -204,6 +213,10 @@ export function warningsFor(plan) {
   }
 
   return warnings;
+}
+
+function andList(names) {
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 /**
@@ -298,11 +311,18 @@ export async function readLiveFinalBasis() {
  * organizer actually confirmed — rather than re-deriving any of it. Refuses on
  * blocking drift, takes a restore point, and only then writes.
  *
- * Three things go into ONE atomic update, so they cannot drift apart:
+ * Four things go into ONE atomic update, so they cannot drift apart:
  *
  *   finalRound/*                        the standings, admin-readable only
  *   teams/{id}/finalSlot                the team's own room and time
  *   judges/{uid}/finalAssignments/{id}  what each judge has to see
+ *   scores/final                        cleared, so this round starts empty
+ *
+ * The last one matters only if a final round is published twice. Closing a
+ * round leaves its cards where they are, and a second round published over
+ * them used to count every card from the first in its averages -- and show the
+ * judges who filed them as having already scored. The restore point is taken
+ * first, so the old cards are still recoverable.
  *
  * The last two exist because Realtime Database needs read permission at the
  * location being queried, and the standings must not be readable. Denormalising
@@ -339,6 +359,10 @@ export async function publishFinalRound(plan) {
         judgeCount: ranked?.judgeCount ?? 0,
         timeslot,
         room: plan.room,
+        // who is seated, kept with the standing: closing the round withdraws
+        // finalAssignments, and the results page still needs to know whose
+        // cards a closed round was waiting on
+        panel: Object.fromEntries(slot.judges.map((judge) => [judge.judgeId, true])),
       };
 
       updates[`teams/${slot.teamId}/finalSlot`] = { room: plan.room, timeslot };
@@ -368,10 +392,16 @@ export async function publishFinalRound(plan) {
       updates[`judges/${judgeUid}/finalAssignments`] = perJudge[judgeUid] ?? null;
     }
 
+    // cards from a previous final round, under either path they have lived at
+    updates["scores/final"] = null;
+    for (const [teamId, team] of Object.entries(live.teamsData)) {
+      if (team?.finalScores) updates[`teams/${teamId}/finalScores`] = null;
+    }
+
     const guard = await guardWith({
       label: `Before activating the final round (${finalists.length} teams)`,
-      reason: "activation rewrites every judge's final assignments and the standings",
-      paths: ["teams", "judges", "finalRound"],
+      reason: "activation rewrites every judge's final assignments and the standings, and clears old final scores",
+      paths: ["teams", "judges", "finalRound", "scores/final"],
     });
     if (!guard.ok) return { ok: false, error: guard.error, warnings: [] };
 
@@ -408,24 +438,39 @@ export async function publishFinalRound(plan) {
  * /scores/final for those teams, because that node is what the rules treat as
  * proof of assignment.
  *
- * The standings are archived rather than deleted. Deactivating used to destroy
- * them outright while the final scores survived underneath, so reactivating
- * recomputed a possibly different finalist set against cards from the old one.
+ * The standings stay. Closing used to delete `finalRound/teams`, which is what
+ * the results page ranks, so closing the round a minute early made the winner
+ * vanish from the screen it was being read off -- while the cards that decided
+ * it sat untouched underneath. Now closing only stops scoring: the results
+ * page keeps the final ranking, marked closed, until the next publish
+ * replaces it. A copy of the standings and the cards also goes to the archive,
+ * and a restore point is taken first, as publishing does.
+ *
+ * Returns { ok, error?, snapshotId }. Throws only if the caller is not an admin.
  */
 export async function deactivateFinalRound() {
   const user = await requireAdmin("deactivate the final round");
 
-  const [currentSnap, judgesSnap, teamsSnap] = await Promise.all([
+  const [currentSnap, judgesSnap, teamsSnap, scoresSnap] = await Promise.all([
     get(ref(database, "finalRound/teams")),
     get(ref(database, "judges")),
     get(ref(database, "teams")),
+    get(ref(database, "scores/final")),
   ]);
+
+  const guard = await guardWith({
+    label: "Before closing the final round",
+    reason: "closing withdraws every judge's final assignments",
+    paths: ["teams", "judges", "finalRound", "scores/final"],
+  });
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const updates = {};
 
   if (currentSnap.exists()) {
     updates[`finalRound/archive/${Date.now()}`] = {
       teams: currentSnap.val(),
+      finalScores: scoresSnap.exists() ? scoresSnap.val() : null,
       archivedAt: serverTimestamp(),
       archivedBy: user.uid,
     };
@@ -439,12 +484,11 @@ export async function deactivateFinalRound() {
   }
 
   updates["finalRound/active"] = false;
-  updates["finalRound/teams"] = null;
   updates["finalRound/deactivatedAt"] = serverTimestamp();
   updates["finalRound/deactivatedBy"] = user.uid;
 
   await update(ref(database), updates);
-  return { ok: true };
+  return { ok: true, error: null, snapshotId: guard.snapshotId };
 }
 
 /**

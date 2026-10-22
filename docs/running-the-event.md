@@ -70,8 +70,12 @@ before a friend registers.
 5. Judges score from their assignment cards.
 6. Watch **Judging progress**. Teams with no scores sort to the top.
 7. **Plan the final round**: build the cut, fix the order and panels, publish.
-8. **Results** (`/user/admin/results`) ranks the final round and names a winner
-   once every expected card is in, not before.
+8. **Results** (`/user/admin/results`) ranks the final round live. It shows who
+   is leading the whole time and names a winner once every judge who is scoring
+   has scored every finalist. Judges who stepped out without scoring are not
+   waited on. A tie for first is shown as a tie for you to decide.
+9. **Close the final round** from the judge page once you are done. Results
+   keeps the standings.
 
 **Announcements** are how you tell the room something: "Lunch is in the atrium",
 "Rice 340 has moved to 342". Post one from the dashboard to everyone,
@@ -90,6 +94,7 @@ wifi gives out.
 | A judge did not turn up | **Judges** on the team's row in Judging progress, then add or swap. It rewrites one team, not the schedule. Use spares first. |
 | A team or room name is wrong | **Edit** on the Teams page, or Control panel, Judging rooms. The name is cached in several places; renaming rewrites all of them. |
 | A judge scored on paper | **Record score** on the team's row. It is filed under the judge and stamped with you. |
+| A judge left partway through the final | Results names them and the teams they still owe. Record their score from paper, or close the final round: what is in becomes the result. |
 | A judge says they submitted but nothing shows | Ask whether their card says "Saved on device". Queued scores send when the connection returns, while the page is open. **Retry now** forces it. |
 | A team missed the deadline | Enter their submission from **Edit** on the Teams page. Organizers are not bound by the switch or the deadline. |
 | A team submitted after the schedule was published | Open the team on the Teams page and pick a batch, room and judges. **Do not publish a new schedule**: that replaces every assignment and strands scores already collected. |

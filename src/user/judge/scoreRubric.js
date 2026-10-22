@@ -133,6 +133,24 @@ export function compareForRanking(a, b) {
 }
 
 /**
+ * Whether two averages are a tie, as far as anyone deciding a place should be
+ * concerned.
+ *
+ * `compareForRanking` always produces an order, which is what the cut needs as
+ * a starting point -- but past the average its keys are fundable votes and then
+ * the team name, and a place decided by alphabetical order is not a result. So
+ * anywhere a place is announced, two teams level on this are shown as tied and
+ * organizers decide.
+ *
+ * Compared to two decimals: averages are float arithmetic over a few cards, and
+ * a gap too small to see on the page should not quietly decide anything either.
+ */
+export function sameAverage(a, b) {
+  if (typeof a !== "number" || typeof b !== "number") return false;
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+/**
  * Build the ranking input for one team from its score cards, so the dashboard
  * and the final-round cut agree on what "best" means.
  */

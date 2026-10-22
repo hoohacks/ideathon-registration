@@ -166,7 +166,8 @@ function JudgingProgress() {
   const [judges, setJudges] = useState({});
   const [scores, setScores] = useState({});
   const [legacyScores, setLegacyScores] = useState({});
-  const [finalRoundTeams, setFinalRoundTeams] = useState(null);
+  const [standingsTeams, setStandingsTeams] = useState(null);
+  const [finalRoundActive, setFinalRoundActive] = useState(false);
   const [round, setRound] = useState(FIRST_ROUND);
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
@@ -188,9 +189,10 @@ function JudgingProgress() {
       // the finalists, and nothing about the first round says who they are
       onValue(
         ref(database, "finalRound/teams"),
-        (snap) => setFinalRoundTeams(snap.exists() ? snap.val() : null),
+        (snap) => setStandingsTeams(snap.exists() ? snap.val() : null),
         (e) => setError(e.message)
       ),
+      onValue(ref(database, "finalRound/active"), (snap) => setFinalRoundActive(snap.val() === true)),
     ];
     return () => stop.forEach((fn) => fn());
   }, []);
@@ -225,6 +227,9 @@ function JudgingProgress() {
   }, [scores, legacyScores]);
 
   const final = round === FINAL_ROUND;
+  // closing the round keeps its standings for the results page, but a closed
+  // round has nobody left to send anywhere, so this page only shows an open one
+  const finalRoundTeams = finalRoundActive ? standingsTeams : null;
 
   const { teamRows, judgeRows, totals } = useMemo(
     () => buildProgress({ teams, judges, scores: merged, final, finalRoundTeams }),
@@ -302,7 +307,7 @@ function JudgingProgress() {
 
       {final && !finalRoundTeams && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          The final round has not been activated, so there are no finalists to show yet.
+          The final round is not open, so there are no finalists to show.
         </Alert>
       )}
 

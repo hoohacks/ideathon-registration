@@ -94,12 +94,39 @@ starts and their place in the order.
 The draft lives at `/finalRoundDraft`. An organizer may seat any registered judge
 by hand, including one outside the pool.
 
+**Ties at the cut.** The ranking always puts somebody in, using fundable votes,
+then judge count, then name. When teams on the same average sit either side of
+the line, the planner shows them as tied (T4) and warns. Decide which goes
+through with **Add** and **Drop**, or take them all.
+
+**Publishing clears `/scores/final`** after taking the restore point, so a
+final round published a second time starts empty and does not count the first
+one's cards.
+
 | What moved | What you get |
 | --- | --- |
 | Any team was scored since the build, including one that had no scores then | **Re-rank**: the averages the cut came from have moved |
 | A finalist withdrew | **Drop** it |
 | A judge on a panel no longer exists in the event | **Remove** them |
 | The final round room changed | **Apply** it (advisory) |
+
+## Results and closing the final round
+
+**Results** shows the final standings live from the first card. The top card
+says **Leading** while cards are due and **Winner** once they are in.
+
+- **Judges who step out are not waited on.** A team waits only on seated judges
+  who have filed a final card for some finalist. Anyone who has scored nobody is
+  left out and named under the top card. A judge who scored some finalists and
+  left is named in the warning with the teams they still owe.
+- **A tie is a tie.** Teams on the same average (to two decimals) share a place.
+  A shared first place reads **Tied for first**, shows fundable votes for
+  reference, and leaves the order to organizers.
+- **Closing the round makes it final.** **Close final round** on the judge page
+  takes two confirmations and a typed phrase. It saves a restore point, withdraws
+  every judge's final assignments and the teams' final slots, and archives the
+  standings with the cards. The standings stay at `finalRound/teams`, so Results
+  keeps showing them, marked closed, with whatever was in counted as the result.
 
 ## Judges on bad wifi
 
