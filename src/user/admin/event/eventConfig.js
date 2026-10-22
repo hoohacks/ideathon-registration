@@ -9,11 +9,12 @@ import {
   panelLabel,
 } from "../../judge/schedulePlan.js";
 import { FINAL_ROUND_ROOM } from "../../judge/finalRoundService.js";
+import { formatClock, parseClock } from "../../judge/finalRoundPlan.js";
 import { EVENT_START } from "../../../eventInfo.js";
 
 /**
- * Batch count, batch times, judges per team, event start and the final round
- * room.
+ * Batch count, batch times, judges per team, event start, and the final round
+ * room and timing.
  *
  * All of these were module constants and remain so as fallbacks. Unlike the room
  * list, these are structural rather than venue facts: an event always has some
@@ -36,16 +37,23 @@ async function readOne(path, fallback) {
 }
 
 export async function readEventConfig() {
-  const [batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom] =
-    await Promise.all([
-      readOne("config/batchCount", BATCH_COUNT),
-      readOne("config/batchTimes", BATCH_TIMES),
-      readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
-      readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
-      readOne("config/eventStart", EVENT_START),
-      readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
-    ]);
-  return { batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom };
+  const [
+    batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom,
+    finalRoundStart, finalRoundSlotMinutes,
+  ] = await Promise.all([
+    readOne("config/batchCount", BATCH_COUNT),
+    readOne("config/batchTimes", BATCH_TIMES),
+    readOne("config/minJudgesPerTeam", MIN_JUDGES_PER_TEAM),
+    readOne("config/maxJudgesPerTeam", MAX_JUDGES_PER_TEAM),
+    readOne("config/eventStart", EVENT_START),
+    readOne("config/finalRoundRoom", FINAL_ROUND_ROOM),
+    readOne("config/finalRoundStart", null),
+    readOne("config/finalRoundSlotMinutes", null),
+  ]);
+  return {
+    batchCount, batchTimes, minJudgesPerTeam, maxJudgesPerTeam, eventStart, finalRoundRoom,
+    finalRoundStart, finalRoundSlotMinutes,
+  };
 }
 
 export async function setBatchCount(count) {
@@ -166,5 +174,48 @@ export async function setFinalRoundRoom(room) {
     action: "config.finalRoundRoom",
     summary: `Final round room ${before} to ${next}`,
     changes: [{ path: "config/finalRoundRoom", before, after: next }],
+  });
+}
+
+/**
+ * When the final round starts and how long each finalist gets, so the cards
+ * read "5:40 PM" rather than "Slot 2". Both blank clears it, and slots go back
+ * to their labels; that is the fallback because there is no sensible default
+ * for when a final round starts.
+ *
+ * Read when the final round is published. A round already published keeps the
+ * times it went out with.
+ */
+export async function setFinalRoundTiming({ start, slotMinutes }) {
+  const text = String(start ?? "").trim();
+  const cleared = !text && (slotMinutes === null || slotMinutes === undefined);
+
+  let after = { start: null, slotMinutes: null };
+  if (!cleared) {
+    const startMinutes = parseClock(text);
+    if (startMinutes === null) {
+      return { ok: false, error: "Give the final round a start time, like 5:30 PM." };
+    }
+    if (!Number.isInteger(slotMinutes) || slotMinutes < 1 || slotMinutes > 120) {
+      return { ok: false, error: "Minutes per team must be a whole number between 1 and 120." };
+    }
+    after = { start: formatClock(startMinutes), slotMinutes };
+  }
+
+  const [beforeStart, beforeMinutes] = await Promise.all([
+    readOne("config/finalRoundStart", null),
+    readOne("config/finalRoundSlotMinutes", null),
+  ]);
+  if (beforeStart === after.start && beforeMinutes === after.slotMinutes) return { ok: true };
+
+  return applyAdminAction({
+    action: "config.finalRoundTiming",
+    summary: cleared
+      ? "Cleared the final round times"
+      : `Final round starts ${after.start}, ${after.slotMinutes} min per team`,
+    changes: [
+      { path: "config/finalRoundStart", before: beforeStart, after: after.start },
+      { path: "config/finalRoundSlotMinutes", before: beforeMinutes, after: after.slotMinutes },
+    ],
   });
 }

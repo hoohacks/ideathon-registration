@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Button, Card, TextField } from "@mui/material";
 import { FIELD, Section, SettingList, SettingRow } from "../adminUi";
-import { setBatchCount, setBatchTimes, setFinalRoundRoom, setJudgesPerTeam } from "./eventConfig";
+import {
+  setBatchCount, setBatchTimes, setFinalRoundRoom, setFinalRoundTiming, setJudgesPerTeam,
+} from "./eventConfig";
 import {
   BATCH_COUNT,
   BATCH_TIMES,
@@ -25,6 +27,9 @@ export default function ScheduleSection({ config, onResult }) {
   const storedRoom = config.finalRoundRoom ?? FINAL_ROUND_ROOM;
   const storedMin = config.minJudgesPerTeam ?? MIN_JUDGES_PER_TEAM;
   const storedMax = config.maxJudgesPerTeam ?? MAX_JUDGES_PER_TEAM;
+  // no fallback: unset means the final round shows "Slot 1", "Slot 2"
+  const storedFinalStart = config.finalRoundStart ?? "";
+  const storedSlotMinutes = config.finalRoundSlotMinutes == null ? "" : String(config.finalRoundSlotMinutes);
 
   const [count, setCount] = useState(String(storedCount));
   const [times, setTimes] = useState(storedTimes);
@@ -32,6 +37,8 @@ export default function ScheduleSection({ config, onResult }) {
   const [minJudges, setMinJudges] = useState(String(storedMin));
   // blank is "no cap", which is how a null max reads back
   const [maxJudges, setMaxJudges] = useState(storedMax == null ? "" : String(storedMax));
+  const [finalStart, setFinalStart] = useState(storedFinalStart);
+  const [slotMinutes, setSlotMinutes] = useState(storedSlotMinutes);
   const [busy, setBusy] = useState(false);
 
   // the database is the source of truth; re-sync when a write lands or another
@@ -41,6 +48,8 @@ export default function ScheduleSection({ config, onResult }) {
   useEffect(() => { setRoom(storedRoom); }, [storedRoom]);
   useEffect(() => { setMinJudges(String(storedMin)); }, [storedMin]);
   useEffect(() => { setMaxJudges(storedMax == null ? "" : String(storedMax)); }, [storedMax]);
+  useEffect(() => { setFinalStart(storedFinalStart); }, [storedFinalStart]);
+  useEffect(() => { setSlotMinutes(storedSlotMinutes); }, [storedSlotMinutes]);
 
   const run = async (work, message) => {
     setBusy(true);
@@ -56,6 +65,9 @@ export default function ScheduleSection({ config, onResult }) {
   const nextMin = Number(minJudges);
   const nextMax = maxJudges.trim() === "" ? null : Number(maxJudges);
   const panelUnchanged = nextMin === storedMin && nextMax === storedMax;
+
+  const nextSlotMinutes = slotMinutes.trim() === "" ? null : Number(slotMinutes);
+  const timingUnchanged = finalStart.trim() === storedFinalStart && slotMinutes.trim() === storedSlotMinutes;
 
   return (
     <Section
@@ -169,6 +181,42 @@ export default function ScheduleSection({ config, onResult }) {
               variant="outlined"
               disabled={busy || room === storedRoom}
               onClick={() => run(() => setFinalRoundRoom(room), `Final round room set to ${room}`)}
+            >
+              Save
+            </Button>
+          </SettingRow>
+
+          <SettingRow
+            label="Final round times"
+            hint="Finalists present one after another from the start time, so their cards show a time instead of a slot number. Read when you publish the final round; cards already published keep their times. Leave both blank to show slot numbers."
+          >
+            <TextField
+              label="Start"
+              placeholder="5:30 PM"
+              value={finalStart}
+              onChange={(event) => setFinalStart(event.target.value)}
+              sx={{ width: FIELD.time }}
+              slotProps={{
+                htmlInput: { "aria-label": "Final round start" },
+                inputLabel: { shrink: true }
+              }} />
+            <TextField
+              type="number"
+              label="Min per team"
+              value={slotMinutes}
+              onChange={(event) => setSlotMinutes(event.target.value)}
+              sx={{ width: FIELD.count }}
+              slotProps={{ htmlInput: { min: 1, max: 120, "aria-label": "Minutes per finalist" } }}
+            />
+            <Button
+              variant="outlined"
+              disabled={busy || timingUnchanged}
+              onClick={() => run(
+                () => setFinalRoundTiming({ start: finalStart, slotMinutes: nextSlotMinutes }),
+                finalStart.trim()
+                  ? `Final round starts at ${finalStart.trim()}, ${nextSlotMinutes} min per team`
+                  : "Final round times cleared"
+              )}
             >
               Save
             </Button>

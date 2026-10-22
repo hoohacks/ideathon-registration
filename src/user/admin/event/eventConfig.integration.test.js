@@ -27,6 +27,8 @@ describe("reading", () => {
       batchTimes: { 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" },
       eventStart: "2026-10-25T10:00:00-04:00",
       finalRoundRoom: "Rice 011",
+      finalRoundStart: null,
+      finalRoundSlotMinutes: null,
       minJudgesPerTeam: 3,
       maxJudgesPerTeam: null,
     });
@@ -35,13 +37,15 @@ describe("reading", () => {
   test("each stored value is read from its own key", async () => {
     db.setData("config", {
       batchCount: 2, batchTimes: { 1: "a", 2: "b" }, eventStart: "2026-11-01T09:00", finalRoundRoom: "Olsson 120",
-      minJudgesPerTeam: 2, maxJudgesPerTeam: 5,
+      minJudgesPerTeam: 2, maxJudgesPerTeam: 5, finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 10,
     });
     await expect(config.readEventConfig()).resolves.toEqual({
       batchCount: 2,
       batchTimes: { 1: "a", 2: "b" },
       eventStart: "2026-11-01T09:00",
       finalRoundRoom: "Olsson 120",
+      finalRoundStart: "5:30 PM",
+      finalRoundSlotMinutes: 10,
       minJudgesPerTeam: 2,
       maxJudgesPerTeam: 5,
     });

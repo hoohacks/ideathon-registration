@@ -319,6 +319,7 @@ describe("the live basis", () => {
       submitted: { t1: true, t2: true, t3: true, t4: false, t5: true },
       room: "Rice 011",
       size: 2,
+      timing: null,
       teamsData: seed().teams,
       judgesData: seed().judges,
     });
@@ -333,6 +334,7 @@ describe("the live basis", () => {
       submitted: {},
       room: "Rice 011",
       size: 4,
+      timing: null,
     });
   });
 
@@ -428,6 +430,22 @@ describe("publishing", () => {
       timeslot: "Slot 1",
       room: "Rice 011",
     });
+  });
+
+  test("with a start and a slot length, cards carry clock times in running order", async () => {
+    db.setData("config/finalRoundStart", "5:30 PM");
+    db.setData("config/finalRoundSlotMinutes", 12);
+    await plannedThenPublished();
+    expect(db.getData("teams/t1/finalSlot")).toEqual({ room: "Rice 011", timeslot: "5:30 PM" });
+    expect(db.getData("teams/t2/finalSlot")).toEqual({ room: "Rice 011", timeslot: "5:42 PM" });
+    expect(db.getData("finalRound/teams/t2/timeslot")).toBe("5:42 PM");
+    expect(db.getData("judges/j1/finalAssignments/t2/timeslot")).toBe("5:42 PM");
+  });
+
+  test("half a timing setting is ignored and cards keep their slot labels", async () => {
+    db.setData("config/finalRoundStart", "5:30 PM");
+    await plannedThenPublished();
+    expect(db.getData("teams/t1/finalSlot/timeslot")).toBe("Slot 1");
   });
 
   test("advisory drift is reported back but does not stop the publish", async () => {

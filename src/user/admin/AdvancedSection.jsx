@@ -37,6 +37,8 @@ export const KNOWN_KEYS = {
   batchTimes: "json",
   finalRoundRoom: "string",
   finalRoundSize: "number",
+  finalRoundStart: "string",
+  finalRoundSlotMinutes: "number",
   eventStart: "string",
   // The rules version deployed, written by the deploy workflow or by an admin
   // who deployed by hand. The app knows which version it needs; it cannot read

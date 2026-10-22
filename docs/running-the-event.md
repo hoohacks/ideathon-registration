@@ -43,7 +43,7 @@ Opening registration is a deploy setting, not an in-app switch. See
 | Do | Where |
 | --- | --- |
 | Add the rooms you booked | Control panel, Event setup, Judging rooms |
-| Set batch count, batch times, judges per team and the final round room | Control panel, Event setup |
+| Set batch count, batch times, judges per team, and the final round room and times | Control panel, Event setup |
 | Set the event date | Control panel, Event setup, Event |
 | Optionally set a submission deadline | Control panel, Event setup, Event |
 | Add admins, judges and competitors | Control panel, People |

@@ -83,6 +83,14 @@ pool is everyone who has checked in, or every first-round judge if nobody has. T
 hears every pitch, and **scoring a team in round one does not bar a judge from
 it in the final**. Correct the running order and the panels, then publish.
 
+**Times.** Set a start time and minutes per team in Control panel, Event setup,
+Final round times, and each finalist's card reads a clock time counted from the
+start in running order (5:30 PM, 5:40 PM, …) instead of "Slot 1", "Slot 2". The
+planner shows the times live. They are read at publish, not stored in the plan,
+so changing them while planning needs no rebuild. Cards already published keep
+the times they went out with; publishing clears the draft, so changing them
+means building and publishing the final round again.
+
 The draft lives at `/finalRoundDraft`. An organizer may seat any registered judge
 by hand, including one outside the pool.
 

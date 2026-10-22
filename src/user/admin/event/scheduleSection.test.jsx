@@ -4,11 +4,15 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
  * The judges-per-team row. A blank max is how an organizer says "no cap", so it
  * has to reach the setter as null rather than as 0 or an empty string.
  */
-const mock = vi.hoisted(() => ({ setJudgesPerTeam: vi.fn(async () => ({ ok: true })) }));
+const mock = vi.hoisted(() => ({
+  setJudgesPerTeam: vi.fn(async () => ({ ok: true })),
+  setFinalRoundTiming: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("./eventConfig", () => ({
   setBatchCount: vi.fn(),
   setBatchTimes: vi.fn(),
   setFinalRoundRoom: vi.fn(),
+  setFinalRoundTiming: mock.setFinalRoundTiming,
   setJudgesPerTeam: mock.setJudgesPerTeam,
 }));
 
@@ -19,7 +23,7 @@ const max = () => screen.getByLabelText("Max judges per team");
 // Batches, then this row, then the final round room; "Save times" is its own name
 const save = () => screen.getAllByRole("button", { name: "Save" })[1];
 
-beforeEach(() => mock.setJudgesPerTeam.mockClear());
+beforeEach(() => Object.values(mock).forEach((fn) => fn.mockClear()));
 
 test("an empty config shows the built-in min of 3 and a blank max, with nothing to save", () => {
   render(<ScheduleSection config={{}} onResult={vi.fn()} />);
@@ -49,4 +53,40 @@ test("a typed min and max are saved as numbers", async () => {
   fireEvent.change(max(), { target: { value: "5" } });
   fireEvent.click(save());
   await waitFor(() => expect(mock.setJudgesPerTeam).toHaveBeenCalledWith({ min: 2, max: 5 }));
+});
+
+describe("final round times", () => {
+  const start = () => screen.getByLabelText("Final round start");
+  const minutes = () => screen.getByLabelText("Minutes per finalist");
+  // Batches, judges per team, final round room, then this row
+  const saveTiming = () => screen.getAllByRole("button", { name: "Save" })[3];
+
+  test("unset shows blanks, with nothing to save", () => {
+    render(<ScheduleSection config={{}} onResult={vi.fn()} />);
+    expect(start()).toHaveValue("");
+    expect(minutes()).toHaveValue(null);
+    expect(saveTiming()).toBeDisabled();
+  });
+
+  test("a typed start and slot length are saved, the length as a number", async () => {
+    render(<ScheduleSection config={{}} onResult={vi.fn()} />);
+    fireEvent.change(start(), { target: { value: "5:30 PM" } });
+    fireEvent.change(minutes(), { target: { value: "10" } });
+    fireEvent.click(saveTiming());
+    await waitFor(() =>
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "5:30 PM", slotMinutes: 10 })
+    );
+  });
+
+  test("clearing both saves blanks as no timing", async () => {
+    render(
+      <ScheduleSection config={{ finalRoundStart: "5:30 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />
+    );
+    fireEvent.change(start(), { target: { value: "" } });
+    fireEvent.change(minutes(), { target: { value: "" } });
+    fireEvent.click(saveTiming());
+    await waitFor(() =>
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ start: "", slotMinutes: null })
+    );
+  });
 });

@@ -20,7 +20,7 @@ vi.mock("firebase/database", () => ({
 vi.mock("firebase/auth", () => ({ getAuth: () => ({ currentUser: { uid: "admin-1" } }) }));
 vi.mock("../../../roles.js", () => ({ requireAdmin: vi.fn(async () => ({ uid: "admin-1" })) }));
 
-const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom, setSubmissionsOpen, setSubmissionsCloseAt } =
+const { readEventConfig, setBatchCount, setBatchTimes, setEventStart, setFinalRoundRoom, setFinalRoundTiming, setSubmissionsOpen, setSubmissionsCloseAt } =
   await import("./eventConfig");
 const { BATCH_COUNT, BATCH_TIMES } = await import("../../judge/schedulePlan");
 const { requireAdmin } = await import("../../../roles.js");
@@ -139,6 +139,48 @@ describe("the submission deadline", () => {
 
   test("a time that is not a time is refused before anything is written", async () => {
     expect((await setSubmissionsCloseAt(NaN)).ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("final round times", () => {
+  test("are written together, with the start in the batch-time format", async () => {
+    expect((await setFinalRoundTiming({ start: "5:30pm", slotMinutes: 10 })).ok).toBe(true);
+    const written = mockUpdate.mock.calls[0][1];
+    expect(written["config/finalRoundStart"]).toBe("5:30 PM");
+    expect(written["config/finalRoundSlotMinutes"]).toBe(10);
+    expect(written["adminLog/entry-1"].action).toBe("config.finalRoundTiming");
+  });
+
+  test("both blank clears them, so slots go back to their labels", async () => {
+    mockGet.mockImplementation(async (r) => {
+      const stored = { "config/finalRoundStart": "5:30 PM", "config/finalRoundSlotMinutes": 10 }[r.path];
+      return { exists: () => stored !== undefined, val: () => stored };
+    });
+    expect((await setFinalRoundTiming({ start: " ", slotMinutes: null })).ok).toBe(true);
+    const written = mockUpdate.mock.calls[0][1];
+    expect(written["config/finalRoundStart"]).toBeNull();
+    expect(written["config/finalRoundSlotMinutes"]).toBeNull();
+  });
+
+  test("a start that is not a time is refused before anything is written", async () => {
+    expect((await setFinalRoundTiming({ start: "after dinner", slotMinutes: 10 })).ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("a start without a slot length is refused", async () => {
+    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: null })).ok).toBe(false);
+    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 0 })).ok).toBe(false);
+    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 7.5 })).ok).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test("saving what is already stored writes nothing", async () => {
+    mockGet.mockImplementation(async (r) => {
+      const stored = { "config/finalRoundStart": "5:30 PM", "config/finalRoundSlotMinutes": 10 }[r.path];
+      return { exists: () => stored !== undefined, val: () => stored };
+    });
+    expect((await setFinalRoundTiming({ start: "5:30 PM", slotMinutes: 10 })).ok).toBe(true);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
