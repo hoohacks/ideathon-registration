@@ -37,6 +37,7 @@ export const KNOWN_KEYS = {
   batchTimes: "json",
   finalRoundRoom: "string",
   finalRoundTime: "string",
+  finalRoundSlotMinutes: "number",
   finalRoundSize: "number",
   eventStart: "string",
   // The rules version deployed, written by the deploy workflow or by an admin

@@ -46,6 +46,15 @@ describe("the pitch card", () => {
     expect(screen.getByText("Final round, starting at 7:30 PM")).toBeInTheDocument();
   });
 
+  test("with a start and a slot length, a finalist sees its own time, live", async () => {
+    db.reset({ config: { finalRoundTime: "7:00 PM", finalRoundSlotMinutes: 10 } });
+    renderPage(<PitchCard finalSlot={{ timeslot: "Slot 3", room: "Rice 011" }} />);
+    expect(await screen.findByText(/You pitch/)).toHaveTextContent("You pitch at 7:20 PM in Rice 011.");
+
+    await act(async () => db.setData("config/finalRoundSlotMinutes", 15));
+    expect(screen.getByText(/You pitch/)).toHaveTextContent("You pitch at 7:30 PM in Rice 011.");
+  });
+
   test("with both rounds, each line is labelled", () => {
     renderPage(
       <PitchCard

@@ -201,16 +201,39 @@ export async function setFinalRoundRoom(room) {
 }
 
 /**
- * When the final round starts, free text like the batch times. Blank clears
- * it. Teams and judges read it live, so this moves what they see immediately.
+ * When the final round starts, and how many minutes each finalist gets. With
+ * both, each finalist's slot reads as a clock time ("Slot 2" becomes 5:40 PM);
+ * with only the start, teams and judges see when the round starts. Blank clears
+ * either. Teams and judges read both live, so this moves what they see
+ * immediately, published or not.
  */
-export async function setFinalRoundTime(time) {
-  const next = String(time ?? "").trim() || null;
-  const before = await readOne("config/finalRoundTime", null);
-  if (before === next) return { ok: true };
+export async function setFinalRoundTiming({ time, slotMinutes }) {
+  const text = String(time ?? "").trim();
+  const nextTime = text ? normalizeClockTime(text) : null;
+  if (text && nextTime === null) {
+    return { ok: false, error: `"${text}" is not a clock time like 7:00 PM.` };
+  }
+  const nextMinutes = slotMinutes ?? null;
+  if (nextMinutes !== null && (!Number.isInteger(nextMinutes) || nextMinutes < 1 || nextMinutes > 120)) {
+    return { ok: false, error: "Minutes per finalist must be a whole number between 1 and 120, or blank." };
+  }
+
+  const [beforeTime, beforeMinutes] = await Promise.all([
+    readOne("config/finalRoundTime", null),
+    readOne("config/finalRoundSlotMinutes", null),
+  ]);
+  if (beforeTime === nextTime && beforeMinutes === nextMinutes) return { ok: true };
+
+  const parts = [
+    nextTime === null ? "no start time" : `starts ${nextTime}`,
+    nextMinutes === null ? "no slot length" : `${nextMinutes} min per finalist`,
+  ];
   return applyAdminAction({
-    action: "config.finalRoundTime",
-    summary: next === null ? "Cleared the final round time" : `Final round time ${before ?? "unset"} to ${next}`,
-    changes: [{ path: "config/finalRoundTime", before, after: next }],
+    action: "config.finalRoundTiming",
+    summary: `Final round ${parts.join(", ")}`,
+    changes: [
+      { path: "config/finalRoundTime", before: beforeTime, after: nextTime },
+      { path: "config/finalRoundSlotMinutes", before: beforeMinutes, after: nextMinutes },
+    ],
   });
 }

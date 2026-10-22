@@ -5,7 +5,7 @@ readiness check on the dashboard can link straight to the section that fixes it.
 
 | Tab | Sections |
 | --- | --- |
-| Event setup | Judging rooms; batch count and times; min and max judges per team; final round room; event start; project submissions switch and deadline; Advanced (write any `config` key) |
+| Event setup | Judging rooms; batch count and times; min and max judges per team; final round room, start time and minutes per finalist; event start; project submissions switch and deadline; Advanced (write any `config` key) |
 | People | Roles, admin access, organizer access, accounts, password resets, bulk check-in, delete |
 | Data and activity | Exports; recent activity, with undo |
 | Recovery | Restore points; danger zone (clear the schedule, optionally with every score) |

@@ -3,6 +3,7 @@ import { ref, onValue } from "firebase/database";
 import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 import { PiPresentationChart } from "react-icons/pi";
 import { database } from "../../firebase";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../judge/finalRoundTiming";
 
 /**
  * A team's published pitch times, read live.
@@ -29,24 +30,22 @@ export function useTeamPitch(teamId) {
     return { schedule, finalSlot };
 }
 
+const NO_TIMING = { start: null, timing: null };
+
 /**
- * When the final round starts (config/finalRoundTime), read live. Only
+ * When the final round starts and how long each finalist gets, read live. Only
  * subscribed once the team is a finalist, so the card costs nothing before.
  */
-function useFinalRoundTime(enabled) {
-    const [time, setTime] = useState(null);
+function useFinalRoundTiming(enabled) {
+    const [timing, setTiming] = useState(NO_TIMING);
 
     useEffect(() => {
-        setTime(null);
+        setTiming(NO_TIMING);
         if (!enabled) return undefined;
-        return onValue(
-            ref(database, "config/finalRoundTime"),
-            (snapshot) => setTime(String(snapshot.val() ?? "").trim() || null),
-            () => setTime(null)
-        );
+        return subscribeToFinalRoundTiming(setTiming);
     }, [enabled]);
 
-    return time;
+    return timing;
 }
 
 const ORDINALS = ["1st", "2nd", "3rd"];
@@ -92,7 +91,7 @@ function PitchLine({ label, time, room }) {
  * published, so it never takes space from a page that has no answer yet.
  */
 export default function PitchCard({ schedule, finalSlot }) {
-    const finalTime = useFinalRoundTime(Boolean(finalSlot));
+    const { start: finalStart, timing } = useFinalRoundTiming(Boolean(finalSlot));
     if (!schedule && !finalSlot) return null;
     return (
         <Card component="section" aria-label="When you pitch" sx={{ borderRadius: 4, border: 2, borderColor: "primary.main" }}>
@@ -103,8 +102,8 @@ export default function PitchCard({ schedule, finalSlot }) {
                     )}
                     {finalSlot && (
                         <PitchLine
-                            label={finalTime ? `Final round, starting at ${finalTime}` : "Final round"}
-                            time={finalSlot.timeslot}
+                            label={finalStart ? `Final round, starting at ${finalStart}` : "Final round"}
+                            time={finalSlotTime(finalSlot.timeslot, timing)}
                             room={finalSlot.room}
                         />
                     )}

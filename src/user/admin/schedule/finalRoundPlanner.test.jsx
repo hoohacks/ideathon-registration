@@ -218,3 +218,11 @@ test("a refused save is shown and the plan is left as it was", async () => {
   expect(await screen.findByText("Another organizer changed this draft.")).toBeInTheDocument();
   expect(screen.getAllByText(/^(Almanac|Beacon)$/).map((el) => el.textContent)).toEqual(["Almanac", "Beacon"]);
 });
+
+test("with final round times set, the running order shows each finalist's time", async () => {
+  db.setData("config", { finalRoundTime: "5:30 PM", finalRoundSlotMinutes: 15 });
+  openWith(plan());
+  expect(await screen.findByText("5:30 PM")).toBeInTheDocument();
+  expect(screen.getByText("5:45 PM")).toBeInTheDocument();
+  expect(screen.queryByText("Slot 1")).not.toBeInTheDocument();
+});

@@ -16,6 +16,7 @@ import {
 } from "../../judge/finalDraftStore.js";
 import { applyFinalEdit, undoFinalEdit } from "../../judge/applyFinalEdit.js";
 import { slotsOf, slotLabel, finalStats } from "../../judge/finalRoundPlan.js";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../../judge/finalRoundTiming.js";
 import RoomField from "./RoomField.jsx";
 
 /**
@@ -35,6 +36,7 @@ import RoomField from "./RoomField.jsx";
 export default function FinalRoundPlanner() {
   const [plan, setPlan] = useState(undefined);
   const [allJudges, setAllJudges] = useState([]);
+  const [timing, setTiming] = useState(null);
   const [building, setBuilding] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState(null);
@@ -63,6 +65,10 @@ export default function FinalRoundPlanner() {
     );
     return () => unsubscribe();
   }, []);
+
+  // the same live times teams and judges are shown, so the running order here
+  // reads the way their cards will
+  useEffect(() => subscribeToFinalRoundTiming((next) => setTiming(next.timing)), []);
 
   const stats = plan ? finalStats(plan) : null;
   const warnings = plan ? warningsFor(plan) : [];
@@ -334,7 +340,7 @@ export default function FinalRoundPlanner() {
                   alignItems: { md: "center" },
                   py: 1
                 }}>
-                <Chip size="small" label={slotLabel(slot.order)} sx={{ flexShrink: 0 }} />
+                <Chip size="small" label={finalSlotTime(slotLabel(slot.order), timing)} sx={{ flexShrink: 0 }} />
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{slot.teamName}</Typography>
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -374,6 +380,7 @@ export default function FinalRoundPlanner() {
         <PanelDrawer
           plan={plan}
           slot={openTeam}
+          timing={timing}
           allJudges={allJudges}
           onClose={() => setOpenTeamId(null)}
           onEdit={edit}
@@ -430,7 +437,7 @@ function Stat({ label, value, warn = false }) {
 }
 
 /** Add, remove or swap a judge on one finalist's panel. */
-function PanelDrawer({ plan, slot, allJudges = [], onClose, onEdit }) {
+function PanelDrawer({ plan, slot, timing = null, allJudges = [], onClose, onEdit }) {
   const [mode, setMode] = useState("add");
   const [target, setTarget] = useState("");
   const [replacing, setReplacing] = useState("");
@@ -485,7 +492,7 @@ function PanelDrawer({ plan, slot, allJudges = [], onClose, onEdit }) {
       <DialogTitle>
         <Typography variant="h3" component="div">Panel for {slot.teamName}</Typography>
         <Typography variant="body2">
-          {slotLabel(slot.order)} · {plan.room}
+          {finalSlotTime(slotLabel(slot.order), timing)} · {plan.room}
         </Typography>
       </DialogTitle>
       <DialogContent dividers>

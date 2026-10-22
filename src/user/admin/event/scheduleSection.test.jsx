@@ -6,13 +6,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
  */
 const mock = vi.hoisted(() => ({
   setJudgesPerTeam: vi.fn(async () => ({ ok: true })),
-  setFinalRoundTime: vi.fn(async () => ({ ok: true })),
+  setFinalRoundTiming: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock("./eventConfig", () => ({
   setBatchCount: vi.fn(),
   setBatchTimes: vi.fn(),
   setFinalRoundRoom: vi.fn(),
-  setFinalRoundTime: mock.setFinalRoundTime,
+  setFinalRoundTiming: mock.setFinalRoundTiming,
   setJudgesPerTeam: mock.setJudgesPerTeam,
 }));
 
@@ -25,7 +25,7 @@ const save = () => screen.getAllByRole("button", { name: "Save" })[1];
 
 beforeEach(() => {
   mock.setJudgesPerTeam.mockClear();
-  mock.setFinalRoundTime.mockClear();
+  mock.setFinalRoundTiming.mockClear();
 });
 
 test("an empty config shows the built-in min of 3 and a blank max, with nothing to save", () => {
@@ -60,29 +60,45 @@ test("a typed min and max are saved as numbers", async () => {
 
 describe("the final round time", () => {
   const time = () => screen.getByLabelText("Final round time");
+  const minutes = () => screen.getByLabelText("Minutes per finalist");
   const saveTime = () => screen.getAllByRole("button", { name: "Save" })[3];
 
   test("unset is blank with nothing to save", () => {
     render(<ScheduleSection config={{}} onResult={vi.fn()} />);
+    expect(time()).toHaveAttribute("type", "time");
     expect(time().value).toBe("");
+    expect(minutes().value).toBe("");
     expect(saveTime()).toBeDisabled();
   });
 
-  test("a typed time is saved", async () => {
+  test("a picked time is saved the way teams are shown it, with the slot length", async () => {
     const onResult = vi.fn();
     render(<ScheduleSection config={{}} onResult={onResult} />);
-    fireEvent.change(time(), { target: { value: "7:00 PM" } });
+    fireEvent.change(time(), { target: { value: "19:00" } });
+    fireEvent.change(minutes(), { target: { value: "10" } });
     fireEvent.click(saveTime());
-    await waitFor(() => expect(mock.setFinalRoundTime).toHaveBeenCalledWith("7:00 PM"));
+    await waitFor(() =>
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ time: "7:00 PM", slotMinutes: 10 })
+    );
     expect(onResult).toHaveBeenCalledWith({ ok: true }, "Final round time set to 7:00 PM");
   });
 
-  test("emptying a stored time saves it as cleared", async () => {
+  test("a stored time and slot length show in the fields", () => {
+    render(<ScheduleSection config={{ finalRoundTime: "7:00 PM", finalRoundSlotMinutes: 10 }} onResult={vi.fn()} />);
+    expect(time().value).toBe("19:00");
+    expect(minutes().value).toBe("10");
+    expect(saveTime()).toBeDisabled();
+  });
+
+  test("emptying both saves them as cleared", async () => {
     const onResult = vi.fn();
-    render(<ScheduleSection config={{ finalRoundTime: "7:00 PM" }} onResult={onResult} />);
-    expect(time().value).toBe("7:00 PM");
+    render(<ScheduleSection config={{ finalRoundTime: "7:00 PM", finalRoundSlotMinutes: 10 }} onResult={onResult} />);
     fireEvent.change(time(), { target: { value: "" } });
+    fireEvent.change(minutes(), { target: { value: "" } });
     fireEvent.click(saveTime());
-    await waitFor(() => expect(onResult).toHaveBeenCalledWith({ ok: true }, "Final round time cleared"));
+    await waitFor(() =>
+      expect(mock.setFinalRoundTiming).toHaveBeenCalledWith({ time: "", slotMinutes: null })
+    );
+    expect(onResult).toHaveBeenCalledWith({ ok: true }, "Final round time cleared");
   });
 });
