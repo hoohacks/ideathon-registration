@@ -108,7 +108,9 @@ function Assignments() {
   const [togglingFinalRound, setTogglingFinalRound] = useState(false);
   const [finalRoundError, setFinalRoundError] = useState(null);
   const [finalRoundTiming, setFinalRoundTiming] = useState({ start: null, timing: null });
-  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
+  // closing is two steps: what it does, then typing the phrase -- it is the one
+  // button on this page that ends something for every judge in the room
+  const [closeStep, setCloseStep] = useState(null);
 
   const { userTypes, userCredential } = useAuth();
   const currentUserId = userCredential?.user?.uid;
@@ -233,19 +235,16 @@ function Assignments() {
     readDraft().then(setDraft);
   }, [canManageSchedule]);
 
-  async function handleDeactivateFinalRound() {
-    setDeactivateConfirmOpen(true);
-  }
-
   async function confirmDeactivateFinalRound() {
-    setDeactivateConfirmOpen(false);
+    setCloseStep(null);
     setTogglingFinalRound(true);
     setFinalRoundError(null);
     try {
-      await deactivateFinalRound();
+      const result = await deactivateFinalRound();
+      if (!result.ok) setFinalRoundError(result.error || "Failed to close the final round.");
     } catch (err) {
       console.error("Failed to deactivate final round:", err);
-      setFinalRoundError(err.message || "Failed to deactivate final round.");
+      setFinalRoundError(err.message || "Failed to close the final round.");
     } finally {
       setTogglingFinalRound(false);
     }
@@ -464,10 +463,11 @@ function Assignments() {
               {finalRoundActive ? (
                 <Button
                   variant="outlined"
-                  onClick={handleDeactivateFinalRound}
+                  color="error"
+                  onClick={() => setCloseStep("explain")}
                   disabled={togglingFinalRound || finalRoundLoading}
                 >
-                  Deactivate final round
+                  Close final round
                 </Button>
               ) : (
                 <Button
@@ -597,15 +597,29 @@ function Assignments() {
       </Snackbar>
 
       <ConfirmDialog
-        open={deactivateConfirmOpen}
-        title="Deactivate final round judging?"
+        open={closeStep === "explain"}
+        title="Close the final round?"
         consequences={[
-          "Assignments are withdrawn from every judge.",
-          "The standings are archived.",
+          "Judges can no longer file or change final round scores, including any still being written.",
+          "Every judge loses their final round assignments, and finalists lose their pitch time on their home page.",
+          "Results keeps the final standings, marked closed, and treats whatever is in as the result.",
+          "Only do this once every judge who is going to score has scored, or the winner has been announced.",
         ]}
-        confirmLabel="Deactivate"
+        confirmLabel="Continue"
+        onConfirm={() => setCloseStep("type")}
+        onCancel={() => setCloseStep(null)}
+      />
+
+      <ConfirmDialog
+        open={closeStep === "type"}
+        title="Are you sure?"
+        consequences={[
+          "A restore point is saved first, but reopening means publishing the final round again, which clears every final score.",
+        ]}
+        typeToConfirm="close final round"
+        confirmLabel="Close final round"
         onConfirm={confirmDeactivateFinalRound}
-        onCancel={() => setDeactivateConfirmOpen(false)}
+        onCancel={() => setCloseStep(null)}
       />
 
     </Layout>

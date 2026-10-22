@@ -8,7 +8,7 @@
  * somebody has not pressed submit yet.
  */
 import {
-  finalStandings, firstRoundStandings, panelsFrom, standingsState, winnerOf,
+  finalStandings, firstRoundStandings, leadersOf, panelsFrom, placesOf, standingsState,
 } from "./standings";
 
 const card = (problem) => ({
@@ -72,17 +72,19 @@ describe("ranking the final round", () => {
   });
 
   test("it counts what is in against what is expected, per team", () => {
-    const finalScores = { t1: { j1: card(8) } };
+    // both judges are scoring -- j2 has filed for Beta -- so Alpha owes j2 a card
+    const finalScores = { t1: { j1: card(8) }, t2: { j2: card(8) } };
     const alpha = finalStandings({ finalRoundTeams, finalScores, panels }).find((t) => t.name === "Alpha");
 
     expect(alpha.received).toBe(1);
     expect(alpha.expected).toBe(2);
+    expect(alpha.missingJudges).toEqual(["j2"]);
     expect(alpha.complete).toBe(false);
   });
 
   test("a card from a judge who is not on the panel does not count as received", () => {
     // j9 is not in t1's panel -- its card must not stand in for j2's
-    const finalScores = { t1: { j1: card(8), j9: card(8) } };
+    const finalScores = { t1: { j1: card(8), j9: card(8) }, t2: { j2: card(8) } };
     const alpha = finalStandings({ finalRoundTeams, finalScores, panels }).find((t) => t.name === "Alpha");
 
     expect(alpha.received).toBe(1);
@@ -101,7 +103,7 @@ describe("a running total is not a result", () => {
   test("every card in is settled, and has a winner", () => {
     const standings = finalStandings({ finalRoundTeams, finalScores: complete, panels });
     expect(standingsState(standings).settled).toBe(true);
-    expect(winnerOf(standings).name).toBe("Alpha");
+    expect(leadersOf(standings).map((t) => t.name)).toEqual(["Alpha"]);
   });
 
   test("one card missing is not settled, and names who it is waiting on", () => {
@@ -111,14 +113,15 @@ describe("a running total is not a result", () => {
 
     expect(state.settled).toBe(false);
     expect(state.waitingOn).toEqual([{ name: "Beta", missing: 1 }]);
+    expect(state.partialJudges).toEqual([{ judgeId: "j2", scored: 2, of: 3, missing: ["Beta"] }]);
   });
 
-  test("there is no winner while a card is outstanding, even though there is a first row", () => {
+  test("the leader is shown while a card is outstanding, but it is not settled", () => {
     const finalScores = { ...complete, t2: { j1: card(7) } };
     const standings = finalStandings({ finalRoundTeams, finalScores, panels });
 
-    expect(standings[0].name).toBe("Alpha");
-    expect(winnerOf(standings)).toBeNull();
+    expect(leadersOf(standings).map((t) => t.name)).toEqual(["Alpha"]);
+    expect(standingsState(standings).settled).toBe(false);
   });
 
   test("a card from an off-panel judge does not settle the round or crown a winner", () => {
@@ -129,19 +132,130 @@ describe("a running total is not a result", () => {
 
     expect(state.settled).toBe(false);
     expect(state.waitingOn).toEqual([{ name: "Beta", missing: 1 }]);
-    expect(winnerOf(standings)).toBeNull();
   });
 
-  test("nothing scored at all has no winner rather than an arbitrary one", () => {
+  test("nothing scored at all has no leader rather than an arbitrary one", () => {
     const standings = finalStandings({ finalRoundTeams, finalScores: {}, panels });
-    expect(winnerOf(standings)).toBeNull();
+    expect(leadersOf(standings)).toEqual([]);
     expect(standingsState(standings).cards).toBe(0);
+    expect(standingsState(standings).settled).toBe(false);
   });
 
   test("no final round at all is an empty result, not a throw", () => {
     expect(finalStandings()).toEqual([]);
     expect(standingsState([]).settled).toBe(false);
-    expect(winnerOf([])).toBeNull();
+    expect(leadersOf([])).toEqual([]);
+  });
+});
+
+/**
+ * Judges step out. Every checked-in judge is seated on every finalist, and the
+ * result cannot wait for somebody who has gone home -- so a judge who has not
+ * scored any finalist is not waited on, and is named instead.
+ */
+describe("a judge who steps out", () => {
+  const seated = { t1: ["j1", "j2", "j3"], t2: ["j1", "j2", "j3"], t3: ["j1", "j2", "j3"] };
+  const twoJudges = {
+    t1: { j1: card(9), j2: card(9) },
+    t2: { j1: card(7), j2: card(7) },
+    t3: { j1: card(5), j2: card(5) },
+  };
+
+  test("before scoring anybody is not waited on, and the round settles without them", () => {
+    const standings = finalStandings({ finalRoundTeams, finalScores: twoJudges, panels: seated });
+    const state = standingsState(standings);
+
+    expect(state.settled).toBe(true);
+    expect(state.notScoring).toEqual(["j3"]);
+    expect(standings.every((team) => team.expected === 2)).toBe(true);
+  });
+
+  test("after scoring some finalists is still waited on for the rest", () => {
+    const finalScores = { ...twoJudges, t1: { ...twoJudges.t1, j3: card(8) } };
+    const state = standingsState(finalStandings({ finalRoundTeams, finalScores, panels: seated }));
+
+    expect(state.settled).toBe(false);
+    expect(state.partialJudges).toEqual([{ judgeId: "j3", scored: 1, of: 3, missing: ["Beta", "Gamma"] }]);
+    expect(state.notScoring).toEqual([]);
+  });
+
+  test("a judge taken off one panel is not waited on for that team", () => {
+    const panelsWithout = { ...seated, t3: ["j1", "j2"] };
+    const finalScores = {
+      t1: { j1: card(9), j2: card(9), j3: card(9) },
+      t2: { j1: card(7), j2: card(7), j3: card(7) },
+      t3: { j1: card(5), j2: card(5) },
+    };
+    const state = standingsState(finalStandings({ finalRoundTeams, finalScores, panels: panelsWithout }));
+    expect(state.settled).toBe(true);
+  });
+});
+
+/**
+ * Closing the round withdraws every judge's finalAssignments. The standings
+ * keep the panel publishing stored, so a closed round can still say whose
+ * cards it was waiting on.
+ */
+describe("a closed round", () => {
+  test("reads the panel stored on each standing once the assignments are gone", () => {
+    const stored = Object.fromEntries(
+      Object.entries(finalRoundTeams).map(([id, team]) => [id, { ...team, panel: { j1: true, j2: true } }])
+    );
+    const finalScores = { t1: { j1: card(9), j2: card(9) }, t2: { j1: card(7) }, t3: { j1: card(5), j2: card(5) } };
+    const standings = finalStandings({ finalRoundTeams: stored, finalScores, panels: {} });
+    const beta = standings.find((t) => t.name === "Beta");
+
+    expect(beta.expected).toBe(2);
+    expect(beta.missingJudges).toEqual(["j2"]);
+  });
+});
+
+/**
+ * A tie is a tie. Fundable votes and the alphabet still order the cut, where
+ * somebody has to be first, but on the results page teams level on average
+ * share the place and a shared first place names nobody the winner.
+ */
+describe("ties", () => {
+  test("two teams level on average are both first, and both lead", () => {
+    const finalScores = {
+      t1: { j1: card(8), j2: card(8) },
+      t2: { j1: card(8), j2: card(8) },
+      t3: { j1: card(5), j2: card(5) },
+    };
+    const standings = placesOf(finalStandings({ finalRoundTeams, finalScores, panels }));
+
+    expect(standings.map((t) => [t.name, t.place, t.tied])).toEqual([
+      ["Alpha", 1, true],
+      ["Beta", 1, true],
+      ["Gamma", 3, false],
+    ]);
+    expect(leadersOf(standings).map((t) => t.name)).toEqual(["Alpha", "Beta"]);
+  });
+
+  test("fundable votes do not break a tie", () => {
+    const noFund = (n) => ({ ...card(n), fundable: false });
+    // Beta has every fundable vote; it is still level with Alpha, not ahead
+    const finalScores = {
+      t1: { j1: noFund(8), j2: noFund(8) },
+      t2: { j1: card(8), j2: card(8) },
+    };
+    const standings = finalStandings({ finalRoundTeams, finalScores, panels });
+    expect(leadersOf(standings).map((t) => t.name)).toEqual(["Alpha", "Beta"]);
+  });
+
+  test("a gap too small to see is still a tie", () => {
+    const rows = placesOf([
+      { teamId: "a", name: "A", averageScore: 31.2500001 },
+      { teamId: "b", name: "B", averageScore: 31.25 },
+      { teamId: "c", name: "C", averageScore: 30 },
+      { teamId: "d", name: "D", averageScore: null },
+    ]);
+    expect(rows.map((t) => [t.name, t.place, t.tied])).toEqual([
+      ["A", 1, true],
+      ["B", 1, true],
+      ["C", 3, false],
+      ["D", null, false],
+    ]);
   });
 });
 

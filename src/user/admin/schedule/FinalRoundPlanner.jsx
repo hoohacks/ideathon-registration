@@ -17,6 +17,7 @@ import {
 import { applyFinalEdit, undoFinalEdit } from "../../judge/applyFinalEdit.js";
 import { slotsOf, slotLabel, finalStats } from "../../judge/finalRoundPlan.js";
 import { finalSlotTime, subscribeToFinalRoundTiming } from "../../judge/finalRoundTiming.js";
+import { sameAverage } from "../../judge/scoreRubric.js";
 import RoomField from "./RoomField.jsx";
 
 /**
@@ -294,8 +295,8 @@ export default function FinalRoundPlanner() {
               const inCut = Boolean(plan.assignments[team.teamId]);
               return (
                 <Stack key={team.teamId} direction="row" spacing={1} sx={{ alignItems: "center", py: 0.75 }}>
-                  <Typography variant="body2" sx={{ width: 28, color: "text.secondary" }}>
-                    {index + 1}
+                  <Typography variant="body2" sx={{ width: 32, color: "text.secondary" }}>
+                    {placeLabel(plan.ranked, index)}
                   </Typography>
                   <Typography variant="body2" sx={{ flex: 1, fontWeight: inCut ? 600 : 400 }}>
                     {team.name}
@@ -392,7 +393,7 @@ export default function FinalRoundPlanner() {
         title={`Publish the final round?`}
         consequences={[
           `${slots.length} team${slots.length === 1 ? "" : "s"} in ${plan.room}.`,
-          "This replaces every judge's final assignments and the standings.",
+          "This replaces every judge's final assignments and the standings, and clears any final round scores already filed.",
           "A restore point is taken first.",
           ...(stats.unjudged.length
             ? [`${stats.unjudged.join(", ")} has nobody on its panel.`]
@@ -423,6 +424,18 @@ export default function FinalRoundPlanner() {
       />
     </Stack>
   );
+}
+
+/**
+ * "3", or "T3" when another team has the same average. The ranking is still in
+ * the order the cut was prefilled from, but a shared place is shown as shared,
+ * so a tie at the cut line is visible here as well as in the warnings.
+ */
+function placeLabel(ranked, index) {
+  const average = ranked[index].averageScore;
+  const first = ranked.findIndex((team) => sameAverage(team.averageScore, average));
+  const tied = ranked.filter((team) => sameAverage(team.averageScore, average)).length > 1;
+  return `${tied ? "T" : ""}${first + 1}`;
 }
 
 function Stat({ label, value, warn = false }) {

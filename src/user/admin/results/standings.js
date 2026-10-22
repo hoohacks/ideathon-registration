@@ -1,4 +1,4 @@
-import { compareForRanking, rankingEntry, scoreCard, scoredJudgeCount } from "../../judge/scoreRubric.js";
+import { rankingEntry, sameAverage, scoreCard, scoredJudgeCount } from "../../judge/scoreRubric.js";
 import { rosterOf } from "../../judge/assignmentList.js";
 
 /**
@@ -12,37 +12,69 @@ import { rosterOf } from "../../judge/assignmentList.js";
  * show you: to find the winner you exported the final round's raw cards and did
  * the arithmetic yourself.
  *
- * This ranks the final round the same way the cut was ranked -- same rubric,
- * same explicit tiebreak -- and keeps the first-round numbers beside it, because
- * a team that led the field all day and came second on the night is a thing an
- * organizer wants to see rather than infer.
+ * This ranks the final round on the same rubric the cut was made on and keeps
+ * the first-round numbers beside it, because a team that led the field all day
+ * and came second on the night is a thing an organizer wants to see rather than
+ * infer.
+ *
+ * Two rules shape what it will claim:
+ *
+ * - **Nobody is waited on who is not scoring.** Every checked-in judge is seated
+ *   on every finalist, and on the night one or two of them will step out. A
+ *   result that waits for the whole seated panel never arrives. So a team is
+ *   only waiting on judges who have filed a final card for *some* finalist --
+ *   whoever has not scored anybody is not counted, and is named so an organizer
+ *   can see who that is.
+ * - **A tie is a tie.** Places are shared between teams on the same average
+ *   (`sameAverage`); nothing past the average decides a place here. Fundable
+ *   votes and the team name still order the cut, where something has to be
+ *   first, but the winner is organizers' call when the scores do not make it.
  *
  * Pure.
  */
 
 /**
- * @param finalRoundTeams the /finalRound/teams node -- who is in the round
- * @param finalScores     /scores/final, as { teamId: { judgeUid: card } }
- * @param panels          { teamId: judgeUid[] } who is expected to score, from
- *                        each judge's finalAssignments
- */
-/**
  * The order a ranking is read in, for either round.
  *
- * `compareForRanking` is the tiebreak the cut is made on and the exports are
- * written with; the only thing added here is where a team with no card at all
- * goes. It sorts last whatever it did in the other round, because it has not
- * been heard yet -- a team that led the field all day and has not presented
- * tonight is not in first place, and it is not in last place either. Both
- * rounds share this so the two tabs cannot drift into ranking by different
- * rules.
+ * Best average first. A team with no card at all goes last whatever it did in
+ * the other round, because it has not been heard yet -- a team that led the
+ * field all day and has not presented tonight is not in first place, and it is
+ * not in last place either.
+ *
+ * Teams on the same average are listed by name, which is only a reading order:
+ * `placesOf` gives them the same place. Both rounds share this so the two tabs
+ * cannot drift into ranking by different rules.
  */
 export function byRank(a, b) {
   const aScored = typeof a.averageScore === "number";
   const bScored = typeof b.averageScore === "number";
   if (aScored !== bScored) return aScored ? -1 : 1;
-  if (!aScored) return String(a.name).localeCompare(String(b.name));
-  return compareForRanking(a, b);
+  if (aScored && !sameAverage(a.averageScore, b.averageScore)) return b.averageScore - a.averageScore;
+
+  const byName = String(a.name ?? "").localeCompare(String(b.name ?? ""), "en");
+  if (byName !== 0) return byName;
+  const left = String(a.teamId ?? "");
+  const right = String(b.teamId ?? "");
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * Each team's place, shared on a tie: two teams level for second are both
+ * second, and the next team is fourth. A team with no card has no place.
+ *
+ * Expects rows already sorted with `byRank`. Returns a new array; each row gains
+ * `place` (a number or null) and `tied` (whether another team shares it).
+ */
+export function placesOf(standings) {
+  const scored = standings.filter((team) => typeof team.averageScore === "number");
+  return standings.map((team) => {
+    if (typeof team.averageScore !== "number") return { ...team, place: null, tied: false };
+    const ahead = scored.filter(
+      (other) => other.averageScore > team.averageScore && !sameAverage(other.averageScore, team.averageScore)
+    ).length;
+    const level = scored.filter((other) => sameAverage(other.averageScore, team.averageScore)).length;
+    return { ...team, place: ahead + 1, tied: level > 1 };
+  });
 }
 
 /**
@@ -81,20 +113,42 @@ export function firstRoundStandings({ teams = {}, firstScores = {} } = {}) {
     .sort(byRank);
 }
 
+/**
+ * The final round, ranked, with what each team is still waiting on.
+ *
+ * @param finalRoundTeams the /finalRound/teams node -- who is in the round
+ * @param finalScores     /scores/final, as { teamId: { judgeUid: card } }
+ * @param panels          { teamId: judgeUid[] } who is seated on each team, from
+ *                        each judge's finalAssignments while the round is open.
+ *                        Closing the round withdraws those, so a team missing
+ *                        here falls back to the panel publishing stored on its
+ *                        standing.
+ */
 export function finalStandings({ finalRoundTeams = {}, finalScores = {}, panels = {} } = {}) {
-  return Object.entries(finalRoundTeams)
-    .map(([teamId, standing]) => {
+  const teamIds = Object.keys(finalRoundTeams ?? {});
+
+  // whoever has filed a final card for any finalist is scoring tonight; the
+  // rest of the seated panel has stepped out or not started, and is not waited on
+  const scoring = new Set();
+  for (const teamId of teamIds) {
+    for (const [judgeId, entry] of Object.entries(finalScores[teamId] ?? {})) {
+      if (scoreCard(entry) !== null) scoring.add(judgeId);
+    }
+  }
+
+  return teamIds
+    .map((teamId) => {
+      const standing = finalRoundTeams[teamId];
       const cards = finalScores[teamId] ?? {};
-      const assigned = panels[teamId] ?? [];
-      const expected = assigned.length;
-      // `expected` and `received` have to be counts over the same population --
-      // the assigned panel -- or a card from a judge who isn't on it can stand
-      // in for the assigned judge's still-missing one and complete a team that
-      // has not actually been heard from by everyone who owes it a score.
-      const received = assigned.filter((judgeId) => scoreCard(cards[judgeId]) !== null).length;
-      // raw card count, not scoped to the panel -- deactivating the round wipes
-      // every judge's finalAssignments but not the cards already written, so
-      // this is the only proof of work standingsState has left once closed
+      const seated = seatedOn(teamId, standing, panels, scoring);
+      // `expected` and `received` are counts over the same population -- the
+      // seated judges who are scoring -- or a card from a judge who isn't on
+      // the panel could stand in for a seated judge's still-missing one
+      const counted = seated.filter((judgeId) => scoring.has(judgeId));
+      const missing = counted.filter((judgeId) => scoreCard(cards[judgeId]) === null);
+      const received = counted.length - missing.length;
+      // raw card count, not scoped to the panel -- the proof of work that
+      // survives whatever happened to the assignments
       const cardsFiled = scoredJudgeCount(cards);
 
       return {
@@ -108,14 +162,29 @@ export function finalStandings({ finalRoundTeams = {}, finalScores = {}, panels 
         },
         timeslot: standing?.timeslot ?? null,
         room: standing?.room ?? null,
-        expected,
+        expected: counted.length,
         received,
         cardsFiled,
+        seated,
+        missingJudges: missing,
+        notScoring: seated.filter((judgeId) => !scoring.has(judgeId)),
         // a ranking that is still missing cards is a running total, not a result
-        complete: expected > 0 && received >= expected,
+        complete: counted.length > 0 && missing.length === 0,
       };
     })
     .sort(byRank);
+}
+
+/**
+ * Who is seated on one finalist: the live assignments while the round is open,
+ * else the panel stored on the standing at publish, else -- for a round
+ * published before panels were stored -- everyone who scored any finalist.
+ */
+function seatedOn(teamId, standing, panels, scoring) {
+  if (panels[teamId]?.length) return [...panels[teamId]];
+  const stored = Object.keys(standing?.panel ?? {});
+  if (stored.length) return stored;
+  return [...scoring];
 }
 
 /** Who is expected to score each finalist, read off the judges' assignments. */
@@ -136,14 +205,34 @@ export function panelsFrom(judges = {}) {
  * "this is the result" and "this is the result so far", and the gap between
  * them is usually one judge who has not pressed submit.
  *
- * There used to be a `closed` option here, for reading an archived round back
- * after deactivation had wiped the panels it counts against. The results page
- * no longer shows a round that is not running, so nothing passes it.
+ * Alongside the per-team gaps, two lists about judges, for the final round:
+ *
+ * - `partialJudges`: scoring judges who have not scored every team they sit on.
+ *   Until they do, the teams they did score have an average with them in it
+ *   and the others do not -- worth knowing before announcing anything.
+ * - `notScoring`: seated judges with no final card at all. They are not waited
+ *   on; this is so an organizer can see who that leaves out, and catch the
+ *   judge who is still writing their first card rather than gone.
+ *
+ * First-round rows carry neither, so both come back empty there.
  */
 export function standingsState(standings) {
   const outstanding = standings.filter((team) => !team.complete);
   const expected = standings.reduce((sum, team) => sum + team.expected, 0);
   const cards = standings.reduce((sum, team) => sum + team.received, 0);
+
+  const owed = new Map();
+  const seatedCount = new Map();
+  const notScoring = new Set();
+  for (const team of standings) {
+    for (const judgeId of team.seated ?? []) {
+      seatedCount.set(judgeId, (seatedCount.get(judgeId) ?? 0) + 1);
+    }
+    for (const judgeId of team.missingJudges ?? []) {
+      owed.set(judgeId, [...(owed.get(judgeId) ?? []), team.name]);
+    }
+    for (const judgeId of team.notScoring ?? []) notScoring.add(judgeId);
+  }
 
   return {
     settled: standings.length > 0 && outstanding.length === 0,
@@ -153,17 +242,24 @@ export function standingsState(standings) {
       name: team.name,
       missing: Math.max(0, team.expected - team.received),
     })),
+    partialJudges: [...owed].map(([judgeId, teams]) => ({
+      judgeId,
+      scored: (seatedCount.get(judgeId) ?? 0) - teams.length,
+      of: seatedCount.get(judgeId) ?? 0,
+      missing: teams,
+    })),
+    notScoring: [...notScoring],
   };
 }
 
 /**
- * The winner, or null while it is still a tie nobody has broken.
+ * The teams in first place: one when the scores decide it, several when they
+ * tie, none before anybody has been scored.
  *
- * `compareForRanking` is a total order, so there is always a first row -- but a
- * first row and a winner are not the same claim while cards are outstanding.
+ * Says nothing about whether that is the result yet -- that is
+ * `standingsState`'s question, and the page asks both.
  */
-export function winnerOf(standings) {
-  const [first] = standings;
-  if (!first || typeof first.averageScore !== "number") return null;
-  return standingsState(standings).settled ? first : null;
+export function leadersOf(standings) {
+  const placed = placesOf(standings);
+  return placed.filter((team) => team.place === 1);
 }

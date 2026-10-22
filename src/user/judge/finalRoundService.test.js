@@ -168,7 +168,9 @@ describe("warnings", () => {
     const three = plan({
       ranked: [...tied, { teamId: "d", name: "D", averageScore: 28, judgeCount: 2 }],
     });
-    expect(warningsFor(three)).toEqual(["B and C tied on average; the tiebreak put B through."]);
+    expect(warningsFor(three)).toEqual([
+      "B, C and D are tied on average (28.00) at the cut. B is in for now; decide which goes through with Add and Drop, or take them all.",
+    ]);
   });
 
   test("a tie inside the cut is not", () => {
@@ -223,7 +225,7 @@ describe("planning", () => {
     ]);
     expect(result.warnings).toEqual([
       "Circles reached the final on fewer than 2 judges.",
-      "Circles and Tempo tied on average; the tiebreak put Circles through.",
+      "Circles and Tempo are tied on average (32.00) at the cut. Circles is in for now; decide which goes through with Add and Drop, or take them all.",
     ]);
   });
 
@@ -364,7 +366,7 @@ describe("publishing", () => {
       drift: [],
       warnings: [
         "Circles reached the final on fewer than 2 judges.",
-        "Circles and Tempo tied on average; the tiebreak put Circles through.",
+        "Circles and Tempo are tied on average (32.00) at the cut. Circles is in for now; decide which goes through with Add and Drop, or take them all.",
       ],
       snapshotId: expect.any(String),
     });
@@ -374,8 +376,14 @@ describe("publishing", () => {
       activatedAt: expect.any(Number),
       activatedBy: "admin-1",
       teams: {
-        t1: { name: "Lantern", averageScore: 36, fundableVotes: 0, judgeCount: 2, timeslot: "Slot 1", room: "Rice 011" },
-        t2: { name: "Circles", averageScore: 32, fundableVotes: 1, judgeCount: 1, timeslot: "Slot 2", room: "Rice 011" },
+        t1: {
+          name: "Lantern", averageScore: 36, fundableVotes: 0, judgeCount: 2, timeslot: "Slot 1", room: "Rice 011",
+          panel: { j1: true, j3: true },
+        },
+        t2: {
+          name: "Circles", averageScore: 32, fundableVotes: 1, judgeCount: 1, timeslot: "Slot 2", room: "Rice 011",
+          panel: { j1: true, j3: true },
+        },
       },
     });
     expect(db.getData("teams/t1/finalSlot")).toEqual({ room: "Rice 011", timeslot: "Slot 1" });
@@ -395,13 +403,25 @@ describe("publishing", () => {
     );
   });
 
-  test("takes a restore point of teams, judges and the final round first", async () => {
+  test("takes a restore point of teams, judges, the final round and its scores first", async () => {
     const { result } = await plannedThenPublished();
     expect(db.getData(`snapshotIndex/${result.snapshotId}`)).toMatchObject({
       label: "Before activating the final round (2 teams)",
-      reason: "activation rewrites every judge's final assignments and the standings",
-      paths: ["teams", "judges", "finalRound"],
+      reason: "activation rewrites every judge's final assignments and the standings, and clears old final scores",
+      paths: ["teams", "judges", "finalRound", "scores/final"],
     });
+  });
+
+  test("final scores from an earlier round are cleared, so the new one starts empty", async () => {
+    db.setData("scores/final/t1/j1", card(9));
+    db.setData("teams/t2/finalScores", { j1: card(9) });
+    const { result } = await plannedThenPublished();
+
+    expect(result.ok).toBe(true);
+    expect(db.getData("scores/final")).toBeNull();
+    expect(db.getData("teams/t2/finalScores")).toBeNull();
+    // first-round cards are not touched
+    expect(db.getData("scores/first")).not.toBeNull();
   });
 
   test("a hand-picked panel is written exactly, and a judge seated nowhere loses any old assignment", async () => {
@@ -427,6 +447,7 @@ describe("publishing", () => {
       judgeCount: 0,
       timeslot: "Slot 1",
       room: "Rice 011",
+      panel: { j1: true, j3: true },
     });
   });
 
@@ -507,10 +528,13 @@ describe("closing the round", () => {
     await publishFinalRound(plan);
   });
 
-  test("archives the standings and clears every slot and assignment with the flag", async () => {
+  test("keeps the standings, archives them with the cards, and clears every slot and assignment", async () => {
+    db.setData("scores/final/t1/j1", card(9));
     const standings = db.getData("finalRound/teams");
     vi.spyOn(Date, "now").mockReturnValue(1234);
-    await expect(deactivateFinalRound()).resolves.toEqual({ ok: true });
+    await expect(deactivateFinalRound()).resolves.toEqual({
+      ok: true, error: null, snapshotId: expect.any(String),
+    });
 
     const finalRound = db.getData("finalRound");
     expect(finalRound).toEqual({
@@ -519,8 +543,14 @@ describe("closing the round", () => {
       activatedBy: "admin-1",
       deactivatedAt: 1234,
       deactivatedBy: "admin-1",
-      archive: { 1234: { teams: standings, archivedAt: 1234, archivedBy: "admin-1" } },
+      // still here, so the results page can show the result of a closed round
+      teams: standings,
+      archive: {
+        1234: { teams: standings, finalScores: { t1: { j1: card(9) } }, archivedAt: 1234, archivedBy: "admin-1" },
+      },
     });
+    // closing stops scoring; it does not throw away what was scored
+    expect(db.getData("scores/final/t1/j1")).toEqual(card(9));
     for (const judge of Object.values(db.getData("judges"))) expect(judge).not.toHaveProperty("finalAssignments");
     for (const team of Object.values(db.getData("teams"))) expect(team).not.toHaveProperty("finalSlot");
   });
@@ -533,6 +563,22 @@ describe("closing the round", () => {
       deactivatedAt: expect.any(Number),
       deactivatedBy: "admin-1",
     });
+  });
+
+  test("takes a restore point first", async () => {
+    const result = await deactivateFinalRound();
+    expect(db.getData(`snapshotIndex/${result.snapshotId}`)).toMatchObject({
+      label: "Before closing the final round",
+      paths: ["teams", "judges", "finalRound", "scores/final"],
+    });
+  });
+
+  test("closes nothing when the restore point cannot be taken", async () => {
+    vi.spyOn(db.module, "runTransaction").mockResolvedValue({ committed: false });
+    const result = await deactivateFinalRound();
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Could not create a restore point/);
+    expect(db.getData("finalRound/active")).toBe(true);
   });
 
   test("only an admin can close it", async () => {

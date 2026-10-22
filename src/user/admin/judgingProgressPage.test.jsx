@@ -108,11 +108,22 @@ test("the final round, before it is activated, says there are no finalists yet",
   renderPage(<JudgingProgress />);
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
   fireEvent.click(screen.getByRole("option", { name: "Final round" }));
-  expect(screen.getByText(/The final round has not been activated/)).toBeInTheDocument();
+  expect(screen.getByText(/The final round is not open/)).toBeInTheDocument();
+});
+
+test("a closed final round keeps its standings for results, but shows no finalists here", () => {
+  db.setData("finalRound/teams", { a: { name: "Almanac" } });
+  db.setData("finalRound/active", false);
+  renderPage(<JudgingProgress />);
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
+  fireEvent.click(screen.getByRole("option", { name: "Final round" }));
+  expect(screen.getByText(/The final round is not open/)).toBeInTheDocument();
+  expect(screen.queryByText("Almanac")).not.toBeInTheDocument();
 });
 
 test("the final round shows the finalists and their own panel, not the first round's", () => {
   db.setData("finalRound/teams", { a: { name: "Almanac" } });
+  db.setData("finalRound/active", true);
   db.setData("teams/a/finalSlot", { room: "Rice 011", timeslot: "6:30 PM" });
   renderPage(<JudgingProgress />);
 

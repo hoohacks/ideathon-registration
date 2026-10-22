@@ -21,7 +21,7 @@ Everything lives in one Firebase Realtime Database tree.
                            schedule        room time batch judges[]
                            finalSlot       room timeslot
 /scores/{round}/{teamId}/{judgeUid}   the rubric, judgeUid, enteredBy, notes
-/finalRound                active, teams/{id} (standings), archive/{ts}
+/finalRound                active, teams/{id} (standings, with panel), archive/{ts}
 /announcements/{id}        text audience postedAt active
 /scheduleDraft             the schedule being planned; deleted on publish
 /finalRoundDraft           the final round being planned; deleted on publish
@@ -72,5 +72,7 @@ values are copied to where their readers can see them. Each copy has a rule:
 | A team's existence | **Fanned out** on delete, standings included |
 | Judge name | **Not** fanned out: every reader resolves it from the judge record, and treats the cached name as a fallback |
 
-`finalRound/archive` is never rewritten. It records what the standings were when
-the round closed.
+`finalRound/archive` is never rewritten. It records the standings and the final
+cards as they were when the round closed. Closing does not delete
+`finalRound/teams`, so Results can show a closed round. The next publish
+replaces the standings and clears `/scores/final`.

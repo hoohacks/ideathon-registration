@@ -5,9 +5,17 @@
  *
  * Scores use only `problem`, so a card of N is worth 4N out of 40.
  */
-import { byRank, firstRoundStandings, finalStandings, panelsFrom, standingsState, winnerOf } from "./standings";
+import { byRank, firstRoundStandings, finalStandings, leadersOf, panelsFrom, standingsState } from "./standings";
 
 describe("ordering", () => {
+  test("teams on the same average are listed by name, not by fundable votes", () => {
+    const rows = [
+      { name: "Zed", teamId: "z", averageScore: 20, fundableVotes: 3, judgeCount: 3 },
+      { name: "Abe", teamId: "a", averageScore: 20, fundableVotes: 0, judgeCount: 1 },
+    ];
+    expect([...rows].sort(byRank).map((r) => r.name)).toEqual(["Abe", "Zed"]);
+  });
+
   test("scored teams come first by their ranking, then unscored ones by name", () => {
     const rows = [
       { name: "Zed" },
@@ -71,18 +79,22 @@ describe("the final round table", () => {
       f1: { name: "Lantern", averageScore: 31.5, judgeCount: 3, fundableVotes: 2, timeslot: "Slot 1", room: "Rice 011" },
       f2: null,
     };
+    // b has scored nothing, so it is not waited on; f2 has no panel, so it
+    // falls back to everyone scoring -- a -- and is waiting on a's card
     const finalScores = { f1: { a: { problem: 8 } } };
     const panels = { f1: ["a", "b"] };
     expect(finalStandings({ finalRoundTeams, finalScores, panels })).toEqual([
       {
         teamId: "f1", name: "Lantern", averageScore: 32, fundableVotes: 0, judgeCount: 1,
         firstRound: { averageScore: 31.5, judgeCount: 3, fundableVotes: 2 },
-        timeslot: "Slot 1", room: "Rice 011", expected: 2, received: 1, cardsFiled: 1, complete: false,
+        timeslot: "Slot 1", room: "Rice 011", expected: 1, received: 1, cardsFiled: 1,
+        seated: ["a", "b"], missingJudges: [], notScoring: ["b"], complete: true,
       },
       {
         teamId: "f2", name: "Unnamed Team", averageScore: null, fundableVotes: 0, judgeCount: 0,
         firstRound: { averageScore: null, judgeCount: 0, fundableVotes: 0 },
-        timeslot: null, room: null, expected: 0, received: 0, cardsFiled: 0, complete: false,
+        timeslot: null, room: null, expected: 1, received: 0, cardsFiled: 0,
+        seated: ["a"], missingJudges: ["a"], notScoring: [], complete: false,
       },
     ]);
   });
@@ -112,18 +124,24 @@ describe("whether it is settled", () => {
         { name: "B", missing: 2 },
         { name: "C", missing: 2 },
       ],
+      partialJudges: [],
+      notScoring: [],
     });
   });
 
   test("everything in is settled; an empty table is not", () => {
-    expect(standingsState([row("A", 2, 2)])).toEqual({ settled: true, cards: 2, expected: 2, waitingOn: [] });
-    expect(standingsState([])).toEqual({ settled: false, cards: 0, expected: 0, waitingOn: [] });
+    expect(standingsState([row("A", 2, 2)])).toEqual({
+      settled: true, cards: 2, expected: 2, waitingOn: [], partialJudges: [], notScoring: [],
+    });
+    expect(standingsState([])).toEqual({
+      settled: false, cards: 0, expected: 0, waitingOn: [], partialJudges: [], notScoring: [],
+    });
   });
 
-  test("a winner only once settled, and only if the top team was scored", () => {
-    expect(winnerOf([row("A", 1, 1), row("B", 1, 1)])).toMatchObject({ name: "A" });
-    expect(winnerOf([row("A", 1, 1), row("B", 1, 0)])).toBeNull();
-    expect(winnerOf([{ ...row("A", 1, 1), averageScore: null }])).toBeNull();
-    expect(winnerOf([])).toBeNull();
+  test("the leaders are whoever shares first place, and only scored teams", () => {
+    expect(leadersOf([row("A", 1, 1, 12), row("B", 1, 1)]).map((t) => t.name)).toEqual(["A"]);
+    expect(leadersOf([row("A", 1, 1), row("B", 1, 0)]).map((t) => t.name)).toEqual(["A", "B"]);
+    expect(leadersOf([{ ...row("A", 1, 1), averageScore: null }])).toEqual([]);
+    expect(leadersOf([])).toEqual([]);
   });
 });

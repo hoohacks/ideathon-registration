@@ -112,7 +112,7 @@ test("judging progress shows the first round, and the final round separately", a
   // published yet; what must never happen is the first round's teams staying
   // on screen with their first-round rooms, which is what this used to do.
   await expect(
-    page.getByText(/final round has not been activated|Slot \d|\d+\/\d+ in/i).first()
+    page.getByText(/final round is not open|Slot \d|\d+\/\d+ in/i).first()
   ).toBeVisible({ timeout: 20_000 });
 });
 
