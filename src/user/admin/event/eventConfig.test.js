@@ -89,6 +89,42 @@ describe("writing config", () => {
     expect((await setBatchTimes({ 1: "5:00 PM", 2: "5:15 PM" })).ok).toBe(false);
   });
 
+  describe("batch times must be clock times", () => {
+    beforeEach(() => {
+      mockGet.mockImplementation(async (r) => {
+        const stored = { "config/batchCount": 3 }[r.path];
+        return { exists: () => stored !== undefined, val: () => stored };
+      });
+    });
+
+    test("a time that is not a clock time is refused, naming the batch", async () => {
+      const result = await setBatchTimes({ 1: "4:30 PM", 2: "4:45 PM", 3: "banana" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain(`Batch 3's time "banana" is not a clock time like 5:00 PM.`);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    test("every bad batch is named", async () => {
+      const result = await setBatchTimes({ 1: "25:99 XM", 2: "4:45 PM", 3: "13:00 PM" });
+      expect(result.error).toContain("Batch 1's");
+      expect(result.error).toContain("Batch 3's");
+      expect(result.error).not.toContain("Batch 2's");
+    });
+
+    test("two batches at the same time are refused, even spelled differently", async () => {
+      const result = await setBatchTimes({ 1: "5:00 PM", 2: "4:45 PM", 3: "5pm" });
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("Batches 1 and 3");
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    test("valid times are saved in canonical form", async () => {
+      const result = await setBatchTimes({ 1: " 4:30pm ", 2: "04:45 PM", 3: "5 pm" });
+      expect(result.ok).toBe(true);
+      expect(mockUpdate.mock.calls[0][1]["config/batchTimes"]).toEqual({ 1: "4:30 PM", 2: "4:45 PM", 3: "5:00 PM" });
+    });
+  });
+
   test("an unparseable event start is refused", async () => {
     expect((await setEventStart("not a date")).ok).toBe(false);
   });
