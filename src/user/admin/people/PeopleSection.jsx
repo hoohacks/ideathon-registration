@@ -1,3 +1,4 @@
+import { count } from "../../../plural";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Avatar, Box, Button, Card, Checkbox, Dialog, DialogActions, DialogContent,
@@ -153,7 +154,7 @@ export default function PeopleSection({ onResult }) {
                     <>
                       <Button size="small" variant="outlined" disabled={busy}
                         onClick={() => run(() => bulkSet({ uids: selectedJudges, role: "judge", field: "checkedIn", value: true }), "Judges checked in")}>
-                        Check in {selectedJudges.length} judge(s)
+                        Check in {count(selectedJudges.length, "judge")}
                       </Button>
                       <Button size="small" variant="outlined" disabled={busy}
                         onClick={() => run(() => bulkSet({ uids: selectedJudges, role: "judge", field: "isRound1Judge", value: true }), "Marked for round one")}>
@@ -168,7 +169,7 @@ export default function PeopleSection({ onResult }) {
                   {selectedCompetitors.length > 0 && (
                     <Button size="small" variant="outlined" disabled={busy}
                       onClick={() => run(() => bulkSet({ uids: selectedCompetitors, role: "competitor", field: "checkedIn", value: true }), "Competitors checked in")}>
-                      Check in {selectedCompetitors.length} competitor(s)
+                      Check in {count(selectedCompetitors.length, "competitor")}
                     </Button>
                   )}
                 </Stack>

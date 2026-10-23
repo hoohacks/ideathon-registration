@@ -1,3 +1,4 @@
+import { count } from "../../../plural";
 import { useEffect, useState } from "react";
 import { LinesSkeleton } from "../../../loadingUi";
 import { Alert, Button, Divider, MenuItem, TextField, Typography } from "@mui/material";
@@ -290,7 +291,7 @@ function ScheduleIntoBatch({ teamId, run, saving }) {
         {slots.map((slot) => (
           <MenuItem key={slot.batch} value={String(slot.batch)} disabled={!slot.freeRooms.length}>
             Batch {slot.batch} · {slot.time} ·{" "}
-            {slot.freeRooms.length ? `${slot.freeRooms.length} room(s) free` : "no free rooms"}
+            {slot.freeRooms.length ? `${count(slot.freeRooms.length, "room")} free` : "no free rooms"}
           </MenuItem>
         ))}
       </TextField>

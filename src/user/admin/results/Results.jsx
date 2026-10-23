@@ -9,6 +9,7 @@ import Layout from "../../Layout";
 import { PageHeader } from "../adminUi";
 import { SCORE_MAX_TOTAL } from "../../judge/scoreRubric";
 import usePageTitle from "../../../usePageTitle";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../../judge/finalRoundTiming";
 import {
   finalStandings, firstRoundStandings, leadersOf, panelsFrom, placesOf, standingsState,
 } from "./standings";
@@ -63,8 +64,13 @@ export default function Results() {
   const [finalScores, setFinalScores] = useState({});
   const [judges, setJudges] = useState({});
   const [active, setActive] = useState(false);
+  // the same live times teams and judges are shown, so "Slot 2" here reads as
+  // the 6:08 PM everyone in the room is going by
+  const [timing, setTiming] = useState(null);
 
   usePageTitle("Results");
+
+  useEffect(() => subscribeToFinalRoundTiming((next) => setTiming(next.timing)), []);
 
   useEffect(() => {
     const stop = [
@@ -188,7 +194,7 @@ export default function Results() {
           </Box>
           <Stack divider={<Divider />} sx={{ px: 2.5, pb: 1 }}>
             {standings.map((team) => (
-              <StandingRow key={team.teamId} team={team} final={final} />
+              <StandingRow key={team.teamId} team={team} final={final} timing={timing} />
             ))}
           </Stack>
         </Card>
@@ -218,7 +224,7 @@ export default function Results() {
  * where and when they presented, which is what an organizer checking a
  * surprising score wants next.
  */
-function StandingRow({ team, final }) {
+function StandingRow({ team, final, timing = null }) {
   const scored = typeof team.averageScore === "number";
 
   return (
@@ -246,7 +252,8 @@ function StandingRow({ team, final }) {
               {typeof team.firstRound.averageScore === "number"
                 ? team.firstRound.averageScore.toFixed(1)
                 : "-"}{" "}
-              · {team.timeslot ?? "no slot"} · {team.room ?? "no room"} ·{" "}
+              · {team.timeslot ? finalSlotTime(team.timeslot, timing) : "no slot"} ·{" "}
+              {team.room ?? "no room"} ·{" "}
               {team.fundableVotes} fundable
             </>
           ) : (

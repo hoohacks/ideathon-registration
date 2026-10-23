@@ -116,6 +116,17 @@ describe("a running total is not a result", () => {
     expect(state.partialJudges).toEqual([{ judgeId: "j2", scored: 2, of: 3, missing: ["Beta"] }]);
   });
 
+  test("what a judge still owes is listed in running order, not ranking order", () => {
+    // Gamma (slot 3) ranks above Beta (slot 2); j2 owes both
+    const finalScores = { t1: { j1: card(9), j2: card(9) }, t2: { j1: card(5) }, t3: { j1: card(8) } };
+    const standings = finalStandings({ finalRoundTeams, finalScores, panels });
+
+    expect(standings.map((t) => t.name)).toEqual(["Alpha", "Gamma", "Beta"]);
+    expect(standingsState(standings).partialJudges).toEqual([
+      { judgeId: "j2", scored: 1, of: 3, missing: ["Beta", "Gamma"] },
+    ]);
+  });
+
   test("the leader is shown while a card is outstanding, but it is not settled", () => {
     const finalScores = { ...complete, t2: { j1: card(7) } };
     const standings = finalStandings({ finalRoundTeams, finalScores, panels });

@@ -15,7 +15,11 @@ import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import { CardGridSkeleton } from "../../loadingUi";
 import { readScheduleMeta } from "./scheduleConfig";
-import { subscribeToPersonalSchedule, subscribeToFinalRoundSchedule } from "./getPersonalSchedule";
+import {
+  subscribeToPersonalSchedule,
+  subscribeToFinalRoundSchedule,
+  subscribeToJudgingStatus,
+} from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import { hasRole } from "../../roles";
@@ -25,6 +29,7 @@ import {
   submitScore,
   getMyScoredTeamIds,
   getMyFinalRoundScoredTeamIds,
+  getMyScore,
   FIRST_ROUND,
   FINAL_ROUND,
 } from "./getTeamInfo";
@@ -78,14 +83,43 @@ function ScoredProgress({ scored, total }) {
   );
 }
 
+/**
+ * What a judge with no first-round teams is told.
+ *
+ * Organizers mark every signed-up judge for the first round, so the mark says
+ * nothing here. What does: whether a schedule exists yet, and -- for anyone it
+ * left out, a spare, or a late sign-up -- whether they are checked in, because
+ * checking in is what makes a judge eligible for the final round. Once the
+ * final round is published that no longer seats anybody, so this stops
+ * promising it and leaves the final round section to speak for itself.
+ */
+function noFirstRoundTeamsMessage({ status, finalRoundActive }) {
+  if (!status?.scheduled) return "No assignments yet. They appear once an admin generates the schedule.";
+  if (finalRoundActive) return "No first round teams for you.";
+  return status.checkedIn
+    ? "No first round teams for you. You're checked in, so you're eligible to judge the final round."
+    : "No first round teams for you. Check in to be eligible to judge the final round.";
+}
+
 function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  function openFor(card) {
-    setSelected(card);
+  // An edit opens on the card as it was filed. If it cannot be read (offline,
+  // say) the form opens empty and still says it replaces the old score, which
+  // is no worse than re-entering it.
+  async function openFor(card) {
+    let existing = null;
+    if (card.scored && card.teamId) {
+      try {
+        existing = await getMyScore(card.round, card.teamId);
+      } catch (error) {
+        console.warn(`Could not load your score for ${card.teamName}:`, error);
+      }
+    }
+    setSelected({ ...card, existing });
     setModalOpen(true);
   }
 
@@ -178,6 +212,18 @@ function Assignments() {
     };
   }, [canViewAssignments]);
 
+  // only read when this judge has no first-round teams, to say why
+  const [judgingStatus, setJudgingStatus] = useState(null);
+  useEffect(() => {
+    if (!canViewAssignments) return undefined;
+    try {
+      return subscribeToJudgingStatus(setJudgingStatus);
+    } catch (err) {
+      console.warn("Could not read your judging status:", err);
+      return undefined;
+    }
+  }, [canViewAssignments]);
+
   /**
    * Pick up scores that synced in the background.
    *
@@ -241,7 +287,16 @@ function Assignments() {
     setFinalRoundError(null);
     try {
       const result = await deactivateFinalRound();
-      if (!result.ok) setFinalRoundError(result.error || "Failed to close the final round.");
+      if (!result.ok) {
+        setFinalRoundError(result.error || "Failed to close the final round.");
+      } else {
+        // the button just turns back into "Plan final round", which on its own
+        // does not say whether the close went through
+        setToast({
+          severity: "success",
+          message: "Final round closed. Results now shows the final standings.",
+        });
+      }
     } catch (err) {
       console.error("Failed to deactivate final round:", err);
       setFinalRoundError(err.message || "Failed to close the final round.");
@@ -277,7 +332,10 @@ function Assignments() {
       const record = isFinalRound ? setFinalRoundScoredTeamIds : setScoredTeamIds;
       if (result.status === "saved") {
         record((prev) => new Set(prev).add(teamId));
-        setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
+        setToast({
+          severity: "success",
+          message: selected?.scored ? `Score updated for ${teamName}.` : `Score submitted for ${teamName}.`,
+        });
       } else {
         setToast({
           severity: "warning",
@@ -366,13 +424,18 @@ function Assignments() {
     };
   }, [finalRoundActive, canViewAssignments]);
 
-  const remaining = useMemo(
-    () =>
-      personalAssignments.filter(
-        (a) => !scoredTeamIds.has(a.id) && !pendingTeamIdsByRound[FIRST_ROUND].has(a.id)
-      ).length,
-    [personalAssignments, scoredTeamIds, pendingTeamIdsByRound]
-  );
+  // Both rounds, and only cards that have landed. This counted the first round
+  // alone, so it said "All teams scored" over five unscored finalists -- and
+  // counted a card still queued on the device as scored, while the banner
+  // under it said the same card had not been sent.
+  const progress = useMemo(() => {
+    const firstScored = personalAssignments.filter((a) => scoredTeamIds.has(a.id)).length;
+    const finalScored = finalAssignments.filter((t) => finalRoundScoredTeamIds.has(t.id)).length;
+    return {
+      scored: firstScored + finalScored,
+      total: personalAssignments.length + finalAssignments.length,
+    };
+  }, [personalAssignments, scoredTeamIds, finalAssignments, finalRoundScoredTeamIds]);
 
   // the first card on each list still to score -- the lists are already in
   // presentation order -- so exactly one card per round reads as "now"
@@ -420,11 +483,8 @@ function Assignments() {
             alignItems: { xs: "flex-start", sm: "center" }
           }}>
           <Typography variant="h1">Judging</Typography>
-          {canViewAssignments && personalAssignments.length > 0 && (
-            <ScoredProgress
-              scored={personalAssignments.length - remaining}
-              total={personalAssignments.length}
-            />
+          {canViewAssignments && progress.total > 0 && (
+            <ScoredProgress scored={progress.scored} total={progress.total} />
           )}
         </Stack>
 
@@ -504,7 +564,7 @@ function Assignments() {
               ) : personalAssignments.length === 0 ? (
                 <Card sx={{ p: 3 }}>
                   <Typography variant="body2" align="center">
-                    No assignments yet. They appear once an admin generates the schedule.
+                    {noFirstRoundTeamsMessage({ status: judgingStatus, finalRoundActive })}
                   </Typography>
                 </Card>
               ) : (
@@ -517,7 +577,7 @@ function Assignments() {
                         room={assignment.room}
                         time={assignment.time}
                         onButtonClick={(card) => openFor({ ...card, round: FIRST_ROUND })}
-                        disabled={scoredTeamIds.has(assignment.id)}
+                        scored={scoredTeamIds.has(assignment.id)}
                         pending={pendingTeamIdsByRound[FIRST_ROUND].has(assignment.id)}
                         next={assignment.id != null && assignment.id === nextFirstRoundId}
                       />
@@ -546,7 +606,7 @@ function Assignments() {
                             teamName={team.teamName}
                             room={team.room}
                             time={finalSlotTime(team.timeslot ?? team.time, finalRoundTiming.timing)}
-                            disabled={finalRoundScoredTeamIds.has(team.id)}
+                            scored={finalRoundScoredTeamIds.has(team.id)}
                             pending={pendingTeamIdsByRound[FINAL_ROUND].has(team.id)}
                             next={team.id === nextFinalRoundId}
                             onButtonClick={(card) => openFor({ ...card, round: FINAL_ROUND })}
@@ -578,6 +638,7 @@ function Assignments() {
               ? finalRoundScoredTeamIds.has(selected.teamId)
               : scoredTeamIds.has(selected.teamId)
           }
+          initialCard={selected.existing}
           onClose={closeModal}
           onSubmit={handleSubmit}
         />

@@ -51,7 +51,14 @@ describe("who acted", () => {
     await expect(resolveName(ADMIN)).resolves.toBe("Hopper");
   });
 
-  test("nobody on record is 'admin' and the start of the uid", async () => {
+  test("nobody on record is the signed-in admin's email", async () => {
+    mockCurrentUser.value = { uid: ADMIN, email: "admin@example.com" };
+    await expect(resolveName(ADMIN)).resolves.toBe("admin@example.com");
+  });
+
+  test("with no email, or for someone else, it is 'admin' and the start of the uid", async () => {
+    await expect(resolveName(ADMIN)).resolves.toBe("admin admin-ui");
+    mockCurrentUser.value = { uid: "someone-else", email: "other@example.com" };
     await expect(resolveName(ADMIN)).resolves.toBe("admin admin-ui");
   });
 

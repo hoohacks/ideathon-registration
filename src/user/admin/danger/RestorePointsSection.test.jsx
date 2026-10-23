@@ -221,7 +221,7 @@ describe("the preview dialog", () => {
     expect(restoreSnapshot).toHaveBeenCalledWith("snap-1");
     expect(onResult).toHaveBeenCalledWith(
       { ok: true, restored: 3 },
-      expect.stringContaining("Restored 3 path(s)")
+      expect.stringContaining("Restored 3 paths")
     );
   });
 

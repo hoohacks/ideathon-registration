@@ -251,7 +251,7 @@ describe("a team that submitted after the schedule was built", () => {
     open(late);
     fireEvent.mouseDown(await screen.findByLabelText("Batch"));
     expect(await screen.findByRole("option", { name: /Batch 1 · 5:00 PM · no free rooms/ })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("option", { name: /Batch 2 · 5:15 PM · 1 room\(s\) free/ })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("option", { name: /Batch 2 · 5:15 PM · 1 room free/ })).not.toHaveAttribute("aria-disabled", "true");
   });
 
   test("it is slotted into the picked batch, room and judges, at that batch's time", async () => {

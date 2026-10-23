@@ -1,3 +1,4 @@
+import { count, agree } from "../../../plural.js";
 import { ref, get } from "firebase/database";
 import { database } from "../../../firebase.js";
 import { applyAdminAction } from "../adminAction.js";
@@ -258,7 +259,7 @@ export async function removeRoom(name, { moveTo } = {}) {
       ok: false,
       inUse,
       finalInUse,
-      error: `${totalInUse} team(s) are scheduled in ${name}. Choose where they should go.`,
+      error: `${count(totalInUse, "team")} ${agree(totalInUse, "is", "are")} scheduled in ${name}. Choose where ${agree(totalInUse, "it", "they")} should go.`,
     };
   }
   if (moveTo && !rooms.includes(moveTo)) {
@@ -305,7 +306,7 @@ export async function removeRoom(name, { moveTo } = {}) {
   return applyAdminAction({
     action: "room.remove",
     summary: moved.length
-      ? `Removed ${name}, moving ${totalInUse} team(s) to ${moveTo}`
+      ? `Removed ${name}, moving ${count(totalInUse, "team")} to ${moveTo}`
       : `Removed ${name}`,
     changes: [
       { path: "config/judgingRooms", before: rooms, after: rooms.filter((r) => r !== name) },

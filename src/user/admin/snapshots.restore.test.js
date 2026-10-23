@@ -154,7 +154,7 @@ describe("restoring", () => {
       by: "admin-1",
       byName: "Ada Byron",
       action: "snapshot.restore",
-      summary: "Restored 2 path(s) from “Morning”. The previous state was saved as a new restore point first.",
+      summary: "Restored 2 paths from “Morning”. The previous state was saved as a new restore point first.",
       undoable: false,
     });
   });

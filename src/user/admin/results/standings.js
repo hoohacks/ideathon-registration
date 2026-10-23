@@ -1,5 +1,6 @@
 import { rankingEntry, sameAverage, scoreCard, scoredJudgeCount } from "../../judge/scoreRubric.js";
 import { rosterOf } from "../../judge/assignmentList.js";
+import { compareSlots } from "../../judge/finalRoundPlan.js";
 
 /**
  * Who won.
@@ -224,7 +225,11 @@ export function standingsState(standings) {
   const owed = new Map();
   const seatedCount = new Map();
   const notScoring = new Set();
-  for (const team of standings) {
+  // in running order, not ranking order, so "still owes Tandem, Almanac and
+  // Kindling" reads the way the judge will meet those teams. First-round
+  // times are not slot labels, so compareSlots leaves them where they are.
+  const inRunningOrder = [...standings].sort((a, b) => compareSlots(a.timeslot, b.timeslot));
+  for (const team of inRunningOrder) {
     for (const judgeId of team.seated ?? []) {
       seatedCount.set(judgeId, (seatedCount.get(judgeId) ?? 0) + 1);
     }

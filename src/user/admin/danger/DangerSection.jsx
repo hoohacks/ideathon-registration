@@ -1,3 +1,4 @@
+import { count, agree } from "../../../plural";
 import { useEffect, useState } from "react";
 import {
   Alert, Button, Card, Checkbox, FormControlLabel, Stack, TextField, Typography,
@@ -78,8 +79,8 @@ export default function DangerSection({ onResult }) {
                 : includeScores
                   // saying "stranded" here would be wrong: with the box
                   // ticked those cards are not orphaned, they are deleted
-                  ? ` ${meta.scoredTeams} team(s) have scores. All of them will be deleted.`
-                  : ` ${meta.scoredTeams} team(s) already have scores; those cards will be stranded, still counting toward averages while belonging to judges who are no longer assigned.`}
+                  ? ` ${count(meta.scoredTeams, "team")} ${agree(meta.scoredTeams, "has", "have")} scores. All of them will be deleted.`
+                  : ` ${count(meta.scoredTeams, "team")} already ${agree(meta.scoredTeams, "has", "have")} scores; those cards will be stranded, still counting toward averages while belonging to judges who are no longer assigned.`}
             </Alert>
           )}
 

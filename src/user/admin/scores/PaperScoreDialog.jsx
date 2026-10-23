@@ -25,8 +25,13 @@ import { writeScoreOnBehalf } from "../../judge/getTeamInfo";
  *
  * initialValues and initialJudgeUid are both optional, so the original call
  * site in JudgingProgress is unchanged.
+ *
+ * `cards` is the team's cards for this round, { judgeUid: card }. Recording
+ * under a judge who already has one replaces it -- which is how an organizer
+ * corrects a mistyped card -- so the dialog says so before it happens rather
+ * than silently writing over a real card when the wrong name is picked.
  */
-function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid, onClose, onSaved }) {
+function PaperScoreDialog({ team, judges, round, cards = {}, initialValues, initialJudgeUid, onClose, onSaved }) {
   const criteria = Object.keys(RUBRIC);
   const [judgeUid, setJudgeUid] = useState(initialJudgeUid ?? "");
   const [values, setValues] = useState({
@@ -40,6 +45,13 @@ function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid,
 
   const missing =
     criteria.filter((f) => values[f] === "").length + (values.fundable === "" ? 1 : 0);
+
+  const existing = judgeUid ? cards?.[judgeUid] ?? null : null;
+  const existingTotal = existing ? criteria.reduce((s, f) => s + Number(existing[f] || 0), 0) : 0;
+  const nameOf = (uid) => {
+    const judge = judges.find((j) => j.judgeId === uid);
+    return judge?.judgeName ?? judge?.name ?? "This judge";
+  };
 
   async function save() {
     if (busy || missing || !judgeUid) return;
@@ -60,7 +72,11 @@ function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid,
           time: team.time ?? "TBD",
         },
       });
-      onSaved(`Recorded a score for ${team.name}.`);
+      onSaved(
+        existing
+          ? `Replaced ${nameOf(judgeUid)}'s score for ${team.name}.`
+          : `Recorded a score for ${team.name}.`
+      );
       onClose();
     } catch (e) {
       setError(e.message);
@@ -94,9 +110,17 @@ function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid,
             {judges.map((judge) => (
               <MenuItem key={judge.judgeId} value={judge.judgeId}>
                 {judge.judgeName ?? judge.name}
+                {cards?.[judge.judgeId] ? " (already scored)" : ""}
               </MenuItem>
             ))}
           </TextField>
+
+          {existing && (
+            <Alert severity="warning" sx={{ py: 0.25 }}>
+              {nameOf(judgeUid)} already filed a card for {team.name} ({existingTotal} /{" "}
+              {SCORE_MAX_TOTAL}). Recording replaces it.
+            </Alert>
+          )}
 
           {Object.entries(RUBRIC).map(([field, spec]) => (
             <TextField
@@ -150,7 +174,7 @@ function PaperScoreDialog({ team, judges, round, initialValues, initialJudgeUid,
             Cancel
           </Button>
           <Button onClick={save} disabled={busy || missing > 0 || !judgeUid} variant="contained">
-            {busy ? "Saving…" : "Record score"}
+            {busy ? "Saving…" : existing ? "Replace score" : "Record score"}
           </Button>
         </Stack>
       </DialogActions>

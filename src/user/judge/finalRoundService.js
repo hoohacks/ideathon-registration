@@ -504,9 +504,11 @@ export async function deactivateFinalRound() {
  * waits on). Nobody else's assignments or cards are touched, so there is no
  * restore point to take.
  *
- * Being seated is not being waited on: the results page waits only on panel
- * judges who have filed a final card, so a judge who arrives after slot 1 does
- * not hold that team's result open.
+ * Once they file a card, the results page waits on them for every finalist,
+ * including any that presented before they arrived -- the same as a judge who
+ * left partway. That is deliberate: nothing here can tell a team they missed
+ * from one they have not scored yet, and guessing wrong would call a winner
+ * while cards are still coming. Closing the round settles it.
  *
  * Returns { ok, error?, judgeName, teams }. Throws only if the caller is not an
  * admin.

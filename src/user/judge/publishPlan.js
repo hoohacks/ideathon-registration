@@ -1,3 +1,4 @@
+import { count, agree } from "../../plural.js";
 import { ref, get, update, push, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
@@ -59,7 +60,7 @@ export async function publishPlan(plan, { discardScores = false } = {}) {
         if (unjudged.length) {
             return {
                 ok: false,
-                error: `${unjudged.length} team(s) have no judges assigned (${unjudged
+                error: `${count(unjudged.length, "team")} ${agree(unjudged.length, "has", "have")} no judges assigned (${unjudged
                     .map((a) => a.teamName)
                     .join(", ")}). Assign a judge to each before publishing.`,
             };
@@ -73,7 +74,7 @@ export async function publishPlan(plan, { discardScores = false } = {}) {
         if (unplaced.length) {
             return {
                 ok: false,
-                error: `${unplaced.length} team(s) have no slot (${unplaced
+                error: `${count(unplaced.length, "team")} ${agree(unplaced.length, "has", "have")} no slot (${unplaced
                     .map((id) => plan.teamNames?.[id] ?? id)
                     .join(", ")}). Place each one before publishing.`,
             };
@@ -107,7 +108,7 @@ export async function publishPlan(plan, { discardScores = false } = {}) {
                 ok: false,
                 stranded,
                 error:
-                    `${stranded.length} score card(s) have already been filed for pairings this ` +
+                    `${count(stranded.length, "score card")} ${agree(stranded.length, "has", "have")} already been filed for pairings this ` +
                     `plan does not keep: ${describeStranded(stranded, plan)}. Publishing would ` +
                     `leave them counting toward the standings for judges who are no longer ` +
                     `assigned. Move a single judge from Judging progress instead, or discard the ` +

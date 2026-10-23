@@ -94,3 +94,12 @@ test("before anyone scores there is no leader", () => {
   expect(screen.getByText("No final round scores have been filed yet.")).toBeInTheDocument();
   expect(screen.queryByText("Leading")).not.toBeInTheDocument();
 });
+
+test("a finalist's slot reads as the clock time once the final round has one", () => {
+  db.setData("finalRound/teams/b/timeslot", "Slot 2");
+  db.setData("config", { finalRoundTime: "6:00 PM", finalRoundSlotMinutes: 8 });
+  db.setData("scores/final", { a: { j1: card(9) }, b: { j1: card(7) } });
+  show();
+  expect(screen.getByText(/· 6:08 PM ·/)).toBeInTheDocument();
+  expect(screen.queryByText(/Slot 2/)).not.toBeInTheDocument();
+});

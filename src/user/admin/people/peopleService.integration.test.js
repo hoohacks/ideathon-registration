@@ -556,7 +556,7 @@ describe("bulk edits", () => {
     await expect(people.bulkSet({ uids: ["grace", "admin-1"], role: "judge", field: "checkedIn", value: true })).resolves.toMatchObject({ ok: true });
     expect(db.getData("judges/grace/checkedIn")).toBe(true);
     const log = lastLog();
-    expect(log).toMatchObject({ action: "people.bulk", summary: "Set checkedIn to true for 1 judge(s)" });
+    expect(log).toMatchObject({ action: "people.bulk", summary: "Set checkedIn to true for 1 judge" });
     expect(log.changes).toEqual([{ path: "judges/grace/checkedIn", before: null, after: true }]);
   });
 

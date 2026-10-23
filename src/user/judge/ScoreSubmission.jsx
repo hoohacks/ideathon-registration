@@ -80,6 +80,18 @@ function Criterion({ field, spec, value, onChange }) {
   );
 }
 
+/** A stored card, in the strings the form's selects hold. */
+function formValuesOf(card) {
+  return {
+    ...EMPTY,
+    ...Object.fromEntries(
+      CRITERIA.filter((field) => typeof card[field] === "number").map((field) => [field, String(card[field])])
+    ),
+    fundable: card.fundable === true ? "yes" : card.fundable === false ? "no" : "",
+    notes: typeof card.notes === "string" ? card.notes : "",
+  };
+}
+
 function ScoreSubmission({
   teamName = "Team",
   room = "TBD",
@@ -89,6 +101,9 @@ function ScoreSubmission({
   draftTarget = null,
   // true when this judge has already filed a card for this team
   isOverwrite = false,
+  // the card being edited, as stored -- numbers and a boolean. A draft on this
+  // device wins over it: that is the edit the judge was halfway through.
+  initialCard = null,
   onClose = () => {},
   onSubmit = () => {},
 }) {
@@ -105,8 +120,10 @@ function ScoreSubmission({
     if (draft) {
       setValues({ ...EMPTY, ...draft });
       setRestored(true);
+    } else if (initialCard) {
+      setValues(formValuesOf(initialCard));
     }
-  }, [draftTarget]);
+  }, [draftTarget, initialCard]);
 
   // Persist on every change. The dialog is unmounted on close, so without this
   // a cancel, a refresh or a dead battery loses everything typed.
@@ -249,7 +266,7 @@ function ScoreSubmission({
               Cancel
             </Button>
             <Button type="submit" variant="contained" disabled={inFlight || missing > 0}>
-              {inFlight ? "Submitting…" : "Submit score"}
+              {inFlight ? "Submitting…" : isOverwrite ? "Update score" : "Submit score"}
             </Button>
           </Stack>
         </DialogActions>

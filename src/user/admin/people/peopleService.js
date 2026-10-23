@@ -1,3 +1,4 @@
+import { count } from "../../../plural.js";
 import { ref, get, push, runTransaction, serverTimestamp } from "firebase/database";
 import { initializeApp, deleteApp } from "firebase/app";
 import {
@@ -688,7 +689,7 @@ export async function bulkSet({ uids, role, field, value }) {
 
   return applyAdminAction({
     action: "people.bulk",
-    summary: `Set ${field} to ${value} for ${changes.length} ${role}(s)`,
+    summary: `Set ${field} to ${value} for ${count(changes.length, role)}`,
     changes,
   });
 }

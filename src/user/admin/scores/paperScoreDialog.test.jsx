@@ -119,3 +119,35 @@ test("re-entering a deleted card starts from its values and its judge", () => {
   expect(screen.getByText("Total 24 / 40")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Record score" })).toBeEnabled();
 });
+
+describe("a judge who already has a card", () => {
+  const cards = { j2: { problem: 5, innovation: 5, impact: 5, viability: 3, pitch_quality: 2, fundable: false } };
+
+  test("is marked in the picker", async () => {
+    open({ cards });
+    fireEvent.mouseDown(screen.getByLabelText("Judge"));
+    const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(options).toEqual(["Priya Raman", "Sam Whitaker (already scored)"]);
+  });
+
+  test("warns before replacing it, and says it replaced it", async () => {
+    open({ cards });
+    await pick("Judge", /Sam Whitaker/);
+    expect(screen.getByText(/Sam Whitaker already filed a card for Lantern \(20 \/ 40\)\. Recording replaces it\./)).toBeInTheDocument();
+    await pick("Problem (of 10)", "8");
+    await pick("Innovation (of 10)", "7");
+    await pick("Impact (of 10)", "9");
+    await pick("Viability (of 5)", "4");
+    await pick("Pitch quality (of 5)", "5");
+    await pick("Worth funding?", "Yes");
+    fireEvent.click(screen.getByRole("button", { name: "Replace score" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith("Replaced Sam Whitaker's score for Lantern."));
+  });
+
+  test("a judge without one gets no warning", async () => {
+    open({ cards });
+    await pick("Judge", "Priya Raman");
+    expect(screen.queryByText(/Recording replaces it/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record score" })).toBeInTheDocument();
+  });
+});
