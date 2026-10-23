@@ -7,7 +7,7 @@
  * These check the card offers the edit, opens on what was filed, and writes
  * the change back under the same judge.
  */
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderPage } from "../../testing/renderPage";
 
 vi.mock("../../firebase", () => ({ database: {}, storage: {}, auth: { currentUser: { uid: "judge-1" } } }));
@@ -87,7 +87,7 @@ describe("the progress line", () => {
     expect(screen.queryByText("All teams scored")).not.toBeInTheDocument();
   });
 
-  test("a final-round-only judge still gets one", async () => {
+  test("a judge with only final round teams still gets one", async () => {
     db.setData("judges/judge-1/teamAssignments", null);
     db.setData("finalRound/active", true);
     db.setData("judges/judge-1/finalAssignments", {
@@ -95,7 +95,43 @@ describe("the progress line", () => {
     });
     renderPage(<Assignments />, judgeAuth);
     expect(await screen.findByText("0 of 1 scored")).toBeInTheDocument();
-    // and is not told to wait for a schedule that was generated long ago
-    expect(screen.getByText("No first round teams for you. You are judging the final round.")).toBeInTheDocument();
+  });
+});
+
+describe("a judge with no first round teams", () => {
+  beforeEach(() => db.setData("judges/judge-1/teamAssignments", null));
+  const says = async (text) => {
+    renderPage(<Assignments />, judgeAuth);
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  };
+
+  test("before any schedule, is told one is coming", () =>
+    says("No assignments yet. They appear once an admin generates the schedule."));
+
+  test("left out of a published schedule and checked in, is eligible for the final round", () => {
+    db.setData("config/scheduleMeta", { generatedAt: 1 });
+    db.setData("judges/judge-1/checkedIn", true);
+    return says("No first round teams for you. You're checked in, so you're eligible to judge the final round.");
+  });
+
+  test("left out and not checked in, is told checking in makes them eligible", () => {
+    db.setData("config/scheduleMeta", { generatedAt: 1 });
+    db.setData("judges/judge-1/checkedIn", false);
+    return says("No first round teams for you. Check in to be eligible to judge the final round.");
+  });
+
+  test("checking in updates the message without a reload", async () => {
+    db.setData("config/scheduleMeta", { generatedAt: 1 });
+    db.setData("judges/judge-1/checkedIn", false);
+    await says("No first round teams for you. Check in to be eligible to judge the final round.");
+    act(() => db.setData("judges/judge-1/checkedIn", true));
+    expect(await screen.findByText(/You're checked in, so you're eligible/)).toBeInTheDocument();
+  });
+
+  test("once the final round is published, promises nothing about it", () => {
+    db.setData("config/scheduleMeta", { generatedAt: 1 });
+    db.setData("judges/judge-1/checkedIn", true);
+    db.setData("finalRound/active", true);
+    return says("No first round teams for you.");
   });
 });

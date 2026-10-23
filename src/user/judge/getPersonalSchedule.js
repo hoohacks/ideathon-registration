@@ -73,3 +73,40 @@ export function subscribeToFinalRoundSchedule(onTeams, onError) {
     }
   );
 }
+
+/**
+ * The two facts that decide what a judge with no first-round teams is told:
+ * whether a schedule has been published at all (config/scheduleMeta, which any
+ * signed-in user may read), and whether they are checked in -- check-in is
+ * what puts a judge in the pool the final round is built from.
+ *
+ * Calls back with { scheduled, checkedIn }, once both have answered and on
+ * every change after. A failed read leaves that fact false rather than
+ * throwing; the worst outcome is a less specific message.
+ */
+export function subscribeToJudgingStatus(onStatus) {
+  const user = requireUser();
+  const status = { scheduled: null, checkedIn: null };
+  const emit = () => {
+    if (status.scheduled !== null && status.checkedIn !== null) onStatus({ ...status });
+  };
+  const watch = (path, key) =>
+    onValue(
+      ref(database, path),
+      (snap) => {
+        status[key] = key === "checkedIn" ? snap.val() === true : snap.exists();
+        emit();
+      },
+      (error) => {
+        console.warn(`Could not read ${path}:`, error);
+        status[key] = false;
+        emit();
+      }
+    );
+
+  const stops = [
+    watch("config/scheduleMeta", "scheduled"),
+    watch(`judges/${user.uid}/checkedIn`, "checkedIn"),
+  ];
+  return () => stops.forEach((stop) => stop());
+}

@@ -15,7 +15,11 @@ import Layout from "../Layout";
 import ScheduleCard from "./ScheduleCard";
 import { CardGridSkeleton } from "../../loadingUi";
 import { readScheduleMeta } from "./scheduleConfig";
-import { subscribeToPersonalSchedule, subscribeToFinalRoundSchedule } from "./getPersonalSchedule";
+import {
+  subscribeToPersonalSchedule,
+  subscribeToFinalRoundSchedule,
+  subscribeToJudgingStatus,
+} from "./getPersonalSchedule";
 import ScoreSubmission from "./ScoreSubmission";
 import { useAuth } from "../../App";
 import { hasRole } from "../../roles";
@@ -77,6 +81,24 @@ function ScoredProgress({ scored, total }) {
       </Stack>
     </Stack>
   );
+}
+
+/**
+ * What a judge with no first-round teams is told.
+ *
+ * Organizers mark every signed-up judge for the first round, so the mark says
+ * nothing here. What does: whether a schedule exists yet, and -- for anyone it
+ * left out, a spare, or a late sign-up -- whether they are checked in, because
+ * checking in is what makes a judge eligible for the final round. Once the
+ * final round is published that no longer seats anybody, so this stops
+ * promising it and leaves the final round section to speak for itself.
+ */
+function noFirstRoundTeamsMessage({ status, finalRoundActive }) {
+  if (!status?.scheduled) return "No assignments yet. They appear once an admin generates the schedule.";
+  if (finalRoundActive) return "No first round teams for you.";
+  return status.checkedIn
+    ? "No first round teams for you. You're checked in, so you're eligible to judge the final round."
+    : "No first round teams for you. Check in to be eligible to judge the final round.";
 }
 
 function Assignments() {
@@ -188,6 +210,18 @@ function Assignments() {
       cancelled = true;
       unsubscribe();
     };
+  }, [canViewAssignments]);
+
+  // only read when this judge has no first-round teams, to say why
+  const [judgingStatus, setJudgingStatus] = useState(null);
+  useEffect(() => {
+    if (!canViewAssignments) return undefined;
+    try {
+      return subscribeToJudgingStatus(setJudgingStatus);
+    } catch (err) {
+      console.warn("Could not read your judging status:", err);
+      return undefined;
+    }
   }, [canViewAssignments]);
 
   /**
@@ -530,11 +564,7 @@ function Assignments() {
               ) : personalAssignments.length === 0 ? (
                 <Card sx={{ p: 3 }}>
                   <Typography variant="body2" align="center">
-                    {/* a judge seated only on the final round is past the
-                        first round, not waiting for it to be scheduled */}
-                    {finalAssignments.length
-                      ? "No first round teams for you. You are judging the final round."
-                      : "No assignments yet. They appear once an admin generates the schedule."}
+                    {noFirstRoundTeamsMessage({ status: judgingStatus, finalRoundActive })}
                   </Typography>
                 </Card>
               ) : (
