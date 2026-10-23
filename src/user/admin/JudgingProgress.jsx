@@ -32,6 +32,7 @@ import {
   swapJudges,
 } from "../judge/assignmentEdits";
 import { seatLateFinalJudge } from "../judge/finalRoundService";
+import { finalSlotTime, subscribeToFinalRoundTiming } from "../judge/finalRoundTiming";
 
 const STATUS_CHIP = {
   [TEAM_UNJUDGED]: { label: "No scores", color: "error" },
@@ -255,6 +256,7 @@ function JudgingProgress() {
   const [reassigning, setReassigning] = useState(null);
   const [scoring, setScoring] = useState(null);
   const [seatingLate, setSeatingLate] = useState(false);
+  const [timing, setTiming] = useState(null);
 
   usePageTitle("Judging progress");
 
@@ -276,6 +278,10 @@ function JudgingProgress() {
     ];
     return () => stop.forEach((fn) => fn());
   }, []);
+
+  // final slots are stored as "Slot 2"; every other page shows them as the
+  // clock time counted from the configured start, so this does too
+  useEffect(() => subscribeToFinalRoundTiming((next) => setTiming(next.timing)), []);
 
   useEffect(() => {
     // scores moved out from under /teams, so this is its own subscription now
@@ -452,7 +458,11 @@ function JudgingProgress() {
                       )}
                     </Stack>
                     <Typography variant="body2">
-                      {[team.room, team.time, team.batch ? `Batch ${team.batch}` : null]
+                      {[
+                        team.room,
+                        final && team.time ? finalSlotTime(team.time, timing) : team.time,
+                        team.batch ? `Batch ${team.batch}` : null,
+                      ]
                         .filter(Boolean)
                         .join(" · ") || "Not scheduled"}
                     </Typography>

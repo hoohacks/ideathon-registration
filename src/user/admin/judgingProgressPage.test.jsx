@@ -278,3 +278,14 @@ describe("changing one team's judges", () => {
     expect(dialog.getByText("Beacon")).toBeInTheDocument();
   });
 });
+
+test("a finalist's slot reads as the clock time once the final round has one", () => {
+  db.setData("finalRound/teams", { a: { name: "Almanac" } });
+  db.setData("finalRound/active", true);
+  db.setData("teams/a/finalSlot", { room: "Rice 011", timeslot: "Slot 2" });
+  db.setData("config", { finalRoundTime: "6:00 PM", finalRoundSlotMinutes: 8 });
+  renderPage(<JudgingProgress />);
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
+  fireEvent.click(screen.getByRole("option", { name: "Final round" }));
+  expect(screen.getByText("Rice 011 · 6:08 PM")).toBeInTheDocument();
+});
