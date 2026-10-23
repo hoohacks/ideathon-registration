@@ -21,7 +21,12 @@ import { LinesSkeleton } from "../../loadingUi";
  * - teamId: the database key. Team names are not unique, so scoring keys off
  *   this rather than the name.
  * - pending: the score is written on this device but has not reached the
- *   database yet. Distinct from `disabled`, which means it has landed.
+ *   database yet. Distinct from `scored`, which means it has landed.
+ * - scored: this judge's card is in. The button turns into "Edit score" rather
+ *   than going dead -- the rules let a judge revise their own card, and a
+ *   mistyped 3 that should have been an 8 was otherwise only fixable by an
+ *   organizer re-entering it on paper. A pending card stays locked: editing it
+ *   would race the copy still waiting to send.
  * - next: the first team on this judge's list still to score. Only that card
  *   gets the filled button; three identical crimson buttons in a row told a
  *   judge walking between rooms nothing about which one was now.
@@ -32,7 +37,7 @@ function ScheduleCard({
   room = "TBD",
   time = "TBD",
   onButtonClick = () => {},
-  disabled = false,
+  scored = false,
   pending = false,
   next = false,
 }) {
@@ -57,7 +62,7 @@ function ScheduleCard({
     }
   }
 
-  const buttonLabel = pending ? "Saved on device" : disabled ? "Scored" : "Score team";
+  const buttonLabel = pending ? "Saved on device" : scored ? "Edit score" : "Score team";
 
   return (
     <Card
@@ -103,6 +108,7 @@ function ScheduleCard({
               sx={{ "& .MuiChip-label": (t) => ({ ...t.typography.data }) }}
             />
             {pending && <Chip label="Not synced" size="small" color="warning" />}
+            {scored && !pending && <Chip label="Scored" size="small" color="success" />}
           </Stack>
         </Stack>
 
@@ -160,10 +166,10 @@ function ScheduleCard({
 
         <Button
           fullWidth
-          variant={next ? "contained" : "outlined"}
-          disabled={disabled || pending}
+          variant={next ? "contained" : scored ? "text" : "outlined"}
+          disabled={pending}
           onClick={(e) => {
-            if (!disabled && !pending) onButtonClick({ teamId, teamName, room, time, event: e });
+            if (!pending) onButtonClick({ teamId, teamName, room, time, scored, event: e });
           }}
           sx={{ mt: "auto" }}
         >

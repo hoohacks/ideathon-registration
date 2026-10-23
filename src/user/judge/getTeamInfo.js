@@ -153,6 +153,17 @@ export function getMyFinalRoundScoredTeamIds(teamIds) {
 }
 
 /**
+ * The signed-in judge's own card for one team, or null. What "Edit score"
+ * starts from, so a judge correcting one criterion does not have to re-enter
+ * the other five from memory.
+ */
+export async function getMyScore(round, teamId) {
+  const user = requireUser();
+  const snap = await get(ref(database, scorePath(round, teamId, user.uid)));
+  return snap.exists() ? snap.val() : null;
+}
+
+/**
  * The idea, problem statement and pitch deck for a team this judge is assigned
  * to. Judges could not read any of this before — they got a card with a room
  * and a time on it and were expected to have found the deck some other way.

@@ -77,11 +77,11 @@ test("a filled-in card submits, and the team then reads as scored", async ({ pag
 
   await expect(dialog).toBeHidden({ timeout: 20_000 });
 
-  // the card is the receipt: it cannot be scored twice
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeVisible({
+  // the card is the receipt: it now offers to edit that score, not file a second
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeEnabled();
 });
 
 test("the score survives a reload, because it reached the database", async ({ page }) => {
@@ -89,12 +89,12 @@ test("the score survives a reload, because it reached the database", async ({ pa
   await goto(page, "/user/judging");
 
   // whatever the previous test scored is still scored
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeVisible({
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeVisible({
     timeout: 20_000,
   });
 
   await page.reload();
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeVisible({
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeVisible({
     timeout: 20_000,
   });
 });

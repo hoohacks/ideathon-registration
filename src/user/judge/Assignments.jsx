@@ -25,6 +25,7 @@ import {
   submitScore,
   getMyScoredTeamIds,
   getMyFinalRoundScoredTeamIds,
+  getMyScore,
   FIRST_ROUND,
   FINAL_ROUND,
 } from "./getTeamInfo";
@@ -84,8 +85,19 @@ function Assignments() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  function openFor(card) {
-    setSelected(card);
+  // An edit opens on the card as it was filed. If it cannot be read (offline,
+  // say) the form opens empty and still says it replaces the old score, which
+  // is no worse than re-entering it.
+  async function openFor(card) {
+    let existing = null;
+    if (card.scored && card.teamId) {
+      try {
+        existing = await getMyScore(card.round, card.teamId);
+      } catch (error) {
+        console.warn(`Could not load your score for ${card.teamName}:`, error);
+      }
+    }
+    setSelected({ ...card, existing });
     setModalOpen(true);
   }
 
@@ -277,7 +289,10 @@ function Assignments() {
       const record = isFinalRound ? setFinalRoundScoredTeamIds : setScoredTeamIds;
       if (result.status === "saved") {
         record((prev) => new Set(prev).add(teamId));
-        setToast({ severity: "success", message: `Score submitted for ${teamName}.` });
+        setToast({
+          severity: "success",
+          message: selected?.scored ? `Score updated for ${teamName}.` : `Score submitted for ${teamName}.`,
+        });
       } else {
         setToast({
           severity: "warning",
@@ -517,7 +532,7 @@ function Assignments() {
                         room={assignment.room}
                         time={assignment.time}
                         onButtonClick={(card) => openFor({ ...card, round: FIRST_ROUND })}
-                        disabled={scoredTeamIds.has(assignment.id)}
+                        scored={scoredTeamIds.has(assignment.id)}
                         pending={pendingTeamIdsByRound[FIRST_ROUND].has(assignment.id)}
                         next={assignment.id != null && assignment.id === nextFirstRoundId}
                       />
@@ -546,7 +561,7 @@ function Assignments() {
                             teamName={team.teamName}
                             room={team.room}
                             time={finalSlotTime(team.timeslot ?? team.time, finalRoundTiming.timing)}
-                            disabled={finalRoundScoredTeamIds.has(team.id)}
+                            scored={finalRoundScoredTeamIds.has(team.id)}
                             pending={pendingTeamIdsByRound[FINAL_ROUND].has(team.id)}
                             next={team.id === nextFinalRoundId}
                             onButtonClick={(card) => openFor({ ...card, round: FINAL_ROUND })}
@@ -578,6 +593,7 @@ function Assignments() {
               ? finalRoundScoredTeamIds.has(selected.teamId)
               : scoredTeamIds.has(selected.teamId)
           }
+          initialCard={selected.existing}
           onClose={closeModal}
           onSubmit={handleSubmit}
         />

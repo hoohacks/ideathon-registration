@@ -82,7 +82,7 @@ test("a score submitted with no connection is kept, not lost", async ({ page, co
   // the score really is in the database, not merely off the queue
   expect(await countCards()).toBe(before + 1);
 
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeVisible({
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeVisible({
     timeout: 60_000,
   });
 });
@@ -115,7 +115,7 @@ test("a queued score is written to disk, not held in memory", async ({ page, con
   await context.setOffline(false);
   await page.reload();
 
-  await expect(page.getByRole("button", { name: "Scored" }).first()).toBeVisible({
+  await expect(page.getByRole("button", { name: "Edit score" }).first()).toBeVisible({
     timeout: 60_000,
   });
   const drained = await page.evaluate(() => localStorage.getItem("ideathon:pendingScores:v1"));
