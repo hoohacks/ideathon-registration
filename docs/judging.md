@@ -103,6 +103,11 @@ through with **Add** and **Drop**, or take them all.
 final round published a second time starts empty and does not count the first
 one's cards.
 
+**A judge who turns up after publishing** is added with **Add a judge** on
+Judging progress, Final round. It seats them on every finalist and checks them
+in, without republishing, so no card already filed is lost. Results does not
+wait on them for a team they arrived too late to score.
+
 | What moved | What you get |
 | --- | --- |
 | Any team was scored since the build, including one that had no scores then | **Re-rank**: the averages the cut came from have moved |
