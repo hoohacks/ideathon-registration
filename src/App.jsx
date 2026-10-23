@@ -159,6 +159,19 @@ function ProtectedRoute({ children, requiredRoles }) {
   return <Suspense fallback={<LoadingFrame />}>{children}</Suspense>;
 }
 
+/**
+ * Where an address that matches nothing goes.
+ *
+ * It used to be "/" for everyone, which is the student registration form -- so
+ * a judge who mistyped /user/judge, signed in and mid-event, was shown a form
+ * asking for their major. Signed in, the home page is the useful place to land.
+ */
+function UnknownAddress() {
+  const { userCredential, loadingAuth } = useAuth();
+  if (loadingAuth) return null;
+  return <Navigate to={userCredential ? "/user/home" : "/"} replace />;
+}
+
 function AuthProvider({ children }) {
   const [userCredential, setUserCredential] = useState(null);
   const [token, setToken] = useState(null);
@@ -312,7 +325,7 @@ function App() {
 
         {/* an unmatched hash route rendered nothing at all, which reads as the
             app being broken rather than the address being wrong */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<UnknownAddress />} />
       </Routes>
       </Suspense>
       </NavDrawerProvider>
@@ -320,6 +333,6 @@ function App() {
   )
 }
 
-export { AuthContext, NavDrawerContext, NavDrawerProvider, useAuth, ProtectedRoute };
+export { AuthContext, NavDrawerContext, NavDrawerProvider, useAuth, ProtectedRoute, UnknownAddress };
 
 export default App
