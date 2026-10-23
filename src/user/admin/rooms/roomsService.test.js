@@ -332,7 +332,7 @@ describe("emptying a room the final round is using", () => {
     const result = await removeRoom("Rice 344");
 
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/1 team\(s\) are scheduled in Rice 344/);
+    expect(result.error).toMatch(/1 team is scheduled in Rice 344\. Choose where it should go/);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 

@@ -1,3 +1,4 @@
+import { count } from "../../../plural";
 import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, Card, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
@@ -222,7 +223,7 @@ export default function RestorePointsSection({ onResult }) {
       const result = await restoreSnapshot(target.id);
       onResult(
         result,
-        `Restored ${result.restored ?? 0} path(s). The state from before this restore was saved as a new point.`
+        `Restored ${count(result.restored ?? 0, "path")}. The state from before this restore was saved as a new point.`
       );
     } finally {
       setBusy(false);

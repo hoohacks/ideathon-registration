@@ -1,3 +1,4 @@
+import { count, agree } from "../../plural.js";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
@@ -66,7 +67,7 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
 
         const absent = roundOneJudges.length - judgesList.length;
         if (onlyCheckedIn && absent > 0) {
-            warnings.push(`${absent} first round judge(s) have not checked in and were left out.`);
+            warnings.push(`${count(absent, "first round judge")} ${agree(absent, "has", "have")} not checked in and ${agree(absent, "was", "were")} left out.`);
         }
 
         const teamsList = Object.entries(teamData)
@@ -151,7 +152,7 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
             // Unreachable given the checks above, but refuse to build a plan that
             // would send a team to a room nobody is coming to.
             return fail(
-                `${unjudged.length} team(s) ended up with no judges (${unjudged
+                `${count(unjudged.length, "team")} ended up with no judges (${unjudged
                     .map((a) => a.teamName)
                     .join(", ")}). No plan was built.`
             );
@@ -170,7 +171,7 @@ export async function planSchedule({ onlyCheckedIn = false } = {}) {
         const spare = judgesList.filter((judge) => !assignedJudgeIds.has(judge.id));
         if (spare.length) {
             warnings.push(
-                `${spare.length} judge(s) have no assignment at all and are spares: ` +
+                `${count(spare.length, "judge")} ${agree(spare.length, "has", "have")} no assignment at all and ${agree(spare.length, "is a spare", "are spares")}: ` +
                 `${spare.map((j) => displayName(j, "Unnamed Judge")).join(", ")}.`
             );
         }

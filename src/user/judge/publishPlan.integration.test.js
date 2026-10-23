@@ -88,7 +88,7 @@ describe("scores filed against pairings the plan drops", () => {
         { teamId: "t2", judgeUid: "ghost" },
       ],
       error:
-        "2 score card(s) have already been filed for pairings this plan does not keep: Lantern by Cy, Circles by ghost. " +
+        "2 score cards have already been filed for pairings this plan does not keep: Lantern by Cy, Circles by ghost. " +
         "Publishing would leave them counting toward the standings for judges who are no longer assigned. " +
         "Move a single judge from Judging progress instead, or discard the first round scores and publish again.",
     });
@@ -125,7 +125,7 @@ describe("refusals", () => {
     plan.assignments.t2.judges = [];
     await expect(publishPlan(plan)).resolves.toEqual({
       ok: false,
-      error: "2 team(s) have no judges assigned (Lantern, Circles). Assign a judge to each before publishing.",
+      error: "2 teams have no judges assigned (Lantern, Circles). Assign a judge to each before publishing.",
     });
   });
 

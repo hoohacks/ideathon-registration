@@ -52,10 +52,10 @@ describe("a thin schedule", () => {
     expect(result.ok).toBe(true);
     expect(result.error).toBeNull();
     expect(result.warnings).toEqual([
-      "Some teams will be seen by only 1 judge(s), below the minimum of 3. The final round is picked on averages, and a small panel makes those noisy.",
+      "Some teams will be seen by only 1 judge, below the minimum of 3. The final round is picked on averages, and a small panel makes those noisy.",
       "Seen by one judge only: Beacon. Add a judge to these from Judging progress.",
     ]);
-    expect(result.advice).toEqual(["Mark 3 more first-round judge(s) to give every team at least 3."]);
+    expect(result.advice).toEqual(["Mark 3 more first-round judges to give every team at least 3."]);
   });
 
   test("assigns rooms in order, the batch time, and judges by full name", async () => {
@@ -134,8 +134,8 @@ describe("a surplus of judges", () => {
     });
     const result = await planSchedule();
     expect(result.warnings).toEqual([
-      "5 judges is more than 1 teams need. Panels are capped at 3 and roughly 2 judge(s) are held back per batch as spares.",
-      "2 judge(s) have no assignment at all and are spares: D, Unnamed Judge.",
+      "5 judges are more than 1 team needs. Panels are capped at 3 and roughly 2 judges are held back per batch as spares.",
+      "2 judges have no assignment at all and are spares: D, Unnamed Judge.",
     ]);
     expect(result.advice).toEqual([
       "Spare judges have no assignment card. Keep them on hand for a no-show, or add them to a team from Judging progress.",
@@ -192,7 +192,7 @@ describe("the check-in filter", () => {
   test("leaves out absent judges, counts them, and marks the plan", async () => {
     event({ teams, judges });
     const result = await planSchedule({ onlyCheckedIn: true });
-    expect(result.warnings[0]).toBe("2 first round judge(s) have not checked in and were left out.");
+    expect(result.warnings[0]).toBe("2 first round judges have not checked in and were left out.");
     expect(result.plan.basis.judgeIds).toEqual(["j1", "j2"]);
     expect(result.plan.onlyCheckedIn).toBe(true);
   });
@@ -216,7 +216,7 @@ describe("the check-in filter", () => {
       ok: false,
       error:
         "None of the first round judges have checked in yet. Check them in on the Judge Search page, or build the plan without the check-in filter.",
-      warnings: ["1 first round judge(s) have not checked in and were left out."],
+      warnings: ["1 first round judge has not checked in and was left out."],
       advice: [],
       plan: null,
     });

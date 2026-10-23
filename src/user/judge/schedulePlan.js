@@ -1,3 +1,5 @@
+import { count, agree } from "../../plural.js";
+
 /**
  * Deciding the shape of the judging round, with no Firebase in sight.
  *
@@ -161,8 +163,8 @@ export function describeSupply({
     return {
       ok: false,
       error:
-        `${teamCount} teams over ${batchCount} batches need ${largest} rooms at once, but only ` +
-        `${roomCount} are configured. Add ${largest - roomCount} more room(s), or raise the batch ` +
+        `${count(teamCount, "team")} over ${batchCount} batches need ${largest} rooms at once, but only ` +
+        `${roomCount} ${agree(roomCount, "is", "are")} configured. Add ${count(largest - roomCount, "more room")}, or raise the batch ` +
         `count to ${neededBatches} so fewer teams present at the same time.`,
       warnings,
       advice,
@@ -174,12 +176,12 @@ export function describeSupply({
     return {
       ok: false,
       error:
-        `${judgeCount} judges cannot cover ${largest} teams presenting at once, and each judge can only ` +
+        `${count(judgeCount, "judge")} cannot cover ${largest} teams presenting at once, and each judge can only ` +
         `be in one room. ` +
         (neededBatches
-          ? `Either mark ${largest - judgeCount} more first-round judge(s), or raise the batch count to ` +
-            `${neededBatches} so only ${Math.ceil(teamCount / neededBatches)} teams present at a time.`
-          : `Mark at least ${largest - judgeCount} more first-round judge(s).`),
+          ? `Either mark ${count(largest - judgeCount, "more first-round judge")}, or raise the batch count to ` +
+            `${neededBatches} so only ${count(Math.ceil(teamCount / neededBatches), "team presents", "teams present")} at a time.`
+          : `Mark at least ${count(largest - judgeCount, "more first-round judge")}.`),
       warnings,
       advice,
     };
@@ -200,11 +202,11 @@ export function describeSupply({
   if (globalMin < min) {
     const needed = largest * min - judgeCount;
     warnings.push(
-      `Some teams will be seen by only ${globalMin} judge(s), below the minimum of ${min}. ` +
+      `Some teams will be seen by only ${count(globalMin, "judge")}, below the minimum of ${min}. ` +
         "The final round is picked on averages, and a small panel makes those noisy."
     );
     if (needed > 0) {
-      advice.push(`Mark ${needed} more first-round judge(s) to give every team at least ${min}.`);
+      advice.push(`Mark ${count(needed, "more first-round judge")} to give every team at least ${min}.`);
     }
   }
 
@@ -225,8 +227,8 @@ export function describeSupply({
   if (seatsAvailable > seatsWanted) {
     const spare = Math.floor((seatsAvailable - seatsWanted) / sizes.length);
     warnings.push(
-      `${judgeCount} judges is more than ${teamCount} teams need. ` +
-        `Panels are capped at ${max} and roughly ${spare} judge(s) are held back per batch as spares.`
+      `${count(judgeCount, "judge")} ${agree(judgeCount, "is", "are")} more than ${count(teamCount, "team")} ${agree(teamCount, "needs", "need")}. ` +
+        `Panels are capped at ${max} and roughly ${count(spare, "judge")} ${agree(spare, "is", "are")} held back per batch as ${agree(spare, "a spare", "spares")}.`
     );
     advice.push(
       "Spare judges have no assignment card. Keep them on hand for a no-show, or add them to a team " +

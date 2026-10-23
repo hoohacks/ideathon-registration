@@ -308,6 +308,6 @@ describe("changes to the event between Build and Publish, repaired as offered", 
     expect(computeStats(unplaced).unscheduledTeamIds).toEqual(["late"]);
     const result = await publishPlan(unplaced);
     expect(result.ok).toBe(false);
-    expect(result.error).toBe("1 team(s) have no slot (Late). Place each one before publishing.");
+    expect(result.error).toBe("1 team has no slot (Late). Place each one before publishing.");
   });
 });

@@ -1,3 +1,4 @@
+import { count, agree } from "../../../plural";
 import { useEffect, useRef, useState } from "react";
 import { LinesSkeleton } from "../../../loadingUi";
 import { useNavigate } from "react-router";
@@ -285,7 +286,7 @@ export default function SchedulePreview({ header = null }) {
   ];
   if ((scheduleMeta?.scoredTeams ?? 0) > 0) {
     publishConsequences.push(
-      `${scheduleMeta.scoredTeams} team(s) already have scores. They are not deleted, but ` +
+      `${count(scheduleMeta.scoredTeams, "team")} already ${agree(scheduleMeta.scoredTeams, "has", "have")} scores. They are not deleted, but ` +
         "they will belong to judges who are no longer assigned."
     );
   }
@@ -472,7 +473,7 @@ export default function SchedulePreview({ header = null }) {
         title="Judging has already started"
         consequences={[
           strandedRefusal?.message ?? "",
-          `Publishing anyway deletes ${strandedRefusal?.stranded?.length ?? 0} score card(s) so ` +
+          `Publishing anyway deletes ${count(strandedRefusal?.stranded?.length ?? 0, "score card")} so ` +
             "they cannot count toward the standings for judges who are not assigned.",
           "A restore point is taken first, so this can be put back.",
         ].filter(Boolean)}

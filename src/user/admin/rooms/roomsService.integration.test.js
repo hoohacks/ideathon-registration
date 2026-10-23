@@ -209,7 +209,7 @@ describe("removing a room", () => {
         { teamId: "t2", teamName: "Circles", time: "5:15 PM", batch: 2 },
       ],
       finalInUse: [{ teamId: "t4", teamName: "Final", timeslot: "Slot 1" }],
-      error: "3 team(s) are scheduled in Rice 340. Choose where they should go.",
+      error: "3 teams are scheduled in Rice 340. Choose where they should go.",
     });
   });
 
@@ -218,7 +218,7 @@ describe("removing a room", () => {
     expect(db.getData("teams/t1/schedule/room")).toBe("Spare");
     expect(db.getData("teams/t4/finalSlot/room")).toBe("Spare");
     expect(db.getData("config/judgingRooms")).toEqual(["Rice 342", "Olsson 005", "Spare"]);
-    expect(lastLog().summary).toBe("Removed Rice 340, moving 3 team(s) to Spare");
+    expect(lastLog().summary).toBe("Removed Rice 340, moving 3 teams to Spare");
   });
 
   test("an unused room with a destination given is still just removed", async () => {

@@ -1,3 +1,4 @@
+import { count } from "../../plural.js";
 import { ref, get, update, push, onValue, runTransaction, serverTimestamp } from "firebase/database";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
@@ -259,7 +260,7 @@ export async function restoreSnapshot(id) {
       byName: await resolveName(admin.uid),
       action: "snapshot.restore",
       summary:
-        `Restored ${entries.length} path(s) from “${meta.label ?? id}”. ` +
+        `Restored ${count(entries.length, "path")} from “${meta.label ?? id}”. ` +
         `The previous state was saved as a new restore point first.`,
       undoable: false,
     };

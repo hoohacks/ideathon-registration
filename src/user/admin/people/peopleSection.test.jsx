@@ -242,11 +242,11 @@ test("selecting people offers the bulk actions that fit their roles", async () =
   await open();
   fireEvent.click(screen.getByRole("checkbox", { name: "Select Maya Okafor" }));
   expect(screen.getByText("1 selected")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Check in 1 competitor(s)" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /judge\(s\)/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Check in 1 competitor" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Check in \d+ judge/ })).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("checkbox", { name: "Select Priya Raman" }));
-  fireEvent.click(screen.getByRole("button", { name: "Check in 1 judge(s)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check in 1 judge" }));
   await waitFor(() =>
     expect(mockService.bulkSet).toHaveBeenCalledWith({ uids: ["j-1"], role: "judge", field: "checkedIn", value: true })
   );

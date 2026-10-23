@@ -1,3 +1,4 @@
+import { count } from "../../../plural";
 import { useState } from "react";
 import { Alert, Box, Button, Chip, Stack, TextField, Typography } from "@mui/material";
 import { FIELD, RowList, Row, Section } from "../adminUi";
@@ -174,7 +175,7 @@ export default function RoomsSection({ rooms, teamsData, onResult }) {
           onConfirm={async (moveTo) => {
             const result = await run(
               () => removeRoom(removing.room, { moveTo }),
-              `Removed ${removing.room}, moving ${removing.inUse.length} team(s) to ${moveTo}`
+              `Removed ${removing.room}, moving ${count(removing.inUse.length, "team")} to ${moveTo}`
             );
             if (result?.ok) setRemoving(null);
           }}

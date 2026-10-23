@@ -9,7 +9,7 @@
 import { allocateBatch, describeSupply } from "./schedulePlan";
 
 const thin = (seen, min = 3) =>
-  `Some teams will be seen by only ${seen} judge(s), below the minimum of ${min}. ` +
+  `Some teams will be seen by only ${seen} judge${seen === 1 ? "" : "s"}, below the minimum of ${min}. ` +
   "The final round is picked on averages, and a small panel makes those noisy.";
 const SPARE_ADVICE =
   "Spare judges have no assignment card. Keep them on hand for a no-show, or add them to a team from Judging progress.";
@@ -53,7 +53,7 @@ describe("refusals", () => {
     expect(describeSupply({ teamCount: 6, judgeCount: 6, roomCount: 2, batchCount: 2 })).toEqual({
       ok: false,
       error:
-        "6 teams over 2 batches need 3 rooms at once, but only 2 are configured. Add 1 more room(s), or raise the batch count to 3 so fewer teams present at the same time.",
+        "6 teams over 2 batches need 3 rooms at once, but only 2 are configured. Add 1 more room, or raise the batch count to 3 so fewer teams present at the same time.",
       warnings: [],
       advice: [],
     });
@@ -63,7 +63,7 @@ describe("refusals", () => {
     expect(describeSupply({ teamCount: 6, judgeCount: 2, roomCount: 6, batchCount: 2 })).toEqual({
       ok: false,
       error:
-        "2 judges cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 1 more first-round judge(s), or raise the batch count to 3 so only 2 teams present at a time.",
+        "2 judges cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 1 more first-round judge, or raise the batch count to 3 so only 2 teams present at a time.",
       warnings: [],
       advice: [],
     });
@@ -71,13 +71,13 @@ describe("refusals", () => {
 
   test("one team per batch counts as a way out when nothing larger is", () => {
     expect(describeSupply({ teamCount: 3, judgeCount: 1, roomCount: 3, batchCount: 1 }).error).toBe(
-      "1 judges cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 2 more first-round judge(s), or raise the batch count to 3 so only 1 teams present at a time."
+      "1 judge cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 2 more first-round judges, or raise the batch count to 3 so only 1 team presents at a time."
     );
   });
 
   test("the smallest batch count is the first that brings a batch within the judges", () => {
     expect(describeSupply({ teamCount: 7, judgeCount: 2, roomCount: 3, batchCount: 3 }).error).toBe(
-      "2 judges cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 1 more first-round judge(s), or raise the batch count to 4 so only 2 teams present at a time."
+      "2 judges cannot cover 3 teams presenting at once, and each judge can only be in one room. Either mark 1 more first-round judge, or raise the batch count to 4 so only 2 teams present at a time."
     );
   });
 });
@@ -88,7 +88,7 @@ describe("what a schedulable event will look like", () => {
       ok: true,
       error: null,
       warnings: [thin(1)],
-      advice: ["Mark 6 more first-round judge(s) to give every team at least 3."],
+      advice: ["Mark 6 more first-round judges to give every team at least 3."],
       batchSizes: [3],
       judgesPerTeam: { min: 1, max: 1 },
     });
@@ -110,7 +110,7 @@ describe("what a schedulable event will look like", () => {
       ok: true,
       error: null,
       warnings: [thin(2, 4)],
-      advice: ["Mark 6 more first-round judge(s) to give every team at least 4."],
+      advice: ["Mark 6 more first-round judges to give every team at least 4."],
       batchSizes: [3],
       judgesPerTeam: { min: 2, max: 2 },
     });
@@ -133,7 +133,7 @@ describe("what a schedulable event will look like", () => {
       error: null,
       warnings: [thin(1)],
       advice: [
-        "Mark 3 more first-round judge(s) to give every team at least 3.",
+        "Mark 3 more first-round judges to give every team at least 3.",
         "Teams are split 2/2/1/1, so the smaller batches get more judges per team. A batch count of 2, 3 or 6 divides 6 teams evenly and removes that.",
       ],
       batchSizes: [2, 2, 1, 1],
@@ -189,15 +189,15 @@ describe("what a schedulable event will look like", () => {
     // eleven teams: nothing from 2 to 8 divides them
     const { advice, judgesPerTeam } = describeSupply({ teamCount: 11, judgeCount: 4, roomCount: 4, batchCount: 3 });
     expect(judgesPerTeam).toEqual({ min: 1, max: 2 });
-    expect(advice).toEqual(["Mark 8 more first-round judge(s) to give every team at least 3."]);
+    expect(advice).toEqual(["Mark 8 more first-round judges to give every team at least 3."]);
   });
 
   test("spare judges are counted per batch", () => {
     expect(describeSupply({ teamCount: 2, judgeCount: 10, roomCount: 2, batchCount: 1, max: 3 }).warnings).toEqual([
-      "10 judges is more than 2 teams need. Panels are capped at 3 and roughly 4 judge(s) are held back per batch as spares.",
+      "10 judges are more than 2 teams need. Panels are capped at 3 and roughly 4 judges are held back per batch as spares.",
     ]);
     expect(describeSupply({ teamCount: 4, judgeCount: 10, roomCount: 2, batchCount: 2, max: 3 }).warnings).toEqual([
-      "10 judges is more than 4 teams need. Panels are capped at 3 and roughly 4 judge(s) are held back per batch as spares.",
+      "10 judges are more than 4 teams need. Panels are capped at 3 and roughly 4 judges are held back per batch as spares.",
     ]);
   });
 
