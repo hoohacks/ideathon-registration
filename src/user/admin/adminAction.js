@@ -1,4 +1,5 @@
 import { ref, get, update, push, serverTimestamp } from "firebase/database";
+import { getAuth } from "firebase/auth";
 import { database } from "../../firebase.js";
 import { requireAdmin } from "../../roles.js";
 
@@ -59,7 +60,15 @@ export async function captureBefore(paths) {
   return Object.fromEntries(entries);
 }
 
-/** Best-effort display name for the acting admin; the uid is the fallback. */
+/**
+ * Best-effort display name for the acting admin.
+ *
+ * A judge or competitor record wins. An admin who is neither -- the usual
+ * organizer account -- falls back to their sign-in email, so the schedule draft
+ * and the activity log read "admin@example.com" rather than "admin Ru3I2cq7",
+ * which nobody can match to a person. The uid is the last resort, for a caller
+ * resolving someone other than whoever is signed in.
+ */
 export async function resolveName(uid) {
   for (const role of ["judges", "competitors"]) {
     try {
@@ -72,6 +81,12 @@ export async function resolveName(uid) {
     } catch {
       // an admin who is neither a judge nor a competitor is normal
     }
+  }
+  try {
+    const user = getAuth().currentUser;
+    if (user?.uid === uid && user.email) return user.email;
+  } catch {
+    // no auth instance, as in a script; fall through to the uid
   }
   return `admin ${uid.slice(0, 8)}`;
 }
