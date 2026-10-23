@@ -544,6 +544,7 @@ function JudgingProgress() {
           team={scoring}
           round={round}
           judges={scoring.assigned.length ? scoring.assigned : allJudges}
+          cards={merged[scoring.teamId] ?? {}}
           onClose={() => setScoring(null)}
           onSaved={(message) => setToast({ severity: "success", message })}
         />
