@@ -28,6 +28,13 @@ vi.mock("../judge/assignmentEdits", async () => ({
   swapJudges: (...a) => mockEdits.swap(...a),
 }));
 
+// stubbed for the same reason; what it writes is tested in finalRoundService.test.js
+const mockSeatLate = vi.fn();
+vi.mock("../judge/finalRoundService", async () => ({
+  ...(await vi.importActual("../judge/finalRoundService")),
+  seatLateFinalJudge: (...a) => mockSeatLate(...a),
+}));
+
 const card = { problem: 7, innovation: 7, impact: 7, viability: 4, pitch_quality: 4 };
 const NAMES = { j1: "Priya Raman", j2: "Sam Whitaker" };
 // the roster on a schedule entry carries each judge's id and cached name
@@ -134,6 +141,57 @@ test("the final round shows the finalists and their own panel, not the first rou
   expect(screen.getByText(/Rice 011/)).toBeInTheDocument();
   expect(screen.getByText(/waiting on Sam Whitaker$/)).toBeInTheDocument();
   expect(screen.getByText(/Check the panel is in the room\./)).toBeInTheDocument();
+});
+
+describe("adding a judge to a live final round", () => {
+  beforeEach(() => {
+    mockSeatLate.mockReset().mockResolvedValue({ ok: true, error: null, judgeName: "Priya Raman", teams: 1 });
+    db.setData("finalRound/teams", { a: { name: "Almanac" } });
+    db.setData("finalRound/active", true);
+  });
+
+  const showFinal = () => {
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Round" }));
+    fireEvent.click(screen.getByRole("option", { name: "Final round" }));
+  };
+
+  test("is offered only in the final round, and only while it is open", () => {
+    renderPage(<JudgingProgress />);
+    expect(screen.queryByRole("button", { name: "Add a judge" })).not.toBeInTheDocument();
+    showFinal();
+    expect(screen.getByRole("button", { name: "Add a judge" })).toBeInTheDocument();
+    act(() => db.setData("finalRound/active", false));
+    expect(screen.queryByRole("button", { name: "Add a judge" })).not.toBeInTheDocument();
+  });
+
+  test("offers only judges missing from a panel, and seats the one picked", async () => {
+    renderPage(<JudgingProgress />);
+    showFinal();
+    fireEvent.click(screen.getByRole("button", { name: "Add a judge" }));
+    const dialog = within(await screen.findByRole("dialog"));
+
+    // Sam is already on Almanac's panel
+    fireEvent.mouseDown(dialog.getByLabelText("Judge"));
+    const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(options).toEqual(["Priya Raman"]);
+    fireEvent.click(screen.getByRole("option", { name: "Priya Raman" }));
+
+    fireEvent.click(dialog.getByRole("button", { name: "Add to final round" }));
+    await waitFor(() => expect(mockSeatLate).toHaveBeenCalledWith({ judgeUid: "j1" }));
+    expect(await screen.findByText("Seated Priya Raman on 1 finalist and checked them in.")).toBeInTheDocument();
+  });
+
+  test("a refusal stays open and says why", async () => {
+    mockSeatLate.mockResolvedValue({ ok: false, error: "The final round is not open, so there is nobody to seat them on." });
+    renderPage(<JudgingProgress />);
+    showFinal();
+    fireEvent.click(screen.getByRole("button", { name: "Add a judge" }));
+    const dialog = within(await screen.findByRole("dialog"));
+    fireEvent.mouseDown(dialog.getByLabelText("Judge"));
+    fireEvent.click(await screen.findByRole("option", { name: "Priya Raman" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Add to final round" }));
+    expect(await dialog.findByText(/nobody to seat them on/)).toBeInTheDocument();
+  });
 });
 
 test("a card that arrives is counted without a reload", () => {

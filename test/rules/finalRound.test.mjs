@@ -9,8 +9,8 @@
  */
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { ref, get, set } from "firebase/database";
-import { makeTestEnv, seed, baseWorld, finalAssignment } from "./helpers.mjs";
+import { ref, get, set, update } from "firebase/database";
+import { makeTestEnv, seed, baseWorld, finalAssignment, scoreCard } from "./helpers.mjs";
 
 let testEnv;
 
@@ -139,6 +139,34 @@ describe("a finalist team sees its own slot", () => {
   test("an admin writing a well-formed slot succeeds", async () => {
     await assertSucceeds(
       set(ref(db("admin"), "teams/team1/finalSlot"), { room: "Rice 011", timeslot: "Slot 2" })
+    );
+  });
+});
+
+describe("seating a judge who arrives after the final round is published", () => {
+  // the update seatLateFinalJudge writes: a check-in, an assignment per
+  // finalist, and a place on each standing's panel
+  const seatJudge1 = () =>
+    update(ref(db("admin")), {
+      "judges/judge1/checkedIn": true,
+      "judges/judge1/finalAssignments/team1": finalAssignment("team1"),
+      "finalRound/teams/team1/panel/judge1": true,
+    });
+
+  test("an admin can seat them, and they can then file a final card", async () => {
+    const card = scoreCard({ judgeUid: "judge1", teamId: "team1" });
+    await assertFails(set(ref(db("judge1"), "scores/final/team1/judge1"), card));
+
+    await assertSucceeds(seatJudge1());
+    await assertSucceeds(set(ref(db("judge1"), "scores/final/team1/judge1"), card));
+  });
+
+  test("a judge cannot seat themselves", async () => {
+    await assertFails(
+      update(ref(db("judge1")), {
+        "judges/judge1/finalAssignments/team1": finalAssignment("team1"),
+        "finalRound/teams/team1/panel/judge1": true,
+      })
     );
   });
 });

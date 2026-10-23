@@ -31,6 +31,7 @@ import {
   unassignJudgeFromTeam,
   swapJudges,
 } from "../judge/assignmentEdits";
+import { seatLateFinalJudge } from "../judge/finalRoundService";
 
 const STATUS_CHIP = {
   [TEAM_UNJUDGED]: { label: "No scores", color: "error" },
@@ -161,6 +162,83 @@ function ReassignDialog({ team, judges, onClose, onSaved }) {
   );
 }
 
+/**
+ * Seat a judge who turned up after the final round was published.
+ *
+ * Republishing is the only other way onto a final round panel, and it clears
+ * every final card already filed. This seats one judge on every finalist and
+ * checks them in, without touching anybody else.
+ */
+function LateFinalJudgeDialog({ judges, onClose, onSaved }) {
+  const [target, setTarget] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await seatLateFinalJudge({ judgeUid: target });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(
+        `Seated ${result.judgeName} on ${result.teams} finalist${result.teams === 1 ? "" : "s"} and checked them in.`
+      );
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>
+        <Typography variant="h3" component="div">
+          Add a judge to the final round
+        </Typography>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={1.75}>
+          <Alert severity="info" sx={{ py: 0.25 }}>
+            Seats them on every finalist and checks them in. Scores already submitted are not
+            affected, and results do not wait on a team they arrived too late to score.
+          </Alert>
+
+          <TextField
+            select
+            label="Judge"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            fullWidth
+            helperText={judges.length ? undefined : "Every registered judge is already on every panel."}
+          >
+            {judges.map((judge) => (
+              <MenuItem key={judge.judgeId} value={judge.judgeId}>
+                {judge.judgeName}
+                {judge.checkedIn ? "" : " (not checked in)"}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {error && <Alert severity="error">{error}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} disabled={busy} variant="outlined">
+          Cancel
+        </Button>
+        <Button onClick={run} disabled={busy || !target} variant="contained">
+          {busy ? "Saving…" : "Add to final round"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function JudgingProgress() {
   const [teams, setTeams] = useState({});
   const [judges, setJudges] = useState({});
@@ -175,6 +253,7 @@ function JudgingProgress() {
   const [toast, setToast] = useState(null);
   const [reassigning, setReassigning] = useState(null);
   const [scoring, setScoring] = useState(null);
+  const [seatingLate, setSeatingLate] = useState(false);
 
   usePageTitle("Judging progress");
 
@@ -250,6 +329,16 @@ function JudgingProgress() {
     [judges]
   );
 
+  // anyone missing from at least one finalist's panel -- seating them again
+  // fills in the gaps and leaves the seats they already have as they are
+  const lateJudgeChoices = useMemo(() => {
+    const finalists = Object.keys(finalRoundTeams ?? {});
+    return allJudges.filter((judge) => {
+      const seats = judges[judge.judgeId]?.finalAssignments ?? {};
+      return finalists.some((teamId) => !seats[teamId]);
+    });
+  }, [allJudges, judges, finalRoundTeams]);
+
   const needle = search.trim().toLowerCase();
   const visibleTeams = needle
     ? teamRows.filter(
@@ -324,12 +413,21 @@ function JudgingProgress() {
       </Tabs>
 
       <FilterBar>
-        <SearchField
-          size="small"
-          placeholder={tab === 0 ? "Search teams or rooms" : "Search judges"}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <SearchField
+              size="small"
+              placeholder={tab === 0 ? "Search teams or rooms" : "Search judges"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </Box>
+          {final && finalRoundTeams && (
+            <Button variant="outlined" onClick={() => setSeatingLate(true)} sx={{ flexShrink: 0 }}>
+              Add a judge
+            </Button>
+          )}
+        </Stack>
       </FilterBar>
 
       {tab === 0 ? (
@@ -428,6 +526,14 @@ function JudgingProgress() {
           team={reassigning}
           judges={allJudges}
           onClose={() => setReassigning(null)}
+          onSaved={(message) => setToast({ severity: "success", message })}
+        />
+      )}
+
+      {seatingLate && (
+        <LateFinalJudgeDialog
+          judges={lateJudgeChoices}
+          onClose={() => setSeatingLate(false)}
           onSaved={(message) => setToast({ severity: "success", message })}
         />
       )}

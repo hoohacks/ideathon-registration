@@ -26,6 +26,7 @@ const {
   readLiveFinalBasis,
   publishFinalRound,
   deactivateFinalRound,
+  seatLateFinalJudge,
   subscribeToFinalRoundActive,
   subscribeToFinalRoundStandings,
 } = await import("./finalRoundService");
@@ -584,6 +585,59 @@ describe("closing the round", () => {
   test("only an admin can close it", async () => {
     db.setData("admins", null);
     await expect(deactivateFinalRound()).rejects.toThrow("Only an admin can deactivate the final round");
+  });
+});
+
+describe("seating a late judge", () => {
+  beforeEach(async () => {
+    const { plan } = await planFinalRound();
+    await publishFinalRound(plan);
+  });
+
+  test("seats them on every finalist and checks them in, leaving everyone else's cards alone", async () => {
+    db.setData("scores/final/t1/j1", card(9));
+    const j1Before = db.getData("judges/j1/finalAssignments");
+
+    await expect(seatLateFinalJudge({ judgeUid: "j2" })).resolves.toEqual({
+      ok: true, error: null, judgeName: "Grace", teams: 2,
+    });
+
+    expect(db.getData("judges/j2/checkedIn")).toBe(true);
+    expect(db.getData("judges/j2/finalAssignments")).toEqual({
+      t1: { teamId: "t1", teamName: "Lantern", room: "Rice 011", timeslot: "Slot 1" },
+      t2: { teamId: "t2", teamName: "Circles", room: "Rice 011", timeslot: "Slot 2" },
+    });
+    expect(db.getData("finalRound/teams/t1/panel")).toEqual({ j1: true, j3: true, j2: true });
+    expect(db.getData("finalRound/teams/t2/panel")).toEqual({ j1: true, j3: true, j2: true });
+    expect(db.getData("scores/final/t1/j1")).toEqual(card(9));
+    expect(db.getData("judges/j1/finalAssignments")).toEqual(j1Before);
+  });
+
+  test("seating someone already seated changes nothing", async () => {
+    const before = db.getData("finalRound/teams");
+    expect((await seatLateFinalJudge({ judgeUid: "j1" })).ok).toBe(true);
+    expect(db.getData("finalRound/teams")).toEqual(before);
+  });
+
+  test("refuses when the round is closed", async () => {
+    await deactivateFinalRound();
+    const result = await seatLateFinalJudge({ judgeUid: "j2" });
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/not open/) });
+    expect(db.getData("judges/j2/finalAssignments")).toBeNull();
+    expect(db.getData("judges/j2/checkedIn")).toBeNull();
+  });
+
+  test("refuses a judge who is not registered, writing nothing", async () => {
+    const result = await seatLateFinalJudge({ judgeUid: "nobody" });
+    expect(result).toEqual({ ok: false, error: "That judge is not registered." });
+    expect(db.getData("judges/nobody")).toBeNull();
+  });
+
+  test("only an admin can do it", async () => {
+    db.setData("admins", null);
+    await expect(seatLateFinalJudge({ judgeUid: "j2" })).rejects.toThrow(
+      "Only an admin can add a judge to the final round"
+    );
   });
 });
 

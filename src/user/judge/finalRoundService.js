@@ -492,6 +492,58 @@ export async function deactivateFinalRound() {
 }
 
 /**
+ * Seat a judge on every finalist of a final round that is already live, and
+ * check them in.
+ *
+ * The panels are fixed at publish, and republishing is the only other way to
+ * change one -- which clears /scores/final, so a judge who walks in after the
+ * round has started could only be added by throwing away every card already
+ * filed. This writes the same two things publish writes for a seated judge,
+ * and nothing else: their finalAssignments (what the rules treat as proof of
+ * assignment) and their place on each standing's panel (what the results page
+ * waits on). Nobody else's assignments or cards are touched, so there is no
+ * restore point to take.
+ *
+ * Being seated is not being waited on: the results page waits only on panel
+ * judges who have filed a final card, so a judge who arrives after slot 1 does
+ * not hold that team's result open.
+ *
+ * Returns { ok, error?, judgeName, teams }. Throws only if the caller is not an
+ * admin.
+ */
+export async function seatLateFinalJudge({ judgeUid }) {
+  await requireAdmin("add a judge to the final round");
+
+  const [activeSnap, standingsSnap, judgeSnap] = await Promise.all([
+    get(ref(database, "finalRound/active")),
+    get(ref(database, "finalRound/teams")),
+    get(ref(database, `judges/${judgeUid}`)),
+  ]);
+
+  if (activeSnap.val() !== true) {
+    return { ok: false, error: "The final round is not open, so there is nobody to seat them on." };
+  }
+  if (!judgeSnap.exists()) return { ok: false, error: "That judge is not registered." };
+
+  const standings = Object.entries(standingsSnap.val() ?? {});
+  if (!standings.length) return { ok: false, error: "The final round has no finalists." };
+
+  const updates = { [`judges/${judgeUid}/checkedIn`]: true };
+  for (const [teamId, standing] of standings) {
+    updates[`judges/${judgeUid}/finalAssignments/${teamId}`] = {
+      teamId,
+      teamName: standing?.name ?? "Unnamed Team",
+      room: standing?.room ?? "",
+      timeslot: standing?.timeslot ?? "",
+    };
+    updates[`finalRound/teams/${teamId}/panel/${judgeUid}`] = true;
+  }
+
+  await update(ref(database), updates);
+  return { ok: true, error: null, judgeName: judgeNameOf(judgeSnap.val()), teams: standings.length };
+}
+
+/**
  * Whether the final round is open. Readable by anyone signed in — it is the
  * only part of /finalRound that is.
  */
