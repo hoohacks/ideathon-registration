@@ -205,7 +205,8 @@ function LateFinalJudgeDialog({ judges, onClose, onSaved }) {
         <Stack spacing={1.75}>
           <Alert severity="info" sx={{ py: 0.25 }}>
             Seats them on every finalist and checks them in. Scores already submitted are not
-            affected, and results do not wait on a team they arrived too late to score.
+            affected. Results lists any team they arrived too late to score as still owed, so
+            close the final round once they are done.
           </Alert>
 
           <TextField
