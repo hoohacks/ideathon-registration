@@ -381,13 +381,18 @@ function Assignments() {
     };
   }, [finalRoundActive, canViewAssignments]);
 
-  const remaining = useMemo(
-    () =>
-      personalAssignments.filter(
-        (a) => !scoredTeamIds.has(a.id) && !pendingTeamIdsByRound[FIRST_ROUND].has(a.id)
-      ).length,
-    [personalAssignments, scoredTeamIds, pendingTeamIdsByRound]
-  );
+  // Both rounds, and only cards that have landed. This counted the first round
+  // alone, so it said "All teams scored" over five unscored finalists -- and
+  // counted a card still queued on the device as scored, while the banner
+  // under it said the same card had not been sent.
+  const progress = useMemo(() => {
+    const firstScored = personalAssignments.filter((a) => scoredTeamIds.has(a.id)).length;
+    const finalScored = finalAssignments.filter((t) => finalRoundScoredTeamIds.has(t.id)).length;
+    return {
+      scored: firstScored + finalScored,
+      total: personalAssignments.length + finalAssignments.length,
+    };
+  }, [personalAssignments, scoredTeamIds, finalAssignments, finalRoundScoredTeamIds]);
 
   // the first card on each list still to score -- the lists are already in
   // presentation order -- so exactly one card per round reads as "now"
@@ -435,11 +440,8 @@ function Assignments() {
             alignItems: { xs: "flex-start", sm: "center" }
           }}>
           <Typography variant="h1">Judging</Typography>
-          {canViewAssignments && personalAssignments.length > 0 && (
-            <ScoredProgress
-              scored={personalAssignments.length - remaining}
-              total={personalAssignments.length}
-            />
+          {canViewAssignments && progress.total > 0 && (
+            <ScoredProgress scored={progress.scored} total={progress.total} />
           )}
         </Stack>
 
@@ -519,7 +521,11 @@ function Assignments() {
               ) : personalAssignments.length === 0 ? (
                 <Card sx={{ p: 3 }}>
                   <Typography variant="body2" align="center">
-                    No assignments yet. They appear once an admin generates the schedule.
+                    {/* a judge seated only on the final round is past the
+                        first round, not waiting for it to be scheduled */}
+                    {finalAssignments.length
+                      ? "No first round teams for you. You are judging the final round."
+                      : "No assignments yet. They appear once an admin generates the schedule."}
                   </Typography>
                 </Card>
               ) : (

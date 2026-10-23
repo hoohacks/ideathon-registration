@@ -73,3 +73,29 @@ test("editing opens on the card as filed and saves the change under the same jud
     problem: 8, innovation: 7, impact: 9, viability: 4, pitch_quality: 4, fundable: true, judgeUid: "judge-1",
   }));
 });
+
+describe("the progress line", () => {
+  test("counts the final round as well as the first", async () => {
+    db.setData("finalRound/active", true);
+    db.setData("judges/judge-1/finalAssignments", {
+      t1: { teamId: "t1", teamName: "Rootstock", room: "Rice 011", timeslot: "Slot 1" },
+    });
+    db.setData("scores/first/t2/judge-1", { ...filed, teamId: "t2", teamName: "Kindling" });
+    renderPage(<Assignments />, judgeAuth);
+    // both first-round cards are in; the final card is not
+    expect(await screen.findByText("2 of 3 scored")).toBeInTheDocument();
+    expect(screen.queryByText("All teams scored")).not.toBeInTheDocument();
+  });
+
+  test("a final-round-only judge still gets one", async () => {
+    db.setData("judges/judge-1/teamAssignments", null);
+    db.setData("finalRound/active", true);
+    db.setData("judges/judge-1/finalAssignments", {
+      t1: { teamId: "t1", teamName: "Rootstock", room: "Rice 011", timeslot: "Slot 1" },
+    });
+    renderPage(<Assignments />, judgeAuth);
+    expect(await screen.findByText("0 of 1 scored")).toBeInTheDocument();
+    // and is not told to wait for a schedule that was generated long ago
+    expect(screen.getByText("No first round teams for you. You are judging the final round.")).toBeInTheDocument();
+  });
+});
