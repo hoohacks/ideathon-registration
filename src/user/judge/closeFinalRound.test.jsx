@@ -84,3 +84,13 @@ test("a refused close is shown, not swallowed", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Close final round" }));
   expect(await screen.findByText(/Could not create a restore point/)).toBeInTheDocument();
 });
+
+test("a close that goes through says so", async () => {
+  await openClose();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.change(screen.getByLabelText('Type "close final round" to confirm'), {
+    target: { value: "close final round" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Close final round" }));
+  expect(await screen.findByText("Final round closed. Results now shows the final standings.")).toBeInTheDocument();
+});

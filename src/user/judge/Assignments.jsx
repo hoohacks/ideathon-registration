@@ -253,7 +253,16 @@ function Assignments() {
     setFinalRoundError(null);
     try {
       const result = await deactivateFinalRound();
-      if (!result.ok) setFinalRoundError(result.error || "Failed to close the final round.");
+      if (!result.ok) {
+        setFinalRoundError(result.error || "Failed to close the final round.");
+      } else {
+        // the button just turns back into "Plan final round", which on its own
+        // does not say whether the close went through
+        setToast({
+          severity: "success",
+          message: "Final round closed. Results now shows the final standings.",
+        });
+      }
     } catch (err) {
       console.error("Failed to deactivate final round:", err);
       setFinalRoundError(err.message || "Failed to close the final round.");
