@@ -94,7 +94,9 @@ test("a final-round-only judge gets cards, despite judging no first round", asyn
   await expectPagePainted(page);
 
   await expect(page.getByRole("heading", { name: "First round" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/No assignments yet/)).toBeVisible();
+  // the schedule is out and the final round is open, so they are not told to
+  // wait for a schedule, nor promised anything about a final already published
+  await expect(page.getByText("No first round teams for you.", { exact: true })).toBeVisible();
 
   await expect(page.getByRole("heading", { name: "Final round" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/No final round assignments for you/)).toHaveCount(0);
