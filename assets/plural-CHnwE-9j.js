@@ -1,0 +1,1 @@
+function e(e,t,n=`${t}s`){return`${e} ${e===1?t:n}`}function t(e,t,n){return e===1?t:n}export{e as n,t};
