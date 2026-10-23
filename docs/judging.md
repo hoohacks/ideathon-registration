@@ -150,5 +150,14 @@ closes the tab, the card sits on their device and Judging progress shows the tea
 as unjudged. The browser's leave warning is armed whenever something is queued,
 and only then.
 
+**A judge can correct their own card.** A scored team shows **Edit score**,
+which opens on the card as filed; submitting replaces it. A card still saved
+on the device stays locked until it has sent. Final round cards can be edited
+until the round is closed.
+
+**Record score** files a card under whichever judge you pick. If that judge
+already has one, it says so and the button reads **Replace score**, because
+recording writes over their card.
+
 The paper fallback is **Record score** on Judging progress, and the printable
 room sheets.
