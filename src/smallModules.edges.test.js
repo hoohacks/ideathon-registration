@@ -1,7 +1,7 @@
 /**
  * Edge cases for the small shared helpers: merging a person's role records,
  * the admin check's wording, the activity feed's one-line change, the judge
- * picker's order, assignment lists, the staff link, past winners and the
+ * picker's order, assignment lists, past winners and the
  * restore-point diff.
  */
 vi.mock("./firebase.js", () => ({ database: {} }));
@@ -14,7 +14,6 @@ const { mergeRoleProfiles, personName, requireAdmin, isAdmin } = await import(".
 const { describeChange } = await import("./user/admin/activity/describeChange");
 const { judgePickerOptions } = await import("./user/judge/judgeRoles");
 const { assignmentList, rosterOf } = await import("./user/judge/assignmentList");
-const { STAFF_PARAM, isStaffEntrance } = await import("./registrationWindow");
 const { diffSnapshot } = await import("./user/admin/danger/snapshotDiff");
 
 describe("merging a person's records", () => {
@@ -119,17 +118,6 @@ describe("assignment lists", () => {
     expect(rosterOf({ judges: [null, { judgeName: "Nobody" }, { judgeId: "j1" }] })).toEqual([{ judgeId: "j1" }]);
     expect(rosterOf({ judges: { a: { judgeId: "j2" }, b: null } })).toEqual([{ judgeId: "j2" }]);
     expect(rosterOf(undefined)).toEqual([]);
-  });
-});
-
-describe("the staff link", () => {
-  test("is ?staff, with or without a value, and nothing else", () => {
-    expect(STAFF_PARAM).toBe("staff");
-    expect(isStaffEntrance("?staff")).toBe(true);
-    expect(isStaffEntrance("?a=1&staff=1")).toBe(true);
-    expect(isStaffEntrance("?staffer")).toBe(false);
-    expect(isStaffEntrance("")).toBe(false);
-    expect(isStaffEntrance(undefined)).toBe(false);
   });
 });
 

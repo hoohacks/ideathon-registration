@@ -1,5 +1,7 @@
 /**
- * Whether the doors are open.
+ * Whether student registration is open. It gates only the competitor form:
+ * sign-in and judge sign-up are never closed, so closing registration stops new
+ * competitors, not the people who already have an account.
  *
  * This is a build-time flag rather than something in `/config`, and the reason
  * is the one place it has to work: a person who is not signed in. The rules
@@ -24,16 +26,3 @@
  * no role and see nothing.
  */
 export const REGISTRATION_OPEN = import.meta.env.VITE_REGISTRATION_OPEN === "true";
-
-/**
- * The way in while the doors are shut.
- *
- * Organizers still have to reach the control panel to set the event up, and
- * signing in is how. `#/login?staff` shows the form. Obscurity rather than a
- * secret: anyone who guesses it still faces the same rules as everybody else.
- */
-export const STAFF_PARAM = "staff";
-
-export function isStaffEntrance(search) {
-  return new URLSearchParams(search ?? "").has(STAFF_PARAM);
-}

@@ -42,24 +42,3 @@ describe("which way it fails", () => {
     expect((await windowWith("true")).REGISTRATION_OPEN).toBe(true);
   });
 });
-
-describe("the way in while the doors are shut", async () => {
-  const { isStaffEntrance } = await import("./registrationWindow");
-
-  test("the parameter lets an organizer reach the sign-in form", () => {
-    expect(isStaffEntrance("?staff")).toBe(true);
-    expect(isStaffEntrance("?staff=1")).toBe(true);
-    expect(isStaffEntrance("?next=/x&staff")).toBe(true);
-  });
-
-  test("an ordinary visitor does not have it", () => {
-    expect(isStaffEntrance("")).toBe(false);
-    expect(isStaffEntrance(undefined)).toBe(false);
-    expect(isStaffEntrance("?other=1")).toBe(false);
-  });
-
-  test("a near miss is not it, so a guess has to be exact", () => {
-    expect(isStaffEntrance("?staffing=1")).toBe(false);
-    expect(isStaffEntrance("?Staff")).toBe(false);
-  });
-});

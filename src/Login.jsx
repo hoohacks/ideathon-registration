@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "./App.jsx";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import {
   Alert,
   Box,
@@ -18,24 +18,13 @@ import { EVENT } from "./eventInfo";
 import { AuthCard, PublicShell } from "./registrationUi";
 import { PiEye, PiEyeSlash } from "react-icons/pi";
 import { PAST_WINNERS } from "./winners";
-import { REGISTRATION_OPEN, isStaffEntrance } from "./registrationWindow";
-import ClosedNotice from "./ClosedNotice";
-
 // page title
 import usePageTitle from "./usePageTitle.js";
 
+// Never gated by the registration window. Closing registration stops new
+// accounts; the people who already have one still need to get in, and signing
+// in creates nothing.
 export default function LoginPage() {
-  // Organizers still have to reach the control panel while the doors are shut,
-  // and signing in is how. `#/login?staff` is the way through.
-  const { search } = useLocation();
-  if (!REGISTRATION_OPEN && !isStaffEntrance(search)) {
-    return <ClosedNotice what="Sign-in" />;
-  }
-
-  return <SignInForm />;
-}
-
-function SignInForm() {
   const { handleLogin } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState("");

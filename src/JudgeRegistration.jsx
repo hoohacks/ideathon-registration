@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
 // firebase
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
@@ -26,8 +26,6 @@ import {
 import { EVENT } from "./eventInfo";
 import { SHIFTS } from "./mentorShifts";
 import { PAST_WINNERS, PAST_WINNERS_YEAR } from "./winners";
-import { REGISTRATION_OPEN, isStaffEntrance } from "./registrationWindow";
-import ClosedNotice from "./ClosedNotice";
 import {
   cleanName,
   focusField,
@@ -233,30 +231,11 @@ function problemsFor(values, recoveryUser) {
   return problems;
 }
 
-const JudgeRegistration = ({ recoveryUser, onComplete } = {}) => {
-  // Organizers need accounts of their own before the doors open, and nothing
-  // in the app can make one for them: creating a person from the control panel
-  // requires an organizer already signed in, which is the very thing being
-  // bootstrapped. `#/judge-registration?staff` is the same entrance the
-  // sign-in page uses, for the same reason -- an organizer is a judge record
-  // with the admin flag set on top, so this is the form they need.
-  //
-  // The competitor form deliberately does NOT have this. Every door left open
-  // while the doors are shut is another record a guessed URL can create, and
-  // an organizer has no use for a competitor record.
-  //
-  // Obscurity, not security: somebody who guesses the parameter can create a
-  // judge record and nothing else. They cannot score -- isRound1Judge is
-  // admin-set -- and the rules show them no team they are not assigned to.
-  const { search } = useLocation();
-  if (!recoveryUser && !REGISTRATION_OPEN && !isStaffEntrance(search)) {
-    return <ClosedNotice what="Judge and mentor sign-up" />;
-  }
-
-  return <JudgeRegistrationForm recoveryUser={recoveryUser} onComplete={onComplete} />;
-};
-
-const JudgeRegistrationForm = ({ recoveryUser, onComplete }) => {
+// Never gated by the registration window. Judges and mentors are recruited and
+// added up to the day, organizers make their accounts here, and a judge record
+// on its own can do nothing: isRound1Judge is admin-set and the rules show it
+// no team it is not assigned to.
+const JudgeRegistration = ({ recoveryUser, onComplete }) => {
   const navigate = useNavigate();
   const { formRef, values, setValue, handleChange, collect } = useSyncedForm({ ...INITIAL, email: recoveryUser?.email ?? "" });
 

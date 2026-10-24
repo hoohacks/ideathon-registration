@@ -98,7 +98,7 @@ describe("competitor registration", () => {
   test("closed shows the notice instead of the form", () => {
     show(Registration);
 
-    expect(screen.getByText(/Registration is not open yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Registration is closed/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/First name/)).not.toBeInTheDocument();
   });
 
@@ -106,73 +106,34 @@ describe("competitor registration", () => {
     mockOpen = true;
     show(Registration);
 
-    expect(screen.queryByText(/is not open yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is closed/)).not.toBeInTheDocument();
     expect(screen.getByText("Student registration")).toBeInTheDocument();
-  });
-
-  /**
-   * The staff entrance is deliberately not wired to this form. An organizer
-   * needs a judge record, not a competitor one, and every door left open while
-   * the doors are shut is another record a guessed URL can create.
-   */
-  test("the staff entrance does not open this one", () => {
-    show(Registration, "/?staff");
-
-    expect(screen.getByText(/Registration is not open yet/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/First name/)).not.toBeInTheDocument();
   });
 });
 
 describe("judge and mentor sign-up", () => {
-  test("closed names itself, so the page is not mistaken for the other form", () => {
-    show(JudgeRegistration);
-
-    expect(screen.getByText(/Judge and mentor sign-up is not open yet/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/First name/)).not.toBeInTheDocument();
-  });
-
   /**
-   * Organizers need accounts of their own before the doors open, and nobody
-   * can make one for them: creating a person from the control panel needs an
-   * organizer already signed in, which is the thing being bootstrapped. The
-   * staff entrance is the same one the sign-in page uses, for the same reason.
+   * Judges and organizers are added up to the day, so closing registration
+   * leaves this form alone.
    */
-  test("closed, the staff entrance still reaches the form", () => {
-    show(JudgeRegistration, "/judge-registration?staff");
+  test("closed, everybody still gets the form", () => {
+    show(JudgeRegistration, "/judge-registration");
 
     expect(screen.getByLabelText(/First name/)).toBeInTheDocument();
-    expect(screen.queryByText(/is not open yet/)).not.toBeInTheDocument();
-  });
-
-  test("a near miss on the parameter does not open it", () => {
-    show(JudgeRegistration, "/judge-registration?staffing=1");
-    expect(screen.getByText(/Judge and mentor sign-up is not open yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/is closed/)).not.toBeInTheDocument();
   });
 });
 
 describe("signing in", () => {
-  test("closed, an ordinary visitor gets the notice", () => {
+  /**
+   * Registration closes before the event, while everybody already registered
+   * still has to get in. Signing in creates nothing, so it is never gated.
+   */
+  test("closed, everybody still gets the form", () => {
     show(Login);
 
-    expect(screen.getByText(/Sign-in is not open yet/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Email address/)).not.toBeInTheDocument();
-  });
-
-  /**
-   * Organizers have to reach the control panel to set the event up, and signing
-   * in is the only way. Without this the gate locks out the people who would
-   * lift it.
-   */
-  test("closed, the staff entrance still reaches the form", () => {
-    show(Login, "/login?staff");
-
     expect(screen.getByLabelText(/Email address/)).toBeInTheDocument();
-    expect(screen.queryByText(/is not open yet/)).not.toBeInTheDocument();
-  });
-
-  test("a near miss on the parameter does not open it", () => {
-    show(Login, "/login?staffing=1");
-    expect(screen.getByText(/Sign-in is not open yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/is closed/)).not.toBeInTheDocument();
   });
 
   test("open, everybody gets the form", () => {
@@ -182,11 +143,11 @@ describe("signing in", () => {
   });
 });
 
-test("the notice points somewhere useful rather than being a dead end", () => {
+test("the notice sends people who already registered to sign in", () => {
   const { container } = show(Registration);
 
   // the shell's own nav also has a "Sign in", so this is addressed by where it
-  // goes rather than by what it says: the staff entrance, not the gated one
-  expect(container.querySelector('a[href="#/login?staff"]')).toBeInTheDocument();
+  // goes: plain sign-in, which is never gated
+  expect(container.querySelector('a[href="#/login"]')).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /About the event/ })).toBeInTheDocument();
 });
