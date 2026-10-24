@@ -1,6 +1,7 @@
 /**
- * Whether the sign-up forms are open. Sign-in is never gated by this: closing
- * registration stops new accounts, not the people who already have one.
+ * Whether student registration is open. It gates only the competitor form:
+ * sign-in and judge sign-up are never closed, so closing registration stops new
+ * competitors, not the people who already have an account.
  *
  * This is a build-time flag rather than something in `/config`, and the reason
  * is the one place it has to work: a person who is not signed in. The rules
@@ -25,19 +26,3 @@
  * no role and see nothing.
  */
 export const REGISTRATION_OPEN = import.meta.env.VITE_REGISTRATION_OPEN === "true";
-
-/**
- * The way in while the doors are shut.
- *
- * Organizers need accounts of their own, and nothing in the app can make one
- * before an organizer exists. `#/judge-registration?staff` shows the judge form
- * (an organizer is a judge record with the admin flag on top). The competitor
- * form has no such entrance: no organizer is ever a competitor. Obscurity
- * rather than a secret: anyone who guesses it still faces the same rules as
- * everybody else.
- */
-export const STAFF_PARAM = "staff";
-
-export function isStaffEntrance(search) {
-  return new URLSearchParams(search ?? "").has(STAFF_PARAM);
-}

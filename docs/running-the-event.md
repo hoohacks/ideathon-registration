@@ -27,15 +27,13 @@ control panel's People tab, or on the Judges page, when they turn up.
 ## Opening and closing sign-ups
 
 Registration is **closed by default**, because the site goes live weeks before
-the event, and it should be closed again before the event so nobody new signs
-up. While closed, the student and judge forms show a "Registration is closed"
-page that points people to sign-in. Sign-in itself is never closed, so everyone
-already registered can still get in.
-
-One staff entrance still works while closed: `#/judge-registration?staff`
-reaches the judge form, for organizers (or late judges) who need an account. An
-organizer is a judge record with the admin flag on top; an existing organizer
-grants admin from the control panel. The student form has no staff entrance.
+the event, and it should be closed again before the event so no new students
+sign up. While closed, the student form shows a "Registration is closed" page
+that points people to sign-in. Sign-in and the judge and mentor form
+(`#/judge-registration`) are never closed, so everyone already registered can
+still get in and judges and organizers can still be added. An organizer is a
+judge record with the admin flag on top; an existing organizer grants admin from
+the control panel.
 
 Opening or closing registration is a deploy setting, not an in-app switch. See
 [deployment](deployment.md#opening-registration).

@@ -72,7 +72,7 @@ jobs:
             echo "### Registration is CLOSED on this deploy" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Set the repository variable \`REGISTRATION_OPEN\` to \`true\` and re-run to open it." >> $GITHUB_STEP_SUMMARY
-            echo "Sign-in stays open. New judge or organizer accounts: \`#/judge-registration?staff\`." >> $GITHUB_STEP_SUMMARY
+            echo "Sign-in and judge sign-up stay open." >> $GITHUB_STEP_SUMMARY
           fi
 
       # The rules go out with every deploy, from the same ref as the site, so
@@ -175,7 +175,7 @@ jobs:
           if [ "$REGISTRATION_OPEN" = "true" ]; then
             DOORS="Open"
           else
-            DOORS="Closed (sign-in stays open; judge accounts at #/judge-registration?staff)"
+            DOORS="Closed to students (sign-in and judge sign-up stay open)"
           fi
 
           # Discord caps an embed description at 4096 characters; release notes

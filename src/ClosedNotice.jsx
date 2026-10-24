@@ -3,7 +3,7 @@ import { EVENT } from "./eventInfo";
 import { Hero, PublicShell } from "./registrationUi";
 
 /**
- * What the public sees on a sign-up form while registration is closed.
+ * What the public sees on the student form while registration is closed.
  *
  * The site is live both before sign-ups open and after they close, so this
  * says only that the form is closed, not which side of the window we are on,
@@ -14,12 +14,12 @@ import { Hero, PublicShell } from "./registrationUi";
  * comes back when it opens should recognise the page, not wonder whether they
  * are on the right site.
  */
-export default function ClosedNotice({ what = "Registration" }) {
+export default function ClosedNotice() {
   return (
     <PublicShell>
       <Hero
         eyebrow={`${EVENT.name} ${EVENT.year}`}
-        title={`${what} is closed`}
+        title="Registration is closed"
         facts={[EVENT.dateLabel, EVENT.hours, EVENT.venue]}
       >
         We are not taking new sign-ups right now. If you already registered,

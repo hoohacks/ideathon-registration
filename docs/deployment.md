@@ -50,8 +50,8 @@ Only needed once per project.
 1. Enable **Email/Password** sign-in.
 2. Set the `GCP_SA_KEY` secret and `FIREBASE_PROJECT` variable (above). The first
    release then publishes `database.rules.json` and `storage.rules`.
-3. **Create the first admin by hand.** Register an account (use
-   `#/judge-registration?staff` if registration is closed), copy its uid from the
+3. **Create the first admin by hand.** Register an account through the
+   judge form (`#/judge-registration`), copy its uid from the
    Authentication tab, then add `admins/<uid>: true` in the database.
 
 Step 3 cannot be done in the app: writing `/admins` requires already being an
@@ -59,9 +59,9 @@ admin. Every later organizer is granted admin from the control panel.
 
 ## Opening registration
 
-Registration is closed by default: a build with nothing set closes both sign-up
-forms. Sign-in is never closed, so people who already registered can always get
-in. To open registration, set the repository variable `REGISTRATION_OPEN` to
+Registration is closed by default: a build with nothing set closes the student
+form. Sign-in and judge sign-up are never closed, so people who already
+registered can always get in and judges can still be added. To open registration, set the repository variable `REGISTRATION_OPEN` to
 `true` (Settings, Secrets and variables, Actions, Variables), then run Deploy. To
 close it again, before the event, set it to anything else and redeploy. No code
 change is needed.
