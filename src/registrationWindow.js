@@ -1,5 +1,6 @@
 /**
- * Whether the doors are open.
+ * Whether the sign-up forms are open. Sign-in is never gated by this: closing
+ * registration stops new accounts, not the people who already have one.
  *
  * This is a build-time flag rather than something in `/config`, and the reason
  * is the one place it has to work: a person who is not signed in. The rules
@@ -28,9 +29,12 @@ export const REGISTRATION_OPEN = import.meta.env.VITE_REGISTRATION_OPEN === "tru
 /**
  * The way in while the doors are shut.
  *
- * Organizers still have to reach the control panel to set the event up, and
- * signing in is how. `#/login?staff` shows the form. Obscurity rather than a
- * secret: anyone who guesses it still faces the same rules as everybody else.
+ * Organizers need accounts of their own, and nothing in the app can make one
+ * before an organizer exists. `#/judge-registration?staff` shows the judge form
+ * (an organizer is a judge record with the admin flag on top). The competitor
+ * form has no such entrance: no organizer is ever a competitor. Obscurity
+ * rather than a secret: anyone who guesses it still faces the same rules as
+ * everybody else.
  */
 export const STAFF_PARAM = "staff";
 

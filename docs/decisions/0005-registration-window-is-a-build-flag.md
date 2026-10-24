@@ -13,8 +13,10 @@ to know, could never read it.
 
 Whether registration is open is baked into the build from the repository
 variable `REGISTRATION_OPEN` (`src/registrationWindow.js`). A build with nothing
-set is closed. `?staff` entrances keep sign-in and the judge form reachable for
-organizers.
+set is closed. It gates only the two sign-up forms: sign-in is always open, so
+people who already registered can get in after sign-ups close. The judge form
+keeps a `?staff` entrance so organizers can still make accounts; the competitor
+form has none.
 
 ## Consequences
 

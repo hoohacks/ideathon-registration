@@ -24,18 +24,20 @@ Judge sign-up creates the account and the judge record. It does **not** mark
 anyone a first-round judge: a judge cannot grant themselves that. Mark them in the
 control panel's People tab, or on the Judges page, when they turn up.
 
-## Before sign-ups open
+## Opening and closing sign-ups
 
-Registration and sign-in are **closed by default**, because the site goes live
-weeks before the event. While closed, both forms and the login page show a "not
-open yet" page, and two staff entrances still work:
+Registration is **closed by default**, because the site goes live weeks before
+the event, and it should be closed again before the event so nobody new signs
+up. While closed, the student and judge forms show a "Registration is closed"
+page that points people to sign-in. Sign-in itself is never closed, so everyone
+already registered can still get in.
 
-- `#/login?staff` reaches the sign-in form.
-- `#/judge-registration?staff` reaches the judge form, for organizers who need an
-  account. An organizer is a judge record with the admin flag on top; an existing
-  organizer grants admin from the control panel.
+One staff entrance still works while closed: `#/judge-registration?staff`
+reaches the judge form, for organizers (or late judges) who need an account. An
+organizer is a judge record with the admin flag on top; an existing organizer
+grants admin from the control panel. The student form has no staff entrance.
 
-Opening registration is a deploy setting, not an in-app switch. See
+Opening or closing registration is a deploy setting, not an in-app switch. See
 [deployment](deployment.md#opening-registration).
 
 ## Before the day

@@ -59,10 +59,12 @@ admin. Every later organizer is granted admin from the control panel.
 
 ## Opening registration
 
-Registration and sign-in are closed by default: a build with nothing set produces
-a closed site. To open them, set the repository variable `REGISTRATION_OPEN` to
-`true` (Settings, Secrets and variables, Actions, Variables), then run Deploy. No
-code change is needed.
+Registration is closed by default: a build with nothing set closes both sign-up
+forms. Sign-in is never closed, so people who already registered can always get
+in. To open registration, set the repository variable `REGISTRATION_OPEN` to
+`true` (Settings, Secrets and variables, Actions, Variables), then run Deploy. To
+close it again, before the event, set it to anything else and redeploy. No code
+change is needed.
 
 The deploy workflow hands it to the build as `VITE_REGISTRATION_OPEN`. This is a
 build-time flag, not a database setting. See
